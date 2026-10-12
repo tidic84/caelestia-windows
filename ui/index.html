@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Ilot</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="island" class="collapsed">
+  <div class="island-clip">
+    <!-- état replié / survol -->
+    <div id="pill">
+      <div class="pill-mini">
+        <img class="mini-art" alt="">
+        <span class="eq"><i></i><i></i><i></i></span>
+        <span class="mini-clock">--:--</span>
+      </div>
+      <div class="pill-peek">
+        <div class="peek-media">
+          <img class="peek-art" alt="">
+          <div class="peek-text">
+            <div class="peek-title"></div>
+            <div class="peek-artist"></div>
+            <div class="peek-bar"><div></div></div>
+          </div>
+          <button class="icon-btn filled" data-media="toggle"><span class="ms play-icon">play_arrow</span></button>
+        </div>
+        <div class="peek-idle">
+          <span class="peek-clock">--:--</span>
+          <span class="peek-date"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- panneau ouvert -->
+    <div id="panel">
+      <nav id="tabs">
+        <div class="tab-ind"></div>
+        <button data-tab="home"><span class="ms">dashboard</span><span>Accueil</span></button>
+        <button data-tab="media"><span class="ms">music_note</span><span>Média</span></button>
+        <button data-tab="apps"><span class="ms">apps</span><span>Apps</span></button>
+        <button data-tab="clips"><span class="ms">content_paste</span><span>Presse-papiers</span></button>
+        <button data-tab="walls"><span class="ms">wallpaper</span><span>Fonds</span></button>
+      </nav>
+
+      <div id="pages">
+        <!-- ACCUEIL -->
+        <section class="page" data-page="home">
+          <div class="home-grid">
+            <div class="card clock-card">
+              <div class="big-clock"><span class="hh">--</span><span class="mm">--</span></div>
+              <div class="big-date"></div>
+            </div>
+            <div class="card cal-card">
+              <div class="cal-head">
+                <button class="icon-btn small" data-cal="-1">‹</button>
+                <span class="cal-title"></span>
+                <button class="icon-btn small" data-cal="1">›</button>
+              </div>
+              <div class="cal-grid"></div>
+            </div>
+            <div class="card home-media">
+              <div class="disc"><img class="disc-art" alt=""><span class="ms disc-ph">music_note</span></div>
+              <div class="hm-title">Rien en lecture</div>
+              <div class="hm-artist"></div>
+              <div class="controls">
+                <button class="icon-btn" data-media="prev"><span class="ms">skip_previous</span></button>
+                <button class="icon-btn filled" data-media="toggle"><span class="ms play-icon">play_arrow</span></button>
+                <button class="icon-btn" data-media="next"><span class="ms">skip_next</span></button>
+              </div>
+            </div>
+            <div class="card res-card">
+              <div class="gauge" data-g="cpu"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">memory</span><b>CPU</b><em>-</em></div>
+              <div class="gauge" data-g="mem"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">developer_board</span><b>RAM</b><em>-</em></div>
+              <div class="gauge" data-g="disk"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">hard_drive</span><b>C:</b><em>-</em></div>
+              <div class="gauge" data-g="bat" hidden><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">battery_full</span><b>Batt.</b><em>-</em></div>
+            </div>
+            <div class="card vol-card">
+              <button class="icon-btn" id="mute"><span class="ms vol-icon">volume_up</span></button>
+              <input type="range" class="slider" id="vol" min="0" max="100" value="50">
+              <span class="vol-val">50</span>
+            </div>
+            <div class="card session-card">
+              <button class="sess" data-sess="lock" title="Verrouiller"><span class="ms">lock</span></button>
+              <button class="sess" data-sess="sleep" title="Veille"><span class="ms">bedtime</span></button>
+              <button class="sess" data-sess="logout" data-confirm title="Déconnexion"><span class="ms">logout</span></button>
+              <button class="sess" data-sess="restart" data-confirm title="Redémarrer"><span class="ms">restart_alt</span></button>
+              <button class="sess danger" data-sess="shutdown" data-confirm title="Éteindre"><span class="ms">power_settings_new</span></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- MÉDIA -->
+        <section class="page" data-page="media">
+          <div class="mp-bg"></div>
+          <div class="mp">
+            <div class="mp-art"><img alt=""><span class="ms">music_note</span></div>
+            <div class="mp-info">
+              <span class="chip mp-app"></span>
+              <div class="mp-title">Rien en lecture</div>
+              <div class="mp-artist"></div>
+              <div class="mp-album"></div>
+              <div class="mp-seek">
+                <input type="range" class="slider" id="seek" min="0" max="1000" value="0">
+                <div class="mp-times"><span class="t-pos">0:00</span><span class="t-dur">0:00</span></div>
+              </div>
+              <div class="controls big">
+                <button class="icon-btn" data-media="prev"><span class="ms">skip_previous</span></button>
+                <button class="icon-btn filled" data-media="toggle"><span class="ms play-icon">play_arrow</span></button>
+                <button class="icon-btn" data-media="next"><span class="ms">skip_next</span></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- APPS -->
+        <section class="page" data-page="apps">
+          <label class="search">
+            <span class="ms">search</span>
+            <input id="q" placeholder="Rechercher une application…" autocomplete="off" spellcheck="false">
+          </label>
+          <div class="app-grid"></div>
+        </section>
+
+        <!-- PRESSE-PAPIERS -->
+        <section class="page" data-page="clips">
+          <div class="page-head">
+            <span class="clip-count">Historique vide</span>
+            <button class="text-btn" id="clip-clear"><span class="ms">delete</span>Effacer</button>
+          </div>
+          <div class="clip-list"></div>
+        </section>
+
+        <!-- FONDS D'ÉCRAN -->
+        <section class="page" data-page="walls">
+          <div class="page-head">
+            <span>Les couleurs suivent le fond d'écran</span>
+            <span>
+              <button class="text-btn" id="wall-refresh"><span class="ms">refresh</span>Actualiser</button>
+              <button class="text-btn" id="wall-folder"><span class="ms">folder_open</span>Dossier</button>
+            </span>
+          </div>
+          <div class="wall-grid"><div class="empty">Chargement…</div></div>
+        </section>
+      </div>
+    </div>
+  </div>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
