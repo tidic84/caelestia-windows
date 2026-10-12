@@ -26,12 +26,24 @@ pour ouvrir le panneau. Les couleurs suivent votre fond d'écran (Material You).
 | **Média** | Lecteur complet avec avance dans le morceau. Fonctionne avec tout ce que Windows voit (Spotify, navigateurs…) |
 | **Apps** | Toutes les applis du menu Démarrer (classiques et Store) avec icônes, recherche, navigation clavier. **Ctrl+Alt+Espace** l'ouvre directement |
 | **Presse-papiers** | Les 40 derniers textes copiés, un clic pour recopier |
-| **Fonds** | Vos images de `Images\Wallpapers` + celles de Windows ; choisir un fond recalcule la palette |
+| **Fonds** | Vos images de `Images\Wallpapers` + celles de Windows ; choisir un fond recalcule la palette. Avec **Wallpaper Engine**, un second onglet liste vos fonds WE |
 
 Autres comportements :
 - hors de l'îlot, les clics passent aux fenêtres en dessous ;
 - l'îlot se cache quand un jeu ou une vidéo est en plein écran ;
 - une icône dans la zone de notification permet de recharger ou de quitter.
+
+## Wallpaper Engine
+
+Si [Wallpaper Engine](https://store.steampowered.com/app/431960/) est installé,
+il est détecté automatiquement (toutes les bibliothèques Steam sont parcourues) :
+
+- l'onglet **Fonds** propose « Windows / Wallpaper Engine » et liste vos fonds
+  du Workshop, vos projets et ceux fournis avec WE, avec leur aperçu ;
+- un clic applique le fond via la commande officielle
+  `wallpaper32.exe -control openWallpaper` (écran 0) ;
+- quand WE tourne, la palette suit le fond WE affiché, et non le fond Windows
+  qu'il recouvre. Si vous changez de fond dans WE, l'îlot se recolore tout seul.
 
 ## Installation
 
@@ -68,6 +80,7 @@ Onglets : `home`, `media`, `apps`, `clips`, `walls` ; `?peek=1` montre l'état s
 - **Média** : `GlobalSystemMediaTransportControls` (WinRT).
 - **Volume** : Core Audio (`IAudioEndpointVolume`).
 - **Apps** : dossier virtuel `shell:AppsFolder`, icônes via `IShellItemImageFactory`.
+- **Wallpaper Engine** : lecture de `config.json` et des `project.json`, application via sa ligne de commande.
 - **Fonds** : `IDesktopWallpaper`, miniatures mises en cache dans `%LOCALAPPDATA%\Ilot\thumbs`.
 - **Couleurs** : [material-color-utilities](https://github.com/material-foundation/material-color-utilities),
   schéma *Tonal Spot* sombre ; les couleurs CSS sont des propriétés enregistrées

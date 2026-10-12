@@ -393,37 +393,112 @@ invoke('clips_get').then(renderClips);
 $('#clip-clear').addEventListener('click', () => invoke('clips_clear'));
 
 // ========================================================= fonds d'écran
+// deux sources : les fonds Windows et ceux de Wallpaper Engine (si installé)
+let wallSrc = 'win';
 let wallsLoaded = false;
-let currentWall = '';
+let we = { installed: false, running: false, current: '' };
 let currentThumb = '';
-async function loadWalls() {
+const wallCache = {};
+const KIND = { scene: 'Scène', video: 'Vidéo', web: 'Web', application: 'Appli' };
+const samePath = (a, b) => !!a && !!b && a.replace(/\//g, '\\').toLowerCase() === b.replace(/\//g, '\\').toLowerCase();
+
+function wallNote() {
+  $('.wall-note').textContent = wallSrc === 'win' && we.running
+    ? 'Masqué par Wallpaper Engine'
+    : we.installed ? '' : "Les couleurs suivent le fond d'écran";
+  $('#wall-folder').hidden = wallSrc !== 'win';
+}
+
+async function loadWalls(force) {
   wallsLoaded = true;
+  wallNote();
+  const src = wallSrc;
   const grid = $('.wall-grid');
-  grid.innerHTML = '<div class="empty">Chargement…</div>';
-  const list = await invoke('walls_get');
-  grid.innerHTML = list.length ? '' : '<div class="empty">Ajoutez des images dans Images\\Wallpapers.</div>';
+  if (force || !wallCache[src]) {
+    grid.innerHTML = '<div class="empty">Chargement…</div>';
+    wallCache[src] = await invoke(src === 'we' ? 'we_walls' : 'walls_get');
+    if (src !== wallSrc) return; // l'utilisateur a changé d'onglet entre-temps
+  }
+  renderWalls();
+}
+
+function renderWalls() {
+  const list = wallCache[wallSrc] || [];
+  const grid = $('.wall-grid');
+  grid.innerHTML = list.length ? '' : wallSrc === 'we'
+    ? '<div class="empty">Aucun fond Wallpaper Engine trouvé.</div>'
+    : '<div class="empty">Ajoutez des images dans Images\\Wallpapers.</div>';
   list.forEach(w => {
     const el = document.createElement('button');
-    el.className = 'wall' + (w.path.toLowerCase() === currentWall.toLowerCase() ? ' cur' : '');
-    el.title = w.path.split('\\').pop();
-    el.innerHTML = `<img src="${w.thumb}" alt=""><span class="ms">check</span><i class="spin"></i>`;
-    el.addEventListener('click', async () => {
-      if (el.classList.contains('cur') || $('.wall.applying')) return;
-      el.classList.add('applying');
-      // la palette part en même temps que le fondu de Windows
-      themeFrom(w.thumb);
-      const ok = await invoke('wall_set', { path: w.path });
-      el.classList.remove('applying');
-      if (!ok) { if (currentThumb) themeFrom(currentThumb); return; }
-      currentThumb = w.thumb;
-      currentWall = w.path;
-      $$('.wall').forEach(x => x.classList.toggle('cur', x === el));
-    });
+    const cur = wallSrc === 'we' ? samePath(w.path, we.current) : w.cur;
+    el.className = 'wall' + (cur ? ' cur' : '');
+    el.dataset.path = w.path;
+    el.innerHTML = `<img src="${w.thumb}" alt="" loading="lazy"><span class="ms">check</span><i class="spin"></i>`;
+    if (w.title) {
+      const cap = document.createElement('span');
+      cap.className = 'cap';
+      const b = document.createElement('b');
+      b.textContent = w.title;
+      cap.append(b);
+      if (KIND[w.kind]) cap.insertAdjacentHTML('beforeend', `<i>${KIND[w.kind]}</i>`);
+      el.append(cap);
+      el.title = w.title;
+    } else {
+      el.title = w.path.split('\\').pop();
+    }
+    el.addEventListener('click', () => pickWall(w, el));
     grid.append(el);
   });
 }
-$('#wall-refresh').addEventListener('click', loadWalls);
+
+async function pickWall(w, el) {
+  if (el.classList.contains('cur') || $('.wall.applying')) return;
+  el.classList.add('applying');
+  const isWe = wallSrc === 'we';
+  // la palette ne suit que le fond réellement visible
+  if (isWe || !we.running) themeFrom(w.thumb);
+  const ok = await invoke(isWe ? 'we_set' : 'wall_set', { path: w.path });
+  // WE met un instant à charger le fond : on garde l'indicateur un peu
+  if (isWe) await new Promise(r => setTimeout(r, 700));
+  el.classList.remove('applying');
+  if (!ok) { if (currentThumb) themeFrom(currentThumb); return; }
+  if (isWe) { we.current = w.path; we.running = true; }
+  else (wallCache.win || []).forEach(x => (x.cur = x === w));
+  if (isWe || !we.running) currentThumb = w.thumb;
+  $$('.wall').forEach(x => x.classList.toggle('cur', x === el));
+  wallNote();
+}
+
+$$('.seg button').forEach(b => b.addEventListener('click', () => {
+  if (b.dataset.src === wallSrc) return;
+  wallSrc = b.dataset.src;
+  $$('.seg button').forEach(x => x.classList.toggle('on', x === b));
+  loadWalls();
+}));
+$('#wall-refresh').addEventListener('click', () => loadWalls(true));
 $('#wall-folder').addEventListener('click', () => { invoke('walls_open_folder'); setState('collapsed'); });
+
+// fond actif (WE s'il tourne, sinon Windows) -> palette
+async function syncWall() {
+  we = await invoke('we_state');
+  $('.seg').hidden = !we.installed;
+  const w = await invoke('wall_current');
+  if (w && w.thumb !== currentThumb) {
+    currentThumb = w.thumb;
+    themeFrom(w.thumb);
+  }
+  if (wallsLoaded) { wallNote(); if (wallCache[wallSrc]) renderWalls(); }
+}
+// changement fait dans Wallpaper Engine, ou WE lancé / quitté
+listen('wall-changed', syncWall);
+(async () => {
+  await syncWall();
+  if (we.installed && we.running) {
+    wallSrc = 'we';
+    $$('.seg button').forEach(x => x.classList.toggle('on', x.dataset.src === 'we'));
+    if (wallsLoaded) loadWalls();
+  }
+})();
 
 // ======================================================== Material You
 const ROLES = {
@@ -460,12 +535,6 @@ try {
   const saved = JSON.parse(localStorage.getItem('palette') || 'null');
   if (saved) applyPalette(saved);
 } catch {}
-invoke('wall_current').then(w => {
-  if (!w) return;
-  currentWall = w.path;
-  currentThumb = w.thumb;
-  themeFrom(w.thumb);
-});
 tickClock();
 renderCal();
 showTab('home');

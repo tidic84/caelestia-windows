@@ -31,6 +31,10 @@ const EXTS: &[&str] = &["jpg", "jpeg", "png", "bmp", "webp"];
 pub struct Wall {
     path: String,
     thumb: String,
+    /// vrai si c'est un fond Wallpaper Engine
+    we: bool,
+    /// fond Windows actuellement choisi
+    cur: bool,
 }
 
 /// Dossier personnel des fonds d'ecran (cree au besoin).
@@ -67,7 +71,7 @@ fn collect(dir: &Path, depth: u32, out: &mut Vec<PathBuf>) {
 }
 
 /// Miniature JPEG en data URL, mise en cache selon chemin + date de modif.
-fn thumb(p: &Path) -> Option<String> {
+pub(crate) fn thumb(p: &Path) -> Option<String> {
     let meta = std::fs::metadata(p).ok()?;
     let mut h = std::collections::hash_map::DefaultHasher::new();
     p.hash(&mut h);
@@ -123,6 +127,8 @@ pub fn walls_get() -> Vec<Wall> {
             Some(Wall {
                 path: p.to_string_lossy().into_owned(),
                 thumb: thumb(p)?,
+                we: false,
+                cur: p.to_string_lossy().eq_ignore_ascii_case(&cur),
             })
         })
         .collect()
@@ -130,6 +136,10 @@ pub fn walls_get() -> Vec<Wall> {
 
 #[tauri::command(async)]
 pub fn wall_current() -> Option<Wall> {
+    // si Wallpaper Engine tourne, c'est son fond qui est visible
+    if let Some((path, thumb)) = crate::we::active() {
+        return Some(Wall { path, thumb, we: true, cur: true });
+    }
     let path = current_path();
     if path.is_empty() {
         return None;
@@ -137,6 +147,8 @@ pub fn wall_current() -> Option<Wall> {
     Some(Wall {
         thumb: thumb(Path::new(&path))?,
         path,
+        we: false,
+        cur: true,
     })
 }
 

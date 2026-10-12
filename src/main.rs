@@ -4,6 +4,7 @@ mod apps;
 mod media;
 mod system;
 mod wall;
+mod we;
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -19,7 +20,7 @@ use windows::Win32::System::Com::{
     CoInitializeEx, COINIT_APARTMENTTHREADED, COINIT_MULTITHREADED,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowRect,
+    GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowRect, IsZoomed,
 };
 
 pub fn com_init_mta() {
@@ -128,12 +129,13 @@ fn track_cursor(win: WebviewWindow, hit: Arc<Mutex<Hit>>) {
     });
 }
 
-/// Vrai si la fenetre au premier plan occupe tout son ecran (jeu, video...),
-/// hors bureau et hors Ilot lui-meme.
+/// Vrai si la fenetre au premier plan est en plein ecran (jeu, video...) sur
+/// l'ecran de l'ilot. Les fenetres simplement maximisees ne comptent pas :
+/// avec une barre des taches masquee, elles couvrent aussi tout l'ecran.
 fn fullscreen_foreground(own: HWND) -> bool {
     unsafe {
         let fg = GetForegroundWindow();
-        if fg.is_invalid() || fg == own {
+        if fg.is_invalid() || fg == own || IsZoomed(fg).as_bool() {
             return false;
         }
         let mut cls = [0u16; 64];
@@ -148,6 +150,9 @@ fn fullscreen_foreground(own: HWND) -> bool {
         }
         let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
         let mon = MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST);
+        if mon != MonitorFromWindow(own, MONITOR_DEFAULTTONEAREST) {
+            return false;
+        }
         if !GetMonitorInfoW(mon, &mut mi).as_bool() {
             return false;
         }
@@ -165,6 +170,22 @@ fn toggle_launcher(app: &AppHandle) {
 }
 
 fn main() {
+    // `ilot.exe --check-we <fichier>` : diagnostic Wallpaper Engine, sans interface
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--check-we") {
+        let walls = we::we_walls();
+        let st = we::we_state();
+        let report = format!(
+            "{}\n{} fonds, {} sans miniature\nactif: {:?}\n{}",
+            serde_json::to_string(&st).unwrap_or_default(),
+            walls.len(),
+            walls.iter().filter(|w| w.thumb_is_empty()).count(),
+            we::active().map(|a| a.0),
+            walls.iter().take(5).map(|w| w.summary()).collect::<Vec<_>>().join("\n"),
+        );
+        let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("we-check.txt"), report);
+        return;
+    }
     let hit = Arc::new(Mutex::new(Hit::default()));
     tauri::Builder::default()
         .plugin(
@@ -198,6 +219,7 @@ fn main() {
             media::watch(h.clone());
             system::watch(h.clone());
             system::watch_clipboard(h.clone());
+            we::watch(h.clone());
             apps::load(h);
 
             // Ctrl+Alt+Espace : lanceur d'applications
@@ -246,6 +268,9 @@ fn main() {
             wall::wall_current,
             wall::wall_set,
             wall::walls_open_folder,
+            we::we_state,
+            we::we_walls,
+            we::we_set,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Ilot");

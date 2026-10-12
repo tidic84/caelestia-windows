@@ -15,9 +15,12 @@ const D={
  wall_current:null, startup_tab:new URLSearchParams(location.search).get('tab'),
 };
 D.wall_current={path:'C:\\w2.jpg',thumb:D.walls_get[2].thumb};
+D.walls_get.forEach((w,i)=>w.cur=i===2);
+D.we_state={installed:true,running:true,current:'C:\\we0'};
+D.we_walls=[["Idyll's Fall",'scene','#1d3557','#a8dadc'],['Night City','video','#10002b','#e0aaff'],['Lofi Room','scene','#3a0ca3','#f72585'],['Aurora','web','#003049','#2a9d8f'],['Neon Rain','video','#240046','#ff4d6d'],['Beach','scene','#0077b6','#ffd166']].map((x,i)=>({path:'C:\\we'+i,title:x[0],kind:x[1],thumb:grad(x[2],x[3])}));
 window.__TAURI__={core:{invoke:async(c)=>D[c]??null},event:{listen:async(e,f)=>{if(e==='sys')setTimeout(()=>f({payload:{cpu:23,mem_used:11.2*2**30,mem_total:32*2**30,disk_used:612*2**30,disk_total:931*2**30,battery:-1,charging:false,uptime:9000}}),300);if(e==='hover'&&new URLSearchParams(location.search).get('peek'))setTimeout(()=>f({payload:true}),200);}}};
 </script>
-<style>body{background:#6b7f99 !important}</style>
+<style>body{background:#6b7f99 !important}</style><script>if(location.search.includes("static"))document.write("<style>*,*::before,*::after{transition:none!important}</style>")</script>
 
 </head>
 <body>
@@ -149,7 +152,11 @@ window.__TAURI__={core:{invoke:async(c)=>D[c]??null},event:{listen:async(e,f)=>{
         <!-- FONDS D'ÉCRAN -->
         <section class="page" data-page="walls">
           <div class="page-head">
-            <span>Les couleurs suivent le fond d'écran</span>
+            <span class="seg" hidden>
+              <button data-src="win" class="on">Windows</button>
+              <button data-src="we">Wallpaper Engine</button>
+            </span>
+            <span class="wall-note">Les couleurs suivent le fond d'écran</span>
             <span>
               <button class="text-btn" id="wall-refresh"><span class="ms">refresh</span>Actualiser</button>
               <button class="text-btn" id="wall-folder"><span class="ms">folder_open</span>Dossier</button>
