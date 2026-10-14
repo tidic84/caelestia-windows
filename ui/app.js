@@ -320,8 +320,11 @@ let appSel = 0;
 let appView = [];
 const norm = s => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 function renderApps() {
+  renderFolders();
   const q = norm($('#q').value.trim());
-  appView = !q ? apps : apps
+  const folder = folders.list.find(f => f.id === folders.sel);
+  const pool = folder ? apps.filter(a => folder.apps.includes(a.id)) : apps;
+  appView = !q ? pool : pool
     .map(a => {
       const n = norm(a.name);
       const score = n.startsWith(q) ? 0 : n.split(/[\s\-_.]/).some(w => w.startsWith(q)) ? 1 : n.includes(q) ? 2 : 9;
@@ -333,7 +336,12 @@ function renderApps() {
   appSel = Math.min(appSel, Math.max(0, appView.length - 1));
   const grid = $('.app-grid');
   if (!apps.length) { grid.innerHTML = '<div class="empty">Chargement des applications…</div>'; return; }
-  if (!appView.length) { grid.innerHTML = '<div class="empty">Aucune application</div>'; return; }
+  if (!appView.length) {
+    grid.innerHTML = folder && !q
+      ? '<div class="empty">Dossier vide : clic droit sur une application pour l\'ajouter ici.</div>'
+      : '<div class="empty">Aucune application</div>';
+    return;
+  }
   grid.innerHTML = '';
   appView.forEach((a, i) => {
     const el = document.createElement('button');
@@ -344,8 +352,180 @@ function renderApps() {
     label.textContent = a.name;
     el.append(label);
     el.addEventListener('click', () => launch(a));
+    el.addEventListener('contextmenu', e => { e.preventDefault(); appMenu(a, e); });
     grid.append(el);
   });
+}
+
+// ---------------------------------------------------------- dossiers d'apps
+// enregistrés dans %LOCALAPPDATA%\Ilot\folders.json : { list: [{ id, name, apps: [id…] }], sel }
+let folders = { list: [], sel: '' };
+const FOLDER_ICONS = [
+  [/jeu|game|gaming/, 'sports_esports'], [/cours|ecole|etude|school|fac|lycee/, 'school'],
+  [/travail|boulot|work|bureau/, 'work'], [/musique|music|audio/, 'music_note'],
+  [/video|film|stream/, 'movie'], [/dev|code|prog/, 'code'], [/photo|image|design|dessin/, 'palette'],
+  [/internet|web|navigat/, 'language'], [/social|discu|chat|message/, 'forum'],
+  [/outil|util|tool|systeme/, 'build'], [/app/, 'apps'],
+];
+const folderIcon = name => (FOLDER_ICONS.find(([re]) => re.test(norm(name))) || [, 'folder'])[1];
+// premier lancement : quelques dossiers, et les jeux reconnus rangés d'office
+const GAME_HINTS = /steam|epic games|roblox|minecraft|riot client|valorant|league of legends|battle\.net|ubisoft|ea app|gog galaxy|fortnite|rockstar|xbox|playnite|heroic|curseforge|lunar client|genshin|hoyoplay/;
+
+function saveFolders() { invoke('store_set', { key: 'folders', value: folders }); }
+
+function renderFolders() {
+  const bar = $('.folder-bar');
+  bar.innerHTML = '';
+  const chip = (id, icon, name, count) => {
+    const b = document.createElement('button');
+    b.className = 'fchip' + (folders.sel === id ? ' on' : '');
+    b.innerHTML = `<span class="ms">${icon}</span>`;
+    const n = document.createElement('span');
+    n.textContent = name;
+    b.append(n);
+    if (count != null) b.insertAdjacentHTML('beforeend', `<i>${count}</i>`);
+    b.addEventListener('click', () => { folders.sel = id; saveFolders(); renderApps(); });
+    bar.append(b);
+    return b;
+  };
+  chip('', 'grid_view', 'Toutes');
+  folders.list.forEach(f => {
+    const n = f.apps.filter(id => apps.some(a => a.id === id)).length;
+    const b = chip(f.id, folderIcon(f.name), f.name, n);
+    b.addEventListener('contextmenu', e => { e.preventDefault(); folderMenu(f, e); });
+  });
+  const add = document.createElement('button');
+  add.className = 'fchip add';
+  add.title = 'Nouveau dossier';
+  add.innerHTML = '<span class="ms">create_new_folder</span>';
+  add.addEventListener('click', e => askName(e, 'Nouveau dossier', '', name => {
+    const f = newFolder(name);
+    folders.sel = f.id;
+    saveFolders();
+    renderApps();
+  }));
+  bar.append(add);
+}
+
+function newFolder(name) {
+  const f = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, apps: [] };
+  folders.list.push(f);
+  return f;
+}
+
+// --- menu contextuel (clic droit)
+const ctx = $('.ctx');
+function showCtx(e, build) {
+  ctx.innerHTML = '';
+  build(ctx);
+  ctx.hidden = false;
+  const page = $('[data-page="apps"]').getBoundingClientRect();
+  const r = ctx.getBoundingClientRect();
+  ctx.style.left = Math.min(e.clientX - page.left, page.width - r.width - 4) + 'px';
+  ctx.style.top = Math.min(e.clientY - page.top, page.height - r.height - 4) + 'px';
+}
+function hideCtx() { ctx.hidden = true; }
+function ctxItem(box, icon, label, fn, cls = '') {
+  const b = document.createElement('button');
+  b.className = 'ctx-item ' + cls;
+  b.innerHTML = `<span class="ms">${icon}</span>`;
+  const t = document.createElement('span');
+  t.textContent = label;
+  b.append(t);
+  b.addEventListener('click', ev => { ev.stopPropagation(); fn(ev); });
+  box.append(b);
+  return b;
+}
+function ctxTitle(box, text) {
+  const t = document.createElement('div');
+  t.className = 'ctx-title';
+  t.textContent = text;
+  box.append(t);
+}
+// petite saisie de nom dans le menu (pas de prompt() dans la webview)
+function ctxInput(box, value, done) {
+  const inp = document.createElement('input');
+  inp.className = 'ctx-input';
+  inp.value = value;
+  inp.placeholder = 'Nom du dossier';
+  inp.spellcheck = false;
+  inp.addEventListener('keydown', ev => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter' && inp.value.trim()) { done(inp.value.trim()); hideCtx(); }
+    if (ev.key === 'Escape') hideCtx();
+  });
+  box.append(inp);
+  setTimeout(() => { inp.focus(); inp.select(); }, 0);
+}
+function askName(e, title, value, done) {
+  showCtx(e, box => { ctxTitle(box, title); ctxInput(box, value, done); });
+}
+
+function appMenu(a, e) {
+  showCtx(e, box => {
+    ctxTitle(box, a.name);
+    folders.list.forEach(f => {
+      const inside = f.apps.includes(a.id);
+      ctxItem(box, inside ? 'check_box' : 'check_box_outline_blank', f.name, () => {
+        if (inside) f.apps = f.apps.filter(x => x !== a.id); else f.apps.push(a.id);
+        saveFolders();
+        hideCtx();
+        renderApps();
+      });
+    });
+    ctxItem(box, 'create_new_folder', 'Nouveau dossier…', () => askName(e, 'Nouveau dossier pour ' + a.name, '', name => {
+      newFolder(name).apps.push(a.id);
+      saveFolders();
+      renderApps();
+    }));
+  });
+}
+
+function folderMenu(f, e) {
+  showCtx(e, box => {
+    ctxTitle(box, f.name);
+    ctxItem(box, 'edit', 'Renommer', () => askName(e, 'Renommer', f.name, name => {
+      f.name = name;
+      saveFolders();
+      renderApps();
+    }));
+    ctxItem(box, 'delete', 'Supprimer le dossier', ev => {
+      // second clic pour confirmer (les applis ne sont pas supprimées)
+      const b = ev.currentTarget;
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.lastChild.textContent = 'Confirmer la suppression'; return; }
+      folders.list = folders.list.filter(x => x !== f);
+      if (folders.sel === f.id) folders.sel = '';
+      saveFolders();
+      hideCtx();
+      renderApps();
+    }, 'danger');
+  });
+}
+document.addEventListener('mousedown', e => { if (!ctx.hidden && !ctx.contains(e.target)) hideCtx(); });
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !ctx.hidden) { hideCtx(); e.stopImmediatePropagation(); }
+}, true);
+
+invoke('store_get', { key: 'folders' }).then(saved => {
+  if (saved && Array.isArray(saved.list)) {
+    folders = { list: saved.list, sel: saved.sel || '' };
+  } else {
+    folders = { list: [], sel: '' };
+    newFolder('Jeux');
+    newFolder('Apps');
+    newFolder('Cours');
+    folders.seeded = false;
+  }
+  seedGames();
+  if (currentTab === 'apps') renderApps();
+});
+// range les jeux reconnus dans « Jeux » au premier lancement (dès que la liste d'applis est là)
+function seedGames() {
+  if (folders.seeded !== false || !apps.length) return;
+  const jeux = folders.list.find(f => f.name === 'Jeux');
+  if (jeux) jeux.apps = apps.filter(a => GAME_HINTS.test(a.name.toLowerCase()) && !/studio|editor|server/i.test(a.name)).map(a => a.id);
+  delete folders.seeded;
+  saveFolders();
 }
 function launch(a) {
   invoke('app_launch', { id: a.id });
@@ -365,8 +545,188 @@ $('#q').addEventListener('keydown', e => {
     launch(appView[appSel]);
   }
 });
-listen('apps', ({ payload }) => { apps = payload; if (currentTab === 'apps') renderApps(); });
-invoke('apps_get').then(l => { if (l.length) apps = l; });
+listen('apps', ({ payload }) => { apps = payload; seedGames(); if (currentTab === 'apps') renderApps(); });
+invoke('apps_get').then(l => { if (l.length) { apps = l; seedGames(); } });
+
+// =================================================================== mail
+// comptes IMAP gérés côté Rust (src/mail.rs) ; vérification toutes les 2 min
+let inbox = { accounts: [], mails: [] };
+let mailAcc = ''; // filtre : '' = tous les comptes
+let mailOpen = null; // message affiché dans le lecteur
+let mailBusy = false;
+const fmtHour = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const fmtDay = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
+function mailDate(ts) {
+  const d = new Date(ts * 1000);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return fmtHour.format(d);
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'Hier';
+  return fmtDay.format(d);
+}
+
+function mailView(v) { // 'list' | 'reader' | 'setup'
+  $('.mail-main').hidden = v !== 'list';
+  $('.mail-reader').hidden = v !== 'reader';
+  $('.mail-setup').hidden = v !== 'setup';
+  if (v === 'setup') renderAccounts();
+}
+
+function applyInbox(ib) {
+  inbox = ib;
+  if (mailAcc && !inbox.accounts.some(a => a.email === mailAcc)) mailAcc = '';
+  const unread = inbox.accounts.reduce((n, a) => n + a.unread, 0);
+  const badge = $('#tabs .badge');
+  badge.hidden = !unread;
+  badge.textContent = unread > 99 ? '99+' : unread;
+  $('.mini-mail').hidden = !unread;
+  $('.peek-mail').hidden = !unread;
+  $('.peek-mail b').textContent = unread;
+  renderMail();
+  if (!$('.mail-setup').hidden) renderAccounts();
+}
+
+function renderMail() {
+  const seg = $('.mail-seg');
+  seg.hidden = inbox.accounts.length < 2;
+  seg.innerHTML = '';
+  if (inbox.accounts.length > 1) {
+    [{ email: '', label: 'Tous' }, ...inbox.accounts.map(a => ({ email: a.email, label: a.email.split('@')[0], unread: a.unread }))]
+      .forEach(a => {
+        const b = document.createElement('button');
+        b.className = mailAcc === a.email ? 'on' : '';
+        b.textContent = a.label;
+        b.title = a.email || 'Tous les comptes';
+        b.addEventListener('click', () => { mailAcc = a.email; renderMail(); });
+        seg.append(b);
+      });
+  }
+  const errs = inbox.accounts.filter(a => a.error);
+  const unread = inbox.accounts.filter(a => !mailAcc || a.email === mailAcc).reduce((n, a) => n + a.unread, 0);
+  $('.mail-note').textContent = errs.length
+    ? `⚠ ${errs[0].email} : ${errs[0].error}`
+    : inbox.accounts.length ? (unread ? `${unread} non lu${unread > 1 ? 's' : ''}` : 'Tout est lu') : '';
+  $('.mail-note').classList.toggle('err', !!errs.length);
+
+  const box = $('.mail-list');
+  if (!inbox.accounts.length) {
+    box.innerHTML = '<div class="empty">Aucun compte.<br><button class="text-btn primary" id="mail-first"><span class="ms">add</span>Ajouter un compte</button></div>';
+    $('#mail-first').addEventListener('click', () => mailView('setup'));
+    return;
+  }
+  const list = inbox.mails.filter(m => !mailAcc || m.account === mailAcc);
+  if (!list.length) {
+    box.innerHTML = `<div class="empty">${mailBusy ? 'Chargement…' : 'Boîte de réception vide'}</div>`;
+    return;
+  }
+  box.innerHTML = '';
+  const multi = inbox.accounts.length > 1 && !mailAcc;
+  list.forEach(m => {
+    const el = document.createElement('button');
+    el.className = 'mail-item' + (m.seen ? '' : ' unread');
+    el.innerHTML = '<i class="dot"></i><div class="mi-text"><div class="mi-top"><b></b><time></time></div><div class="mi-sub"></div></div>';
+    el.querySelector('b').textContent = m.from || m.from_addr || '(inconnu)';
+    el.querySelector('time').textContent = mailDate(m.date);
+    el.querySelector('.mi-sub').textContent = m.subject || '(sans objet)';
+    el.title = (multi ? m.account + '\n' : '') + m.from_addr;
+    if (multi) el.querySelector('.mi-top').insertAdjacentHTML('beforeend', `<span class="mi-acc">${m.account.split('@')[0].replace(/[<>&"]/g, '')}</span>`);
+    el.addEventListener('click', () => readMail(m));
+    box.append(el);
+  });
+}
+
+async function refreshMail() {
+  if (mailBusy) return;
+  mailBusy = true;
+  $('#mail-refresh').classList.add('busy');
+  try { applyInbox(await invoke('mail_refresh')); } finally {
+    mailBusy = false;
+    $('#mail-refresh').classList.remove('busy');
+  }
+}
+
+// le message est affiché dans une iframe sans scripts ; les liens partent dans le navigateur
+function mailDoc(body) {
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const content = body.html || `<pre>${esc(body.text || '(message vide)')}</pre>`;
+  return `<!doctype html><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data: cid:; style-src 'unsafe-inline' https:; font-src https: data:">
+<style>html{background:#fff;color:#1d1b20;font:14px/1.45 'Segoe UI',sans-serif}body{margin:16px;word-wrap:break-word}
+pre{white-space:pre-wrap;font:inherit}img{max-width:100%;height:auto}a{color:#6750a4}</style>${content}`;
+}
+async function readMail(m) {
+  mailOpen = m;
+  mailView('reader');
+  $('.mr-subject').textContent = m.subject || '(sans objet)';
+  $('.mr-from').textContent = `${m.from}${m.from !== m.from_addr ? ' <' + m.from_addr + '>' : ''} · ${new Date(m.date * 1000).toLocaleString('fr-FR')}`;
+  $('#mr-web').hidden = !m.link;
+  const frame = $('.mr-body');
+  frame.srcdoc = mailDoc({ text: 'Chargement…' });
+  try {
+    const body = await invoke('mail_read', { account: m.account, uid: m.uid });
+    if (mailOpen !== m) return;
+    frame.srcdoc = mailDoc(body);
+  } catch (e) {
+    if (mailOpen === m) frame.srcdoc = mailDoc({ text: 'Impossible de charger le message : ' + e });
+  }
+}
+$('.mr-body').addEventListener('load', () => {
+  const doc = $('.mr-body').contentDocument;
+  if (!doc) return;
+  doc.addEventListener('click', e => {
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    e.preventDefault();
+    if (/^https?:/i.test(a.href)) invoke('open_url', { url: a.href });
+  });
+});
+$('#mr-back').addEventListener('click', () => { mailOpen = null; mailView('list'); });
+$('#mr-web').addEventListener('click', () => { if (mailOpen?.link) { invoke('open_url', { url: mailOpen.link }); setState('collapsed'); } });
+$('#mail-refresh').addEventListener('click', refreshMail);
+$('#mail-accounts').addEventListener('click', () => mailView('setup'));
+$('#ms-back').addEventListener('click', () => mailView('list'));
+
+function renderAccounts() {
+  const box = $('.acc-list');
+  box.innerHTML = inbox.accounts.length ? '' : '<div class="acc-none">Aucun compte pour l\'instant.</div>';
+  inbox.accounts.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'acc';
+    el.innerHTML = '<span class="ms">account_circle</span><div><b></b><small></small></div><button class="icon-btn small" title="Retirer ce compte"><span class="ms">delete</span></button>';
+    el.querySelector('b').textContent = a.email;
+    el.querySelector('small').textContent = a.error ? '⚠ ' + a.error : `${a.host} · ${a.unread} non lu${a.unread > 1 ? 's' : ''}`;
+    el.querySelector('small').classList.toggle('err', !!a.error);
+    const del = el.querySelector('button');
+    del.addEventListener('click', async () => {
+      if (!del.classList.contains('armed')) { del.classList.add('armed'); del.title = 'Cliquer encore pour retirer'; setTimeout(() => del.classList.remove('armed'), 3000); return; }
+      applyInbox(await invoke('mail_remove', { email: a.email }));
+    });
+    box.append(el);
+  });
+}
+$('.acc-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.currentTarget;
+  const btn = f.querySelector('button[type=submit]');
+  const err = $('.acc-err');
+  err.textContent = 'Connexion…';
+  err.classList.remove('err');
+  btn.disabled = true;
+  try {
+    applyInbox(await invoke('mail_add', { email: f.email.value, pass: f.pass.value, host: f.host.value || null }));
+    f.reset();
+    err.textContent = '';
+    mailView('list');
+  } catch (ex) {
+    err.textContent = String(ex);
+    err.classList.add('err');
+  } finally {
+    btn.disabled = false;
+  }
+});
+$$('[data-url]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); invoke('open_url', { url: a.dataset.url }); }));
+listen('mail', ({ payload }) => applyInbox(payload));
+invoke('mail_get').then(applyInbox);
 
 // ========================================================= presse-papiers
 function renderClips(list) {
@@ -469,10 +829,10 @@ async function pickWall(w, el) {
   wallNote();
 }
 
-$$('.seg button').forEach(b => b.addEventListener('click', () => {
+$$('.wall-seg button').forEach(b => b.addEventListener('click', () => {
   if (b.dataset.src === wallSrc) return;
   wallSrc = b.dataset.src;
-  $$('.seg button').forEach(x => x.classList.toggle('on', x === b));
+  $$('.wall-seg button').forEach(x => x.classList.toggle('on', x === b));
   loadWalls();
 }));
 $('#wall-refresh').addEventListener('click', () => loadWalls(true));
@@ -481,7 +841,7 @@ $('#wall-folder').addEventListener('click', () => { invoke('walls_open_folder');
 // fond actif (WE s'il tourne, sinon Windows) -> palette
 async function syncWall() {
   we = await invoke('we_state');
-  $('.seg').hidden = !we.installed;
+  $('.wall-seg').hidden = !we.installed;
   const w = await invoke('wall_current');
   if (w && w.thumb !== currentThumb) {
     currentThumb = w.thumb;
@@ -495,7 +855,7 @@ listen('wall-changed', syncWall);
   await syncWall();
   if (we.installed && we.running) {
     wallSrc = 'we';
-    $$('.seg button').forEach(x => x.classList.toggle('on', x.dataset.src === 'we'));
+    $$('.wall-seg button').forEach(x => x.classList.toggle('on', x.dataset.src === 'we'));
     if (wallsLoaded) loadWalls();
   }
 })();

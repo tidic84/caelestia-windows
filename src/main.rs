@@ -1,7 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod apps;
+mod mail;
 mod media;
+mod store;
 mod system;
 mod wall;
 mod we;
@@ -200,6 +202,7 @@ fn main() {
         .manage(HitState(hit.clone()))
         .manage(system::Clips(Mutex::new(VecDeque::new())))
         .manage(apps::Apps(Mutex::new(Vec::new())))
+        .manage(mail::MailState(Mutex::new(Default::default())))
         .setup(move |app| {
             let win = app.get_webview_window("island").expect("fenetre island");
             place(&win);
@@ -220,6 +223,7 @@ fn main() {
             system::watch(h.clone());
             system::watch_clipboard(h.clone());
             we::watch(h.clone());
+            mail::watch(h.clone());
             apps::load(h);
 
             // Ctrl+Alt+Espace : lanceur d'applications
@@ -271,6 +275,14 @@ fn main() {
             we::we_state,
             we::we_walls,
             we::we_set,
+            store::store_get,
+            store::store_set,
+            mail::mail_get,
+            mail::mail_refresh,
+            mail::mail_add,
+            mail::mail_remove,
+            mail::mail_read,
+            mail::open_url,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Ilot");
