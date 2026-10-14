@@ -316,6 +316,9 @@ $$('.sess').forEach(b => b.addEventListener('click', () => {
 
 // =================================================================== apps
 let apps = [];
+let games = [];
+const GAMES = '@games'; // pseudo-dossier « Launcher de jeux »
+const SOURCE = { steam: 'Steam', epic: 'Epic', ubisoft: 'Ubisoft', gog: 'GOG' };
 let appSel = 0;
 let appView = [];
 const norm = s => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
@@ -323,7 +326,8 @@ function renderApps() {
   renderFolders();
   const q = norm($('#q').value.trim());
   const folder = folders.list.find(f => f.id === folders.sel);
-  const pool = folder ? apps.filter(a => folder.apps.includes(a.id)) : apps;
+  const inGames = folders.sel === GAMES;
+  const pool = inGames ? games : folder ? apps.filter(a => folder.apps.includes(a.id)) : apps;
   appView = !q ? pool : pool
     .map(a => {
       const n = norm(a.name);
@@ -335,6 +339,8 @@ function renderApps() {
     .map(x => x.a);
   appSel = Math.min(appSel, Math.max(0, appView.length - 1));
   const grid = $('.app-grid');
+  grid.classList.toggle('games', inGames);
+  if (inGames) return renderGames(grid, q);
   if (!apps.length) { grid.innerHTML = '<div class="empty">Chargement des applications…</div>'; return; }
   if (!appView.length) {
     grid.innerHTML = folder && !q
@@ -356,6 +362,50 @@ function renderApps() {
     grid.append(el);
   });
 }
+
+// ------------------------------------------------------- launcher de jeux
+// jeux Steam / Epic / Ubisoft / GOG détectés côté Rust (src/games.rs)
+function renderGames(grid, q) {
+  if (!appView.length) {
+    grid.innerHTML = q ? '<div class="empty">Aucun jeu</div>'
+      : '<div class="empty">Aucun jeu trouvé (Steam, Epic Games, Ubisoft Connect, GOG).</div>';
+    return;
+  }
+  grid.innerHTML = '';
+  appView.forEach((g, i) => {
+    const el = document.createElement('button');
+    el.className = 'game' + (q && i === appSel ? ' sel' : '') + (g.cover ? '' : ' nocover');
+    el.title = g.name;
+    el.innerHTML = g.cover ? `<img class="cov" src="${g.cover}" alt="" loading="lazy">`
+      : g.icon ? `<img class="ico" src="${g.icon}" alt="">` : `<div class="ph">${g.name[0] || '?'}</div>`;
+    const cap = document.createElement('span');
+    cap.className = 'cap';
+    const b = document.createElement('b');
+    b.textContent = g.name;
+    cap.append(b);
+    cap.insertAdjacentHTML('beforeend', `<i>${SOURCE[g.source] || ''}</i>`);
+    el.append(cap);
+    el.addEventListener('click', () => launch(g));
+    el.addEventListener('contextmenu', e => { e.preventDefault(); gameMenu(g, e); });
+    grid.append(el);
+  });
+}
+function gameMenu(g, e) {
+  showCtx(e, box => {
+    ctxTitle(box, g.name);
+    ctxItem(box, 'play_arrow', 'Lancer', () => { hideCtx(); launch(g); });
+    ctxItem(box, 'folder_open', 'Ouvrir le dossier du jeu', () => openFolder(() => invoke('game_folder', { id: g.id })));
+  });
+}
+// ouvre l'Explorateur puis replie l'îlot ; sinon le signale dans le menu
+async function openFolder(call) {
+  const ok = await call();
+  if (ok) { hideCtx(); setState('collapsed'); return; }
+  showCtx(lastCtxEvent, box => ctxTitle(box, 'Dossier introuvable'));
+  setTimeout(hideCtx, 1500);
+}
+listen('games', ({ payload }) => { games = payload; if (currentTab === 'apps' && folders.sel === GAMES) renderApps(); });
+invoke('games_get').then(l => { if (l.length) games = l; });
 
 // ---------------------------------------------------------- dossiers d'apps
 // enregistrés dans %LOCALAPPDATA%\Ilot\folders.json : { list: [{ id, name, apps: [id…] }], sel }
@@ -389,6 +439,7 @@ function renderFolders() {
     return b;
   };
   chip('', 'grid_view', 'Toutes');
+  chip(GAMES, 'stadia_controller', 'Launcher', games.length || null).classList.add('games-chip');
   folders.list.forEach(f => {
     const n = f.apps.filter(id => apps.some(a => a.id === id)).length;
     const b = chip(f.id, folderIcon(f.name), f.name, n);
@@ -415,7 +466,9 @@ function newFolder(name) {
 
 // --- menu contextuel (clic droit)
 const ctx = $('.ctx');
+let lastCtxEvent = null;
 function showCtx(e, build) {
+  lastCtxEvent = e;
   ctx.innerHTML = '';
   build(ctx);
   ctx.hidden = false;
@@ -464,6 +517,8 @@ function askName(e, title, value, done) {
 function appMenu(a, e) {
   showCtx(e, box => {
     ctxTitle(box, a.name);
+    ctxItem(box, 'folder_open', 'Ouvrir l’emplacement', () => openFolder(() => invoke('app_folder', { id: a.id, name: a.name })));
+    box.insertAdjacentHTML('beforeend', '<hr class="ctx-sep">');
     folders.list.forEach(f => {
       const inside = f.apps.includes(a.id);
       ctxItem(box, inside ? 'check_box' : 'check_box_outline_blank', f.name, () => {
@@ -528,19 +583,20 @@ function seedGames() {
   saveFolders();
 }
 function launch(a) {
-  invoke('app_launch', { id: a.id });
+  if (a.source) invoke('game_launch', { id: a.id });
+  else invoke('app_launch', { id: a.id });
   $('#q').value = '';
   setState('collapsed');
 }
 $('#q').addEventListener('input', () => { appSel = 0; renderApps(); });
 $('#q').addEventListener('keydown', e => {
-  const cols = 7;
+  const cols = folders.sel === GAMES ? 6 : 7;
   const moves = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols };
   if (e.key in moves) {
     e.preventDefault();
     appSel = Math.max(0, Math.min(appView.length - 1, appSel + moves[e.key]));
-    $$('.app').forEach((el, i) => el.classList.toggle('sel', i === appSel));
-    $$('.app')[appSel]?.scrollIntoView({ block: 'nearest' });
+    $$('.app-grid > button').forEach((el, i) => el.classList.toggle('sel', i === appSel));
+    $$('.app-grid > button')[appSel]?.scrollIntoView({ block: 'nearest' });
   } else if (e.key === 'Enter' && appView[appSel]) {
     launch(appView[appSel]);
   }

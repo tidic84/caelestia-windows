@@ -103,7 +103,7 @@ fn bitmap_png(hbmp: HBITMAP) -> Option<String> {
     }
 }
 
-fn icon_of(item: &IShellItem) -> String {
+pub(crate) fn icon_of(item: &IShellItem) -> String {
     unsafe {
         let Ok(f) = item.cast::<IShellItemImageFactory>() else {
             return String::new();
