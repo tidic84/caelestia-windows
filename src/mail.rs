@@ -209,6 +209,10 @@ fn login(host: &str, port: u16, user: &str, pass: &str) -> Result<Session, Strin
     let mut client = open(host, port)?;
     client.read_greeting().map_err(|e| e.to_string())?;
     client.login(user, pass).map_err(|(e, _)| match e {
+        // Gmail recoit le mot de passe habituel du compte au lieu d'un mot de passe d'application
+        imap::error::Error::No(m) if m.contains("Application-specific password required") => {
+            "c'est le mot de passe habituel du compte : Gmail exige un mot de passe d'application (code de 16 lettres, lien ci-dessous)".to_string()
+        }
         // message du serveur, ex. « [AUTHENTICATIONFAILED] Invalid credentials »
         imap::error::Error::No(m) | imap::error::Error::Bad(m) => format!(
             "identifiants refuses par le serveur ({}) : verifiez l'adresse et le mot de passe d'application",
