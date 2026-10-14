@@ -724,13 +724,15 @@ $('.acc-form').addEventListener('submit', async e => {
     btn.disabled = false;
   }
 });
+$$('.acc-form input').forEach(i => i.addEventListener('focus', () => { pinned = true; }));
 $$('[data-url]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); invoke('open_url', { url: a.dataset.url }); }));
 listen('mail', ({ payload }) => applyInbox(payload));
 invoke('mail_get').then(applyInbox);
 
 // ========================================================= presse-papiers
 function renderClips(list) {
-  $('.clip-count').textContent = list.length ? `${list.length} élément${list.length > 1 ? 's' : ''}` : 'Historique vide';
+  clipCount = list.length ? `${list.length} élément${list.length > 1 ? 's' : ''}` : 'Historique vide';
+  if (clipView === 'hist') $('.clip-count').textContent = clipCount;
   const box = $('.clip-list');
   box.innerHTML = list.length ? '' : '<div class="empty">Copiez du texte : il apparaîtra ici.</div>';
   list.forEach(t => {
@@ -739,7 +741,13 @@ function renderClips(list) {
     const p = document.createElement('p');
     p.textContent = t.length > 600 ? t.slice(0, 600) + '…' : t;
     el.append(p);
-    el.insertAdjacentHTML('beforeend', '<span class="ms">check</span>');
+    el.insertAdjacentHTML('beforeend', '<span class="ms to-note" title="Ajouter au bloc-notes">note_add</span><span class="ms ok">check</span>');
+    el.querySelector('.to-note').addEventListener('click', e => {
+      e.stopPropagation();
+      addToNotes(t);
+      el.classList.add('done');
+      setTimeout(() => el.classList.remove('done'), 1200);
+    });
     el.addEventListener('click', () => {
       invoke('clip_copy', { text: t });
       el.classList.add('done');
@@ -751,6 +759,51 @@ function renderClips(list) {
 listen('clips', ({ payload }) => renderClips(payload));
 invoke('clips_get').then(renderClips);
 $('#clip-clear').addEventListener('click', () => invoke('clips_clear'));
+
+// ============================================================== bloc-notes
+// dans l'onglet presse-papiers ; enregistré dans %LOCALAPPDATA%\Ilot\notes.json
+const notes = $('.notes');
+let clipView = 'hist';
+let clipCount = '';
+let noteTimer = null;
+function showClipView(v) {
+  clipView = v;
+  $$('.clip-seg button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  $('.clip-list').hidden = v !== 'hist';
+  notes.hidden = v !== 'notes';
+  $('#clip-clear').hidden = v !== 'hist';
+  $('#note-copy').hidden = v !== 'notes';
+  noteStatus();
+  if (v === 'notes') notes.focus();
+}
+function noteStatus(msg) {
+  if (clipView !== 'notes') { $('.clip-count').textContent = clipCount; return; }
+  const n = notes.value.length;
+  $('.clip-count').textContent = msg || (n ? `${n} caractère${n > 1 ? 's' : ''}` : 'Bloc-notes vide');
+}
+function saveNotes() {
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(async () => {
+    const ok = await invoke('store_set', { key: 'notes', value: { text: notes.value } });
+    noteStatus(ok ? 'Enregistré' : 'Erreur d’enregistrement');
+    setTimeout(() => noteStatus(), 1500);
+  }, 400);
+}
+function addToNotes(t) {
+  const v = notes.value.replace(/\s+$/, '');
+  notes.value = (v ? v + '\n\n' : '') + t;
+  saveNotes();
+}
+notes.addEventListener('input', () => { noteStatus(); saveNotes(); });
+// on écrit : l'îlot reste ouvert même si la souris sort
+notes.addEventListener('focus', () => { pinned = true; });
+$$('.clip-seg button').forEach(b => b.addEventListener('click', () => showClipView(b.dataset.v)));
+$('#note-copy').addEventListener('click', () => {
+  invoke('clip_copy', { text: notes.value });
+  noteStatus('Copié');
+  setTimeout(() => noteStatus(), 1200);
+});
+invoke('store_get', { key: 'notes' }).then(n => { if (n && typeof n.text === 'string') notes.value = n.text; noteStatus(); });
 
 // ========================================================= fonds d'écran
 // deux sources : les fonds Windows et ceux de Wallpaper Engine (si installé)
