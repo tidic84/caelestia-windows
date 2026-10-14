@@ -166,19 +166,47 @@ fn connect(acc: &Account) -> Result<Session, String> {
     login(&acc.host, acc.port, &acc.email, &pass)
 }
 
-fn login(host: &str, port: u16, user: &str, pass: &str) -> Result<Session, String> {
-    let addr = (host, port)
+/// Diagnostic `--check-imap <hote>` : connexion + accueil du serveur, sans identifiants.
+pub fn check(host: &str) -> String {
+    match open(host, 993) {
+        Ok(mut c) => match c.read_greeting() {
+            Ok(g) => format!("OK {host} : {}", String::from_utf8_lossy(&g).trim()),
+            Err(e) => format!("ERREUR accueil {host} : {e}"),
+        },
+        Err(e) => format!("ERREUR {e}"),
+    }
+}
+
+fn open(host: &str, port: u16) -> Result<imap::Client<native_tls::TlsStream<TcpStream>>, String> {
+    let mut addrs: Vec<_> = (host, port)
         .to_socket_addrs()
-        .map_err(|_| format!("serveur introuvable : {host}"))?
-        .next()
-        .ok_or_else(|| format!("serveur introuvable : {host}"))?;
-    let tcp = TcpStream::connect_timeout(&addr, Duration::from_secs(10))
-        .map_err(|e| format!("connexion impossible : {e}"))?;
+        .map_err(|e| format!("serveur introuvable : {host} ({e})"))?
+        .collect();
+    if addrs.is_empty() {
+        return Err(format!("serveur introuvable : {host}"));
+    }
+    // IPv4 d'abord : sur certaines box 4G/5G l'IPv6 vers le serveur n'aboutit pas
+    addrs.sort_by_key(|a| a.is_ipv6());
+    let mut last = String::new();
+    let tcp = addrs
+        .iter()
+        .find_map(|a| match TcpStream::connect_timeout(a, Duration::from_secs(6)) {
+            Ok(t) => Some(t),
+            Err(e) => {
+                last = e.to_string();
+                None
+            }
+        })
+        .ok_or_else(|| format!("connexion impossible a {host} : {last}"))?;
     let _ = tcp.set_read_timeout(Some(Duration::from_secs(30)));
     let _ = tcp.set_write_timeout(Some(Duration::from_secs(30)));
     let tls = native_tls::TlsConnector::new().map_err(|e| e.to_string())?;
     let stream = tls.connect(host, tcp).map_err(|e| format!("TLS : {e}"))?;
-    let mut client = imap::Client::new(stream);
+    Ok(imap::Client::new(stream))
+}
+
+fn login(host: &str, port: u16, user: &str, pass: &str) -> Result<Session, String> {
+    let mut client = open(host, port)?;
     client.read_greeting().map_err(|e| e.to_string())?;
     client.login(user, pass).map_err(|(e, _)| match e {
         imap::error::Error::No(_) | imap::error::Error::Bad(_) => {
@@ -303,9 +331,17 @@ pub fn mail_add(app: AppHandle, email: String, pass: String, host: Option<String
     if !email.contains('@') || pass.is_empty() {
         return Err("adresse ou mot de passe manquant".into());
     }
-    let host = match host.map(|h| h.trim().to_string()).filter(|h| !h.is_empty()) {
-        Some(h) => h,
-        None => guess_host(&email).ok_or("serveur IMAP inconnu pour ce domaine : indiquez-le")?.to_string(),
+    // serveur saisi a la main : on tolere « imaps://hote:993/ » et les espaces
+    let typed = host
+        .map(|h| h.trim().trim_start_matches("imaps://").trim_start_matches("imap://").trim_end_matches('/').replace(' ', ""))
+        .filter(|h| !h.is_empty());
+    let guessed = guess_host(&email);
+    let host = match (typed, guessed) {
+        // serveur saisi introuvable mais domaine connu : on prend le serveur connu
+        (Some(h), Some(g)) if (h.split(':').next().unwrap_or(&h), 993).to_socket_addrs().is_err() => g.to_string(),
+        (Some(h), _) => h,
+        (None, Some(g)) => g.to_string(),
+        (None, None) => return Err("serveur IMAP inconnu pour ce domaine : indiquez-le".into()),
     };
     let (host, port) = match host.rsplit_once(':') {
         Some((h, p)) if p.parse::<u16>().is_ok() => (h.to_string(), p.parse().unwrap()),

@@ -189,6 +189,12 @@ fn main() {
         let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("we-check.txt"), report);
         return;
     }
+    // `ilot.exe --check-imap <hote> <fichier>` : test de connexion IMAP
+    if let Some(i) = args.iter().position(|a| a == "--check-imap") {
+        let host = args.get(i + 1).map(String::as_str).unwrap_or("imap.gmail.com");
+        let _ = std::fs::write(args.get(i + 2).map(String::as_str).unwrap_or("imap-check.txt"), mail::check(host));
+        return;
+    }
     // `ilot.exe --check-games <fichier>` : jeux detectes, sans interface
     if let Some(i) = args.iter().position(|a| a == "--check-games") {
         let report = games::report();
