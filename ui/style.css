@@ -278,8 +278,15 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .clip { text-align: left; background: var(--surface-c); border-radius: 16px; padding: 11px 14px; display: flex; gap: 12px; align-items: center; transition: background .15s; }
 .clip:hover { background: var(--surface-c-high); }
 .clip p { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; word-break: break-word; line-height: 1.35; }
-.clip .ms { opacity: 0; color: var(--primary); transition: opacity .2s; }
-.clip.done .ms { opacity: 1; }
+.clip .ok { opacity: 0; color: var(--primary); transition: opacity .2s; }
+.clip.done .ok { opacity: 1; }
+.clip .to-note { font-size: 18px; padding: 5px; margin: -5px; border-radius: 50%; color: var(--on-surface-variant); opacity: 0; transition: opacity .2s, background .2s; }
+.clip:hover .to-note { opacity: 1; }
+.clip .to-note:hover { background: var(--surface-c-highest); color: var(--on-surface); }
+.clip-count { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.notes { flex: 1; resize: none; border: 2px solid transparent; outline: 0; border-radius: 18px; padding: 14px 16px; background: var(--surface-c); color: var(--on-surface); font: inherit; font-size: 14px; line-height: 1.5; user-select: text; -webkit-user-select: text; transition: border-color .2s; }
+.notes:focus { border-color: var(--primary); }
+.notes::placeholder { color: var(--on-surface-variant); }
 
 /* ------------------------------------------------------- fonds d'écran */
 .wall-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 104px; gap: 10px; padding-right: 4px; align-content: start; }

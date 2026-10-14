@@ -180,10 +180,18 @@
         <!-- PRESSE-PAPIERS -->
         <section class="page" data-page="clips">
           <div class="page-head">
+            <span class="seg clip-seg">
+              <button data-v="hist" class="on">Historique</button>
+              <button data-v="notes">Bloc-notes</button>
+            </span>
             <span class="clip-count">Historique vide</span>
-            <button class="text-btn" id="clip-clear"><span class="ms">delete</span>Effacer</button>
+            <span>
+              <button class="text-btn" id="clip-clear"><span class="ms">delete</span>Effacer</button>
+              <button class="text-btn" id="note-copy" hidden><span class="ms">content_copy</span>Copier</button>
+            </span>
           </div>
           <div class="clip-list"></div>
+          <textarea class="notes" hidden spellcheck="true" placeholder="Écrivez vos notes ici… Elles sont enregistrées automatiquement."></textarea>
         </section>
 
         <!-- FONDS D'ÉCRAN -->
