@@ -1,9 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod apps;
+mod audio;
+mod discord;
 mod games;
 mod mail;
 mod media;
+mod pc;
 mod store;
 mod system;
 mod wall;
@@ -195,6 +198,21 @@ fn main() {
         let _ = std::fs::write(args.get(i + 2).map(String::as_str).unwrap_or("imap-check.txt"), mail::check(host));
         return;
     }
+    // `ilot.exe --check-pc <fichier>` : mode d'alimentation, logiciels, volumes
+    if let Some(i) = args.iter().position(|a| a == "--check-pc") {
+        let names = ["DCv2", "ArmouryCrate", "lghub", "Discord", "Spotify"].map(String::from).to_vec();
+        let vol = |app: &str, mic| audio::app_volume_get(app.into(), Some(mic)).map(|v| serde_json::to_string(&v).unwrap_or_default());
+        let report = format!(
+            "alimentation: {:?}
+processus {:?}: {:?}
+son discord: {:?}
+micro discord: {:?}
+son spotify: {:?}",
+            pc::power_get(), names, pc::procs_running(names.clone()), vol("discord", false), vol("discord", true), vol("spotify", false)
+        );
+        let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("pc-check.txt"), report);
+        return;
+    }
     // `ilot.exe --check-games <fichier>` : jeux detectes, sans interface
     if let Some(i) = args.iter().position(|a| a == "--check-games") {
         let report = games::report();
@@ -216,6 +234,7 @@ fn main() {
         .manage(system::Clips(Mutex::new(VecDeque::new())))
         .manage(apps::Apps(Mutex::new(Vec::new())))
         .manage(games::Games(Mutex::new(Vec::new())))
+        .manage(discord::Discord::default())
         .manage(mail::MailState(Mutex::new(Default::default())))
         .setup(move |app| {
             let win = app.get_webview_window("island").expect("fenetre island");
@@ -238,6 +257,7 @@ fn main() {
             system::watch_clipboard(h.clone());
             we::watch(h.clone());
             mail::watch(h.clone());
+            discord::start(h.clone());
             games::load(h.clone());
             apps::load(h);
 
@@ -288,6 +308,18 @@ fn main() {
             games::game_launch,
             games::game_folder,
             games::app_folder,
+            games::folder_open,
+            games::pick_folder,
+            audio::app_volume_get,
+            audio::app_volume_set,
+            pc::power_get,
+            pc::power_set,
+            pc::procs_running,
+            discord::discord_get,
+            discord::discord_setup,
+            discord::discord_forget,
+            discord::discord_self,
+            discord::discord_user,
             wall::walls_get,
             wall::wall_current,
             wall::wall_set,

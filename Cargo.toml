@@ -20,6 +20,7 @@ arboard = { version = "3", default-features = false }
 imap = "2.4"
 native-tls = "0.2"
 mailparse = "0.18"
+ureq = { version = "2", default-features = false, features = ["native-tls", "json"] }
 windows = { version = "0.61", features = [
   "Foundation",
   "Media_Control",
@@ -32,9 +33,12 @@ windows = { version = "0.61", features = [
   "Win32_Storage_FileSystem",
   "Win32_System_Com",
   "Win32_System_DataExchange",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Pipes",
   "Win32_System_Power",
   "Win32_System_Registry",
   "Win32_System_Shutdown",
+  "Win32_System_Threading",
   "Win32_UI_Shell",
   "Win32_UI_Shell_Common",
   "Win32_UI_WindowsAndMessaging",
