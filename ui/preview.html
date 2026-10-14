@@ -18,7 +18,7 @@ D.wall_current={path:'C:\\w2.jpg',thumb:D.walls_get[2].thumb};
 D.walls_get.forEach((w,i)=>w.cur=i===2);
 D.we_state={installed:true,running:true,current:'C:\\we0'};
 D.we_walls=[["Idyll's Fall",'scene','#1d3557','#a8dadc'],['Night City','video','#10002b','#e0aaff'],['Lofi Room','scene','#3a0ca3','#f72585'],['Aurora','web','#003049','#2a9d8f'],['Neon Rain','video','#240046','#ff4d6d'],['Beach','scene','#0077b6','#ffd166']].map((x,i)=>({path:'C:\\we'+i,title:x[0],kind:x[1],thumb:grad(x[2],x[3])}));
-D.store_get=null;D.clip_copy=true;D.store_set=true;
+D.store_get=null;D.games_get=[['Anno 1800','ubisoft',0],['Baldurs Gate 3','steam',1],['Euro Truck Simulator 2','steam',1],['Genshin Impact','epic',0],['Hollow Knight','steam',1],['Stardew Valley','steam',1],['Terraria','steam',1]].map((g,i)=>({id:g[1]+':'+i,name:g[0],source:g[1],cover:g[2]?grad(['#3d348b','#e76f51','#2a9d8f','#14213d','#ff006e'][i%5],'#111'):'',icon:''}));D.clip_copy=true;D.store_set=true;
 D.mail_get={accounts:[{email:'melinromain07@gmail.com',host:'imap.gmail.com',unread:2,error:null},{email:'romain@orange.fr',host:'imap.orange.fr',unread:1,error:null}],
  mails:[['GitHub','noreply@github.com','[tidic84/ilot] Nouvelle release v0.2',1,0],['Pronote','ne-pas-repondre@index-education.net','Nouveau devoir en mathématiques',1,1],['Steam','noreply@steampowered.com','Un jeu de votre liste de souhaits est en promo !',0,0],['Maman','maman@orange.fr','Ce soir',0,1],['Discord','noreply@discord.com','Vous avez 3 messages non lus',0,0]]
  .map((m,i)=>({account:m[4]?'romain@orange.fr':'melinromain07@gmail.com',uid:i+1,from:m[0],from_addr:m[1],subject:m[2],seen:!m[3],date:Math.floor(Date.now()/1000)-i*30000,link:'https://mail.google.com/'}))};

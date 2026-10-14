@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod apps;
+mod games;
 mod mail;
 mod media;
 mod store;
@@ -188,6 +189,12 @@ fn main() {
         let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("we-check.txt"), report);
         return;
     }
+    // `ilot.exe --check-games <fichier>` : jeux detectes, sans interface
+    if let Some(i) = args.iter().position(|a| a == "--check-games") {
+        let report = games::report();
+        let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("games-check.txt"), report);
+        return;
+    }
     let hit = Arc::new(Mutex::new(Hit::default()));
     tauri::Builder::default()
         .plugin(
@@ -202,6 +209,7 @@ fn main() {
         .manage(HitState(hit.clone()))
         .manage(system::Clips(Mutex::new(VecDeque::new())))
         .manage(apps::Apps(Mutex::new(Vec::new())))
+        .manage(games::Games(Mutex::new(Vec::new())))
         .manage(mail::MailState(Mutex::new(Default::default())))
         .setup(move |app| {
             let win = app.get_webview_window("island").expect("fenetre island");
@@ -224,6 +232,7 @@ fn main() {
             system::watch_clipboard(h.clone());
             we::watch(h.clone());
             mail::watch(h.clone());
+            games::load(h.clone());
             apps::load(h);
 
             // Ctrl+Alt+Espace : lanceur d'applications
@@ -268,6 +277,11 @@ fn main() {
             apps::apps_get,
             apps::apps_refresh,
             apps::app_launch,
+            games::games_get,
+            games::games_refresh,
+            games::game_launch,
+            games::game_folder,
+            games::app_folder,
             wall::walls_get,
             wall::wall_current,
             wall::wall_set,
