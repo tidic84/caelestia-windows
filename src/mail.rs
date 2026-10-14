@@ -209,9 +209,11 @@ fn login(host: &str, port: u16, user: &str, pass: &str) -> Result<Session, Strin
     let mut client = open(host, port)?;
     client.read_greeting().map_err(|e| e.to_string())?;
     client.login(user, pass).map_err(|(e, _)| match e {
-        imap::error::Error::No(_) | imap::error::Error::Bad(_) => {
-            "identifiants refuses (utilisez un mot de passe d'application)".to_string()
-        }
+        // message du serveur, ex. « [AUTHENTICATIONFAILED] Invalid credentials »
+        imap::error::Error::No(m) | imap::error::Error::Bad(m) => format!(
+            "identifiants refuses par le serveur ({}) : verifiez l'adresse et le mot de passe d'application",
+            m.trim()
+        ),
         e => e.to_string(),
     })
 }
@@ -327,7 +329,11 @@ pub fn mail_refresh(app: AppHandle) -> Inbox {
 pub fn mail_add(app: AppHandle, email: String, pass: String, host: Option<String>) -> Result<Inbox, String> {
     let email = email.trim().to_string();
     // Google affiche les mots de passe d'application par groupes de 4 avec des espaces
-    let pass = pass.replace(' ', "");
+    // (copie depuis la page Google : espaces insecables et caracteres invisibles possibles)
+    let pass: String = pass
+        .chars()
+        .filter(|c| !c.is_whitespace() && !matches!(c, '\u{200B}'..='\u{200D}' | '\u{FEFF}'))
+        .collect();
     if !email.contains('@') || pass.is_empty() {
         return Err("adresse ou mot de passe manquant".into());
     }
