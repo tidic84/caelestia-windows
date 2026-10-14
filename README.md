@@ -27,11 +27,12 @@ pour ouvrir le panneau. Les couleurs suivent votre fond d'écran (Material You).
 | **Apps** | Toutes les applis du menu Démarrer (classiques et Store) avec icônes, recherche, navigation clavier. **Ctrl+Alt+Espace** l'ouvre directement |
 | **Presse-papiers** | Les 40 derniers textes copiés, un clic pour recopier |
 | **Fonds** | Vos images de `Images\Wallpapers` + celles de Windows ; choisir un fond recalcule la palette. Avec **Wallpaper Engine**, un second onglet liste vos fonds WE |
+| **Réglages** (⚙) | Lancer au démarrage de Windows ; choisir l'écran où s'affiche l'îlot (l'écran principal par défaut, ou si l'écran choisi est débranché) |
 
 Autres comportements :
 - hors de l'îlot, les clics passent aux fenêtres en dessous ;
 - l'îlot se cache quand un jeu ou une vidéo est en plein écran ;
-- une icône dans la zone de notification permet de recharger ou de quitter.
+- une icône dans la zone de notification permet d'ouvrir les réglages, de recharger ou de quitter.
 
 ## Wallpaper Engine
 
@@ -70,7 +71,7 @@ ouvrez `preview.html`, qui simule le backend avec des données factices :
 cd ui; python -m http.server 8765   # puis http://localhost:8765/preview.html?tab=home
 ```
 
-Onglets : `home`, `media`, `apps`, `clips`, `walls` ; `?peek=1` montre l'état survolé.
+Onglets : `home`, `media`, `apps`, `clips`, `walls`, `settings` ; `?peek=1` montre l'état survolé.
 
 ## Comment ça marche
 

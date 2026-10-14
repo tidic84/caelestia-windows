@@ -66,6 +66,7 @@ listen('fullscreen', ({ payload }) => {
 listen('blur', () => {
   if (state === 'open' && !hovered) setState('collapsed');
 });
+listen('open', ({ payload }) => { pinned = true; open(payload); });
 listen('launcher', () => {
   if (state === 'open' && currentTab === 'apps') return setState('collapsed');
   pinned = true;
@@ -123,6 +124,7 @@ function onOpen() {
 function onTab(tab) {
   if (tab === 'walls' && !wallsLoaded) loadWalls();
   if (tab === 'apps') renderApps();
+  if (tab === 'settings') loadSettings();
 }
 
 // ================================================================ horloge
@@ -499,6 +501,43 @@ listen('wall-changed', syncWall);
     if (wallsLoaded) loadWalls();
   }
 })();
+
+// ================================================================ réglages
+const autostart = $('#set-autostart');
+async function loadSettings() {
+  const s = await invoke('settings_get');
+  autostart.checked = s.autostart;
+  renderMonitors(s.monitors, s.monitor);
+}
+function renderMonitors(list, chosen) {
+  const box = $('.mon-list');
+  box.innerHTML = '';
+  // l'écran choisi peut être débranché : on retombe alors sur « Automatique »
+  const cur = list.some(m => m.id === chosen) ? chosen : null;
+  const primary = list.find(m => m.primary);
+  const items = [{ id: null, label: 'Automatique', sub: primary ? `Écran principal (${primary.label})` : 'Écran principal', icon: 'auto_awesome' }]
+    .concat(list.map(m => ({
+      id: m.id, label: m.label, icon: 'monitor',
+      sub: `${m.width} × ${m.height}${m.primary ? ' · principal' : ''}`,
+    })));
+  items.forEach(m => {
+    const el = document.createElement('button');
+    el.className = 'mon' + (m.id === cur ? ' on' : '');
+    el.innerHTML = `<span class="ms">${m.icon}</span><b></b><small></small>`;
+    el.querySelector('b').textContent = m.label;
+    el.querySelector('small').textContent = m.sub;
+    el.addEventListener('click', async () => {
+      $$('.mon').forEach(x => x.classList.toggle('on', x === el));
+      await invoke('settings_monitor', { id: m.id });
+    });
+    box.append(el);
+  });
+}
+autostart.addEventListener('change', async () => {
+  autostart.disabled = true;
+  autostart.checked = await invoke('settings_autostart', { on: autostart.checked });
+  autostart.disabled = false;
+});
 
 // ======================================================== Material You
 const ROLES = {

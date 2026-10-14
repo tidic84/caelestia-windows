@@ -14,6 +14,8 @@ const D={
  walls_get:[['#264653','#2a9d8f'],['#f4a261','#e76f51'],['#3d348b','#7678ed'],['#0b090a','#e5383b'],['#606c38','#dda15e'],['#03045e','#00b4d8'],['#ff006e','#8338ec'],['#14213d','#fca311']].map((g,i)=>({path:'C:\\w'+i+'.jpg',thumb:grad(g[0],g[1])})),
  wall_current:null, startup_tab:new URLSearchParams(location.search).get('tab'),
 };
+D.settings_get={autostart:true,monitor:null,monitors:[{id:'\\\\.\\DISPLAY1',label:'Écran 1',width:2560,height:1440,primary:true},{id:'\\\\.\\DISPLAY2',label:'Écran 2',width:1920,height:1080,primary:false}]};
+D.settings_autostart=true;
 D.wall_current={path:'C:\\w2.jpg',thumb:D.walls_get[2].thumb};
 D.walls_get.forEach((w,i)=>w.cur=i===2);
 D.we_state={installed:true,running:true,current:'C:\\we0'};
@@ -59,6 +61,7 @@ window.__TAURI__={core:{invoke:async(c)=>D[c]??null},event:{listen:async(e,f)=>{
         <button data-tab="apps"><span class="ms">apps</span><span>Apps</span></button>
         <button data-tab="clips"><span class="ms">content_paste</span><span>Presse-papiers</span></button>
         <button data-tab="walls"><span class="ms">wallpaper</span><span>Fonds</span></button>
+        <button data-tab="settings" title="Réglages"><span class="ms">settings</span></button>
       </nav>
 
       <div id="pages">
@@ -163,6 +166,30 @@ window.__TAURI__={core:{invoke:async(c)=>D[c]??null},event:{listen:async(e,f)=>{
             </span>
           </div>
           <div class="wall-grid"><div class="empty">Chargement…</div></div>
+        </section>
+
+        <!-- RÉGLAGES -->
+        <section class="page" data-page="settings">
+          <div class="set-list">
+            <label class="card set-row">
+              <span class="ms set-icon">rocket_launch</span>
+              <span class="set-text">
+                <b>Lancer au démarrage de Windows</b>
+                <small>L'îlot s'ouvre automatiquement à l'ouverture de session</small>
+              </span>
+              <input type="checkbox" class="switch" id="set-autostart">
+            </label>
+            <div class="card set-block">
+              <div class="set-row">
+                <span class="ms set-icon">desktop_windows</span>
+                <span class="set-text">
+                  <b>Écran de l'îlot</b>
+                  <small>Si l'écran choisi est débranché, l'îlot revient sur l'écran principal</small>
+                </span>
+              </div>
+              <div class="mon-list"></div>
+            </div>
+          </div>
         </section>
       </div>
     </div>

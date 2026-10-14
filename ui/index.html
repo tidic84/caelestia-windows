@@ -41,6 +41,7 @@
         <button data-tab="apps"><span class="ms">apps</span><span>Apps</span></button>
         <button data-tab="clips"><span class="ms">content_paste</span><span>Presse-papiers</span></button>
         <button data-tab="walls"><span class="ms">wallpaper</span><span>Fonds</span></button>
+        <button data-tab="settings" title="Réglages"><span class="ms">settings</span></button>
       </nav>
 
       <div id="pages">
@@ -145,6 +146,30 @@
             </span>
           </div>
           <div class="wall-grid"><div class="empty">Chargement…</div></div>
+        </section>
+
+        <!-- RÉGLAGES -->
+        <section class="page" data-page="settings">
+          <div class="set-list">
+            <label class="card set-row">
+              <span class="ms set-icon">rocket_launch</span>
+              <span class="set-text">
+                <b>Lancer au démarrage de Windows</b>
+                <small>L'îlot s'ouvre automatiquement à l'ouverture de session</small>
+              </span>
+              <input type="checkbox" class="switch" id="set-autostart">
+            </label>
+            <div class="card set-block">
+              <div class="set-row">
+                <span class="ms set-icon">desktop_windows</span>
+                <span class="set-text">
+                  <b>Écran de l'îlot</b>
+                  <small>Si l'écran choisi est débranché, l'îlot revient sur l'écran principal</small>
+                </span>
+              </div>
+              <div class="mon-list"></div>
+            </div>
+          </div>
         </section>
       </div>
     </div>

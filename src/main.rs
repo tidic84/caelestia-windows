@@ -2,6 +2,7 @@
 
 mod apps;
 mod media;
+mod settings;
 mod system;
 mod wall;
 mod we;
@@ -66,14 +67,18 @@ fn grab_focus(win: WebviewWindow) {
     let _ = win.set_focus();
 }
 
-/// Place la fenetre en haut, au centre de l'ecran principal.
-fn place(win: &WebviewWindow) {
-    let Ok(Some(mon)) = win.primary_monitor() else { return };
+/// Place la fenetre en haut, au centre de l'ecran choisi dans les reglages
+/// (l'ecran principal par defaut, ou si l'ecran choisi est debranche).
+pub fn place(win: &WebviewWindow) {
+    let Some(mon) = settings::target_monitor(win) else { return };
     let Ok(size) = win.outer_size() else { return };
     let mpos = mon.position();
     let msize = mon.size();
     let x = mpos.x + (msize.width as i32 - size.width as i32) / 2;
-    let _ = win.set_position(PhysicalPosition::new(x, mpos.y));
+    let target = PhysicalPosition::new(x, mpos.y);
+    if win.outer_position().ok() != Some(target) {
+        let _ = win.set_position(target);
+    }
 }
 
 /// Suit le curseur : active/desactive le passage des clics selon qu'il est
@@ -88,6 +93,10 @@ fn track_cursor(win: WebviewWindow, hit: Arc<Mutex<Hit>>) {
         loop {
             std::thread::sleep(Duration::from_millis(25));
             tick = tick.wrapping_add(1);
+            // ecran branche / debranche, resolution modifiee : on se recale
+            if tick % 80 == 0 && !hidden {
+                place(&win);
+            }
             if tick % 20 == 0 {
                 let fs = fullscreen_foreground(own);
                 if fs != hidden {
@@ -169,6 +178,14 @@ fn toggle_launcher(app: &AppHandle) {
     }
 }
 
+fn open_tab(app: &AppHandle, tab: &str) {
+    if let Some(win) = app.get_webview_window("island") {
+        let _ = win.set_ignore_cursor_events(false);
+        let _ = win.set_focus();
+        let _ = win.emit("open", tab);
+    }
+}
+
 fn main() {
     // `ilot.exe --check-we <fichier>` : diagnostic Wallpaper Engine, sans interface
     let args: Vec<String> = std::env::args().collect();
@@ -201,6 +218,7 @@ fn main() {
         .manage(system::Clips(Mutex::new(VecDeque::new())))
         .manage(apps::Apps(Mutex::new(Vec::new())))
         .setup(move |app| {
+            settings::init(app.handle());
             let win = app.get_webview_window("island").expect("fenetre island");
             place(&win);
             let _ = win.show();
@@ -228,15 +246,17 @@ fn main() {
                 Code::Space,
             ));
 
+            let prefs = MenuItem::with_id(app, "settings", "Réglages", true, None::<&str>)?;
             let reload = MenuItem::with_id(app, "reload", "Recharger", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quitter Ilot", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&reload, &quit])?;
+            let menu = Menu::with_items(app, &[&prefs, &reload, &quit])?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("Ilot")
                 .menu(&menu)
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "quit" => app.exit(0),
+                    "settings" => open_tab(app, "settings"),
                     "reload" => {
                         if let Some(w) = app.get_webview_window("island") {
                             let _ = w.eval("location.reload()");
@@ -271,6 +291,9 @@ fn main() {
             we::we_state,
             we::we_walls,
             we::we_set,
+            settings::settings_get,
+            settings::settings_autostart,
+            settings::settings_monitor,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Ilot");
