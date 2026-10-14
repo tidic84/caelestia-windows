@@ -46,8 +46,7 @@ pub fn user_dir() -> PathBuf {
 }
 
 fn cache_dir() -> PathBuf {
-    let base = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".into());
-    let d = Path::new(&base).join("Ilot").join("thumbs");
+    let d = crate::store::data_dir().join("thumbs");
     let _ = std::fs::create_dir_all(&d);
     d
 }
