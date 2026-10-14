@@ -466,3 +466,37 @@ pub fn app_folder(app: AppHandle, id: String, name: String) -> bool {
     .join()
     .unwrap_or(false)
 }
+
+// ------------------------------------------- dossiers d'apps : emplacement reel
+
+/// Ouvre un dossier dans l'Explorateur.
+#[tauri::command(async)]
+pub fn folder_open(path: String) -> bool {
+    open_dir(Path::new(&path))
+}
+
+/// Boite « Choisir un dossier » de Windows ; renvoie le chemin choisi.
+#[tauri::command(async)]
+pub fn pick_folder(app: AppHandle, title: Option<String>) -> Option<String> {
+    use windows::Win32::UI::Shell::{FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH};
+    let owner = app.get_webview_window("island").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize);
+    std::thread::spawn(move || unsafe {
+        crate::com_init_sta();
+        let dlg: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER).ok()?;
+        let opts = dlg.GetOptions().ok()?;
+        dlg.SetOptions(opts | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM).ok()?;
+        if let Some(t) = title {
+            let _ = dlg.SetTitle(&HSTRING::from(t));
+        }
+        let owner = owner.map(|h| windows::Win32::Foundation::HWND(h as _));
+        dlg.Show(owner).ok()?;
+        let item = dlg.GetResult().ok()?;
+        let p = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
+        let s = p.to_string().ok();
+        CoTaskMemFree(Some(p.0 as _));
+        s
+    })
+    .join()
+    .ok()
+    .flatten()
+}

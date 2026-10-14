@@ -1,5 +1,7 @@
 import {
-  Hct, SchemeTonalSpot, MaterialDynamicColors as MDC, sourceColorFromImage, hexFromArgb,
+  Hct, SchemeTonalSpot, SchemeVibrant, SchemeExpressive, SchemeFidelity, SchemeContent, SchemeNeutral,
+  SchemeMonochrome, SchemeRainbow, SchemeFruitSalad,
+  MaterialDynamicColors as MDC, sourceColorFromImage, hexFromArgb, argbFromHex,
 } from './vendor/mcu.js';
 
 const { invoke } = window.__TAURI__.core;
@@ -89,6 +91,7 @@ addEventListener('resize', reportHit);
 // ================================================================ onglets
 let currentTab = 'home';
 const TABS = $$('#tabs button').map(b => b.dataset.tab);
+$$('#tabs button').forEach(b => (b.title = b.querySelector('span:not(.ms)').textContent));
 
 function showTab(tab) {
   const dir = TABS.indexOf(tab) > TABS.indexOf(currentTab) ? 1 : -1;
@@ -123,6 +126,10 @@ function onOpen() {
 function onTab(tab) {
   if (tab === 'walls' && !wallsLoaded) loadWalls();
   if (tab === 'apps') renderApps();
+  if (tab === 'media') refreshAppVolume();
+  // onglet PC : état des logiciels, du mode d'alimentation et du volume Discord
+  clearInterval(pcTimer);
+  if (tab === 'pc') { refreshPc(); pcTimer = setInterval(() => state === 'open' && currentTab === 'pc' ? refreshPc() : clearInterval(pcTimer), 3000); }
 }
 
 // ================================================================ horloge
@@ -517,7 +524,7 @@ function askName(e, title, value, done) {
 function appMenu(a, e) {
   showCtx(e, box => {
     ctxTitle(box, a.name);
-    ctxItem(box, 'folder_open', 'Ouvrir l’emplacement', () => openFolder(() => invoke('app_folder', { id: a.id, name: a.name })));
+    ctxItem(box, 'folder_open', 'Ouvrir l’emplacement du fichier', () => openFolder(() => invoke('app_folder', { id: a.id, name: a.name })));
     box.insertAdjacentHTML('beforeend', '<hr class="ctx-sep">');
     folders.list.forEach(f => {
       const inside = f.apps.includes(a.id);
@@ -539,6 +546,25 @@ function appMenu(a, e) {
 function folderMenu(f, e) {
   showCtx(e, box => {
     ctxTitle(box, f.name);
+    // dossier réel associé (ex. Documents\Cours) pour y accéder vite
+    ctxItem(box, 'folder_open', 'Ouvrir l’emplacement du fichier', async () => {
+      if (!f.path) {
+        hideCtx();
+        const p = await invoke('pick_folder', { title: `Emplacement du dossier « ${f.name} »` });
+        if (!p) return;
+        f.path = p;
+        saveFolders();
+      }
+      openFolder(() => invoke('folder_open', { path: f.path }));
+    });
+    if (f.path) {
+      ctxItem(box, 'drive_file_move', 'Changer l’emplacement…', async () => {
+        hideCtx();
+        const p = await invoke('pick_folder', { title: `Emplacement du dossier « ${f.name} »` });
+        if (p) { f.path = p; saveFolders(); }
+      });
+    }
+    box.insertAdjacentHTML('beforeend', '<hr class="ctx-sep">');
     ctxItem(box, 'edit', 'Renommer', () => askName(e, 'Renommer', f.name, name => {
       f.name = name;
       saveFolders();
@@ -785,6 +811,328 @@ $$('[data-url]').forEach(a => a.addEventListener('click', e => { e.preventDefaul
 listen('mail', ({ payload }) => applyInbox(payload));
 invoke('mail_get').then(applyInbox);
 
+// ============================================ média : volume de l'appli
+// volume de la session audio Windows de l'appli qui joue (Spotify, Chrome…)
+const mpVol = $('#mp-vol');
+let mpApp = '';
+function showAppVolume(v) {
+  $('.mp-vol').hidden = !v;
+  if (!v) return;
+  const n = Math.round(v.level * 100);
+  mpVol.value = n;
+  mpVol.style.setProperty('--p', (v.muted ? 0 : n) + '%');
+  $('.mp-vol-val').textContent = v.muted ? '–' : n;
+  $('#mp-mute .ms').textContent = v.muted || !n ? 'volume_off' : n < 50 ? 'volume_down' : 'volume_up';
+  mpVol.dataset.muted = v.muted;
+}
+function refreshAppVolume() {
+  mpApp = hasMedia ? media.app : '';
+  if (!mpApp) return showAppVolume(null);
+  invoke('app_volume_get', { app: mpApp }).then(showAppVolume);
+}
+mpVol.addEventListener('input', () => {
+  showAppVolume({ level: mpVol.value / 100, muted: false });
+  invoke('app_volume_set', { app: mpApp, level: mpVol.value / 100, muted: false });
+});
+mpVol.addEventListener('wheel', e => {
+  e.stopPropagation();
+  const v = Math.max(0, Math.min(100, Number(mpVol.value) - Math.sign(e.deltaY) * 5));
+  showAppVolume({ level: v / 100, muted: false });
+  invoke('app_volume_set', { app: mpApp, level: v / 100, muted: false });
+}, { passive: true });
+$('#mp-mute').addEventListener('click', () => {
+  const muted = mpVol.dataset.muted !== 'true';
+  showAppVolume({ level: mpVol.value / 100, muted });
+  invoke('app_volume_set', { app: mpApp, muted });
+});
+listen('media', ({ payload }) => { if (currentTab === 'media' && payload.app !== mpApp) refreshAppVolume(); });
+
+// --- panneaux latéraux (playlists, apparence)
+function togglePanel(id) {
+  const p = $(id);
+  const show = p.hidden;
+  $$('.side-panel').forEach(x => (x.hidden = true));
+  p.hidden = !show;
+}
+$$('.side-panel [data-close]').forEach(b => b.addEventListener('click', () => (b.closest('.side-panel').hidden = true)));
+$('#mp-lists').addEventListener('click', () => togglePanel('#pl-panel'));
+$('#mp-style').addEventListener('click', () => togglePanel('#st-panel'));
+$$('.side-panel input').forEach(i => i.addEventListener('focus', () => { pinned = true; }));
+
+// ================================================== playlists favorites
+// %LOCALAPPDATA%\Ilot\playlists.json : [{ name, url }]
+let playlists = [];
+const plIcon = url => /spotify/.test(url) ? 'music_note' : /deezer/.test(url) ? 'graphic_eq' : /youtu/.test(url) ? 'smart_display' : 'queue_music';
+// les liens open.spotify.com s'ouvrent directement dans l'appli Spotify
+const plTarget = url => {
+  const m = url.match(/open\.spotify\.com\/(?:intl-\w+\/)?(playlist|album|artist|track)\/(\w+)/);
+  return m ? `spotify:${m[1]}:${m[2]}` : url;
+};
+function renderPlaylists() {
+  const box = $('.pl-list');
+  box.innerHTML = playlists.length ? '' : '<div class="sp-hint">Aucune playlist enregistrée.</div>';
+  playlists.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'pl-item';
+    el.innerHTML = `<button class="pl-open"><span class="ms">${plIcon(p.url)}</span><span></span></button><button class="icon-btn small" title="Retirer"><span class="ms">close</span></button>`;
+    el.querySelector('.pl-open span:last-child').textContent = p.name;
+    el.querySelector('.pl-open').title = p.url;
+    el.querySelector('.pl-open').addEventListener('click', () => { invoke('open_url', { url: plTarget(p.url) }); setState('collapsed'); });
+    el.querySelector('.icon-btn').addEventListener('click', () => {
+      playlists.splice(i, 1);
+      invoke('store_set', { key: 'playlists', value: playlists });
+      renderPlaylists();
+    });
+    box.append(el);
+  });
+}
+$('.pl-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.currentTarget;
+  const url = f.url.value.trim();
+  if (!/^(https?:\/\/|spotify:|deezer:\/\/)/.test(url)) { f.url.setCustomValidity('Lien http(s) ou spotify: attendu'); f.url.reportValidity(); return; }
+  playlists.push({ name: f.name.value.trim(), url });
+  invoke('store_set', { key: 'playlists', value: playlists });
+  f.reset();
+  renderPlaylists();
+});
+$('.pl-form [name=url]').addEventListener('input', e => e.target.setCustomValidity(''));
+invoke('store_get', { key: 'playlists' }).then(l => { if (Array.isArray(l)) playlists = l; renderPlaylists(); });
+
+// ============================================================ apparence
+// %LOCALAPPDATA%\Ilot\theme.json ; « auto » = couleur tirée du fond d'écran
+let theme = { color: 'auto', scheme: 'tonal', dark: true, mediaBg: 'art' };
+const SCHEMES = {
+  tonal: ['Doux', SchemeTonalSpot], vibrant: ['Vif', SchemeVibrant], expressive: ['Expressif', SchemeExpressive],
+  fidelity: ['Fidèle', SchemeFidelity], content: ['Contenu', SchemeContent], neutral: ['Neutre', SchemeNeutral],
+  mono: ['Monochrome', SchemeMonochrome], rainbow: ['Arc-en-ciel', SchemeRainbow], fruit: ['Fruité', SchemeFruitSalad],
+};
+const OPTS = {
+  scheme: Object.entries(SCHEMES).map(([k, [l]]) => [k, l]),
+  dark: [[true, 'Sombre'], [false, 'Clair']],
+  mediaBg: [['art', 'Pochette floutée'], ['color', 'Couleur'], ['gradient', 'Dégradé'], ['none', 'Aucun']],
+};
+const SWATCHES = ['#6750a4', '#3f51b5', '#1e88e5', '#00897b', '#43a047', '#c0ca33', '#fb8c00', '#e53935', '#d81b60', '#8e24aa'];
+
+function renderThemePanel() {
+  const sw = $('.swatches');
+  sw.innerHTML = '';
+  const auto = document.createElement('button');
+  auto.className = 'sw auto' + (theme.color === 'auto' ? ' on' : '');
+  auto.title = 'Automatique (fond d’écran)';
+  auto.innerHTML = '<span class="ms">wallpaper</span>';
+  auto.addEventListener('click', () => setTheme({ color: 'auto' }));
+  sw.append(auto);
+  SWATCHES.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'sw' + (theme.color === c ? ' on' : '');
+    b.style.background = c;
+    b.addEventListener('click', () => setTheme({ color: c }));
+    sw.append(b);
+  });
+  const custom = document.createElement('label');
+  custom.className = 'sw custom' + (theme.color !== 'auto' && !SWATCHES.includes(theme.color) ? ' on' : '');
+  custom.title = 'Autre couleur';
+  custom.innerHTML = `<span class="ms">colorize</span><input type="color" value="${theme.color === 'auto' ? '#6750a4' : theme.color}">`;
+  custom.querySelector('input').addEventListener('change', e => setTheme({ color: e.target.value }));
+  sw.append(custom);
+  $$('.chips[data-opt]').forEach(box => {
+    const key = box.dataset.opt;
+    box.innerHTML = '';
+    OPTS[key].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = 'fchip' + (theme[key] === v ? ' on' : '');
+      b.textContent = label;
+      b.addEventListener('click', () => setTheme({ [key]: v }));
+      box.append(b);
+    });
+  });
+}
+function setTheme(patch) {
+  theme = { ...theme, ...patch };
+  invoke('store_set', { key: 'theme', value: theme });
+  renderThemePanel();
+  applyMediaBg();
+  if ('color' in patch || 'scheme' in patch || 'dark' in patch) themeFrom(currentThumb);
+}
+function applyMediaBg() {
+  const page = $('[data-page="media"]');
+  ['art', 'color', 'gradient', 'none'].forEach(k => page.classList.toggle('bg-' + k, theme.mediaBg === k));
+}
+invoke('store_get', { key: 'theme' }).then(t => {
+  if (t && typeof t === 'object') theme = { ...theme, ...t };
+  renderThemePanel();
+  applyMediaBg();
+  if (theme.color !== 'auto' || theme.scheme !== 'tonal' || !theme.dark) themeFrom(currentThumb);
+});
+
+// =================================================================== PC
+// --- Discord : RPC (src/discord.rs) si configuré, sinon mélangeur de volume Windows
+let dc = { status: 'setup', people: [] };
+const DC_STATUS = { setup: 'Mode simple', closed: 'Discord fermé', authorizing: 'Autorise Ilot dans Discord…', ready: 'Connecté', error: 'Erreur' };
+const dcRpc = () => dc.status === 'ready';
+let dcLocal = { mic: false, out: false }; // sourdines Windows (mode simple)
+
+function renderDiscord() {
+  $('.dc-status').textContent = DC_STATUS[dc.status] || dc.status;
+  $('.dc-status').classList.toggle('ok', dcRpc());
+  $('.dc-status').classList.toggle('bad', dc.status === 'error');
+  const mic = dcRpc() ? dc.mute : dcLocal.mic;
+  const deaf = dcRpc() ? dc.deaf : dcLocal.out;
+  $('#dc-mic').classList.toggle('off', mic);
+  $('#dc-mic .ms').textContent = mic ? 'mic_off' : 'mic';
+  $('#dc-mic').title = mic ? 'Réactiver le micro' : 'Couper le micro';
+  $('#dc-deaf').classList.toggle('off', deaf);
+  $('#dc-deaf .ms').textContent = deaf ? 'headset_off' : 'headphones';
+  $('#dc-deaf').title = deaf ? 'Réactiver le son' : 'Couper le son (sourdine)';
+
+  const setup = $('.dc-setup');
+  const showSetup = dc.status === 'setup' || dc.status === 'error' || setup.dataset.open === '1';
+  setup.hidden = !showSetup;
+  $('#dc-forget').hidden = dc.status === 'setup';
+  $('.dc-err').textContent = dc.status === 'error' ? dc.error : '';
+  $('.dc-err').classList.toggle('err', dc.status === 'error');
+
+  const chan = $('.dc-chan');
+  const box = $('.dc-people');
+  box.innerHTML = '';
+  if (showSetup) { chan.textContent = ''; return; }
+  if (!dcRpc()) {
+    chan.textContent = dc.status === 'authorizing'
+      ? 'Une fenêtre d’autorisation s’est ouverte dans Discord : clique sur « Autoriser ».'
+      : 'Lance Discord pour voir les personnes du salon.';
+    return;
+  }
+  chan.innerHTML = dc.channel ? `<span class="ms">volume_up</span>` : '';
+  chan.append(dc.channel ? dc.channel : 'Pas dans un salon vocal');
+  if (dc.error) chan.insertAdjacentHTML('beforeend', ` <small class="err">(${dc.error.replace(/[<>&]/g, '')})</small>`);
+  dc.people.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'dc-person' + (p.speaking ? ' speaking' : '') + (p.mute ? ' muted' : '');
+    el.innerHTML = `<span class="av">${p.avatar ? `<img src="${p.avatar}" alt="">` : ''}</span>
+      <div class="dp-main"><div class="dp-name"><b></b><span class="dp-flags"></span></div>
+      <input type="range" class="slider" min="0" max="200" value="${Math.round(p.volume)}"></div>
+      <span class="dp-val">${Math.round(p.volume)}%</span>
+      <button class="icon-btn small" title="${p.mute ? 'Réactiver' : 'Rendre muet (pour moi)'}"><span class="ms">${p.mute ? 'volume_off' : 'volume_up'}</span></button>`;
+    el.querySelector('b').textContent = p.name;
+    if (!p.avatar) el.querySelector('.av').textContent = (p.name[0] || '?').toUpperCase();
+    el.querySelector('.dp-flags').innerHTML = (p.self_mute ? '<span class="ms">mic_off</span>' : '') + (p.self_deaf ? '<span class="ms">headset_off</span>' : '');
+    const r = el.querySelector('input');
+    r.style.setProperty('--p', (p.volume / 2) + '%');
+    r.addEventListener('input', () => {
+      r.style.setProperty('--p', (r.value / 2) + '%');
+      el.querySelector('.dp-val').textContent = r.value + '%';
+      p.volume = Number(r.value);
+      invoke('discord_user', { userId: p.id, volume: p.volume });
+    });
+    r.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
+    el.querySelector('button').addEventListener('click', () => invoke('discord_user', { userId: p.id, mute: !p.mute }).then(() => { p.mute = !p.mute; renderDiscord(); }));
+    box.append(el);
+  });
+}
+// pendant qu'on fait glisser un curseur, on ne reconstruit pas la liste
+listen('discord', ({ payload }) => {
+  dc = payload;
+  if (document.activeElement?.closest?.('.dc-people')) return;
+  renderDiscord();
+});
+invoke('discord_get').then(s => { dc = s; renderDiscord(); });
+
+$('#dc-mic').addEventListener('click', async () => {
+  if (dcRpc()) return invoke('discord_self', { mute: !dc.mute });
+  dcLocal.mic = !dcLocal.mic;
+  const ok = await invoke('app_volume_set', { app: 'discord', mic: true, muted: dcLocal.mic });
+  if (!ok) dcLocal.mic = false;
+  renderDiscord();
+});
+$('#dc-deaf').addEventListener('click', async () => {
+  if (dcRpc()) return invoke('discord_self', { deaf: !dc.deaf });
+  dcLocal.out = !dcLocal.out;
+  const ok = await invoke('app_volume_set', { app: 'discord', muted: dcLocal.out });
+  if (!ok) dcLocal.out = false;
+  renderDiscord();
+});
+const dcVol = $('#dc-vol');
+function showDcVolume(v) {
+  dcVol.disabled = !v;
+  const n = v ? Math.round(v.level * 100) : 0;
+  dcVol.value = n;
+  dcVol.style.setProperty('--p', n + '%');
+  $('.dc-vol-val').textContent = v ? n : '–';
+  $('.dc-vol').title = v ? 'Volume de Discord (mélangeur Windows)' : 'Discord ne joue pas de son pour l’instant';
+  if (v && !dcRpc()) dcLocal.out = v.muted;
+}
+dcVol.addEventListener('input', () => {
+  showDcVolume({ level: dcVol.value / 100, muted: false });
+  invoke('app_volume_set', { app: 'discord', level: dcVol.value / 100 });
+});
+dcVol.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
+$('#dc-settings').addEventListener('click', () => {
+  const s = $('.dc-setup');
+  s.dataset.open = s.dataset.open === '1' ? '' : '1';
+  renderDiscord();
+});
+$('.dc-setup').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.currentTarget;
+  try {
+    await invoke('discord_setup', { clientId: f.cid.value, secret: f.secret.value });
+    f.reset();
+    f.dataset.open = '';
+    $('.dc-err').textContent = '';
+  } catch (ex) {
+    $('.dc-err').textContent = String(ex);
+    $('.dc-err').classList.add('err');
+  }
+});
+$('#dc-forget').addEventListener('click', () => { invoke('discord_forget'); $('.dc-setup').dataset.open = ''; });
+$$('.dc-setup input').forEach(i => i.addEventListener('focus', () => { pinned = true; }));
+
+// --- logiciels constructeur : nom dans le menu Démarrer + exécutable de leur interface
+const HARDWARE = [
+  { match: /^msi center/i, exe: 'DCv2', label: 'MSI Center', icon: 'memory' },
+  { match: /^armoury crate/i, exe: 'ArmouryCrate', label: 'Armoury Crate', icon: 'developer_board' },
+  { match: /^logitech g hub/i, exe: 'lghub', label: 'Logitech G HUB', icon: 'mouse' },
+];
+async function renderHardware() {
+  const list = HARDWARE.map(h => ({ ...h, app: apps.find(a => h.match.test(a.name)) }));
+  const running = await invoke('procs_running', { names: list.map(h => h.exe) });
+  const box = $('.hw-list');
+  box.innerHTML = '';
+  list.forEach((h, i) => {
+    const b = document.createElement('button');
+    b.className = 'hw' + (running[i] ? ' on' : '') + (h.app ? '' : ' missing');
+    b.innerHTML = (h.app?.icon ? `<img src="${h.app.icon}" alt="">` : `<span class="ms">${h.icon}</span>`) + '<span class="hw-name"></span><i></i>';
+    b.querySelector('.hw-name').textContent = h.label;
+    b.querySelector('i').textContent = !h.app ? 'non installé' : running[i] ? 'ouvert' : '';
+    b.disabled = !h.app;
+    b.addEventListener('click', () => { invoke('app_launch', { id: h.app.id }); setState('collapsed'); });
+    b.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (h.app) invoke('app_folder', { id: h.app.id, name: h.app.name }).then(ok => ok && setState('collapsed'));
+    });
+    box.append(b);
+  });
+}
+
+// --- mode d'alimentation de Windows 11
+async function refreshPower() {
+  const m = await invoke('power_get');
+  $$('.pw-modes button').forEach(b => b.classList.toggle('on', b.dataset.pw === m));
+  $('.pw-note').textContent = m ? '' : 'Mode non disponible avec le plan d’alimentation actuel (il faut « Utilisation normale »).';
+}
+$$('.pw-modes button').forEach(b => b.addEventListener('click', async () => {
+  $$('.pw-modes button').forEach(x => x.classList.toggle('on', x === b));
+  if (!await invoke('power_set', { mode: b.dataset.pw })) refreshPower();
+}));
+
+let pcTimer = null;
+function refreshPc() {
+  renderHardware();
+  refreshPower();
+  invoke('app_volume_get', { app: 'discord' }).then(v => { showDcVolume(v); renderDiscord(); });
+}
+
 // ========================================================= presse-papiers
 function renderClips(list) {
   clipCount = list.length ? `${list.length} élément${list.length > 1 ? 's' : ''}` : 'Historique vide';
@@ -983,13 +1331,20 @@ const ROLES = {
 function applyPalette(p) {
   for (const [k, v] of Object.entries(p)) document.documentElement.style.setProperty('--' + k, v);
 }
+// couleur source : celle du fond d'écran (src), ou celle choisie dans Apparence
 async function themeFrom(src) {
   try {
-    const img = new Image();
-    img.src = src;
-    await img.decode();
-    const argb = await sourceColorFromImage(img);
-    const scheme = new SchemeTonalSpot(Hct.fromInt(argb), true, 0);
+    let argb;
+    if (theme.color !== 'auto') argb = argbFromHex(theme.color);
+    else {
+      if (!src) return;
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      argb = await sourceColorFromImage(img);
+    }
+    const Scheme = (SCHEMES[theme.scheme] || SCHEMES.tonal)[1];
+    const scheme = new Scheme(Hct.fromInt(argb), theme.dark, 0);
     const p = {};
     for (const [css, role] of Object.entries(ROLES)) p[css] = hexFromArgb(MDC[role].getArgb(scheme));
     applyPalette(p);

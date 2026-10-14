@@ -79,7 +79,7 @@ fn take(out: CRYPT_INTEGER_BLOB) -> Vec<u8> {
     }
 }
 
-fn protect(plain: &str) -> Option<String> {
+pub(crate) fn protect(plain: &str) -> Option<String> {
     let mut out = CRYPT_INTEGER_BLOB::default();
     unsafe {
         CryptProtectData(&blob(plain.as_bytes()), None, None, None, None, CRYPTPROTECT_UI_FORBIDDEN, &mut out)
@@ -88,7 +88,7 @@ fn protect(plain: &str) -> Option<String> {
     Some(base64::engine::general_purpose::STANDARD.encode(take(out)))
 }
 
-fn unprotect(enc: &str) -> Option<String> {
+pub(crate) fn unprotect(enc: &str) -> Option<String> {
     let data = base64::engine::general_purpose::STANDARD.decode(enc).ok()?;
     let mut out = CRYPT_INTEGER_BLOB::default();
     unsafe {
@@ -417,10 +417,11 @@ pub fn mail_read(app: AppHandle, account: String, uid: u32) -> Result<Body, Stri
     Ok(Body { html, text })
 }
 
-/// Ouvre un lien http(s) dans le navigateur par defaut.
+/// Ouvre un lien web, ou un lien d'appli musicale (spotify:, deezer:).
 #[tauri::command(async)]
 pub fn open_url(url: String) {
-    if url.starts_with("https://") || url.starts_with("http://") {
+    const OK: &[&str] = &["https://", "http://", "spotify:", "deezer://"];
+    if OK.iter().any(|p| url.starts_with(p)) {
         let _ = Command::new("explorer.exe").arg(url).creation_flags(CREATE_NO_WINDOW).spawn();
     }
 }
