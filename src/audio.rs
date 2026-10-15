@@ -534,3 +534,95 @@ fn spectrum(samples: &[f32], window: &[f32]) -> Vec<f32> {
     }
     (0..n / 2).map(|i| (re[i] * re[i] + im[i] * im[i]).sqrt() * 4.0 / n as f32).collect()
 }
+
+// ------------------------------------------- volume d'une appli par son nom
+// (Discord en mode simple, sans RPC : sourdine du micro ou du son de Discord)
+
+/// Nom de l'executable d'un processus, en minuscules et sans « .exe ».
+fn exe_name_of(pid: u32) -> Option<String> {
+    use windows::core::PWSTR;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    unsafe {
+        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buf = [0u16; 520];
+        let mut len = buf.len() as u32;
+        let r = QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len);
+        let _ = CloseHandle(h);
+        r.ok()?;
+        let path = String::from_utf16_lossy(&buf[..len as usize]);
+        let file = path.rsplit('\\').next()?.to_lowercase();
+        Some(file.trim_end_matches(".exe").to_string())
+    }
+}
+
+/// Sessions audio (sortie, ou micro si `mic`) des processus dont l'executable contient `app`.
+fn named_sessions(app: &str, mic: bool) -> Vec<ISimpleAudioVolume> {
+    use windows::Win32::Media::Audio::eCapture;
+    crate::com_init_mta();
+    let key = app.to_lowercase().trim_end_matches(".exe").to_string();
+    let mut out = Vec::new();
+    if key.is_empty() {
+        return out;
+    }
+    let flow = if mic { eCapture } else { eRender };
+    let _ = (|| -> windows::core::Result<()> {
+        unsafe {
+            let devs = enumerator()?.EnumAudioEndpoints(flow, DEVICE_STATE_ACTIVE)?;
+            for d in 0..devs.GetCount()? {
+                let Ok(mgr) = devs.Item(d)?.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) else { continue };
+                let list = mgr.GetSessionEnumerator()?;
+                for i in 0..list.GetCount()? {
+                    let Ok(ctl) = list.GetSession(i) else { continue };
+                    let Ok(ctl2) = ctl.cast::<IAudioSessionControl2>() else { continue };
+                    let Ok(pid) = ctl2.GetProcessId() else { continue };
+                    if pid == 0 || !exe_name_of(pid).is_some_and(|n| n.contains(&key)) {
+                        continue;
+                    }
+                    if let Ok(v) = ctl.cast::<ISimpleAudioVolume>() {
+                        out.push(v);
+                    }
+                }
+            }
+            Ok(())
+        }
+    })();
+    out
+}
+
+#[derive(Serialize)]
+pub struct NamedVolume {
+    level: f32,
+    muted: bool,
+}
+
+/// Volume d'une appli designee par son nom (None si elle n'a pas de session audio).
+#[tauri::command(async)]
+pub fn app_volume_get(app: String, mic: Option<bool>) -> Option<NamedVolume> {
+    let s = named_sessions(&app, mic.unwrap_or(false));
+    let first = s.first()?;
+    unsafe {
+        Some(NamedVolume {
+            level: first.GetMasterVolume().ok()?,
+            muted: s.iter().any(|v| v.GetMute().is_ok_and(|m| m.as_bool())),
+        })
+    }
+}
+
+#[tauri::command(async)]
+pub fn app_volume_set(app: String, mic: Option<bool>, level: Option<f32>, muted: Option<bool>) -> bool {
+    let s = named_sessions(&app, mic.unwrap_or(false));
+    unsafe {
+        for v in &s {
+            if let Some(l) = level {
+                let _ = v.SetMasterVolume(l.clamp(0.0, 1.0), std::ptr::null());
+            }
+            if let Some(m) = muted {
+                let _ = v.SetMute(m, std::ptr::null());
+            }
+        }
+    }
+    !s.is_empty()
+}
