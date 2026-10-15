@@ -22,7 +22,7 @@ const store = {
 
 // Réglages (remplacés par ceux du backend au démarrage)
 let cfg = {
-  variant: 'tonalspot', mode: 'dark', win_accent: false, win_mode: false, city: null, icals: [],
+  variant: 'tonalspot', mode: 'dark', win_accent: false, win_mode: false, island_bg: 'solid', city: null, icals: [],
   rotate_min: 0, notif_popups: true, dnd: false, osd: true,
 };
 async function setCfg(patch) {
@@ -47,7 +47,7 @@ let actTimer = null;
 let weather = null;
 
 function sizeFor(s) {
-  if (s === 'open') return OPEN;
+  if (s === 'open') return big ? bigSize() : OPEN;
   if (s === 'peek') return hasMedia ? { w: 420, h: 66 } : { w: weather ? 320 : 250, h: 50 };
   if (act) return act.size;
   let w = hasMedia ? 200 : 132;
@@ -98,7 +98,7 @@ listen('hover', ({ payload }) => {
     if (state === 'collapsed' && !act) setState('peek');
   } else if (state === 'peek') {
     leaveTimer = setTimeout(() => setState('collapsed'), 120);
-  } else if (state === 'open' && !pinned) {
+  } else if (state === 'open' && !pinned && !locked) {
     leaveTimer = setTimeout(() => setState('collapsed'), 450);
   }
 });
@@ -109,7 +109,51 @@ listen('fullscreen', ({ payload }) => {
   updateViz();
 });
 listen('blur', () => {
-  if (state === 'open' && !hovered) setState('collapsed');
+  if (state === 'open' && !hovered && !locked) setState('collapsed');
+});
+
+// ------------------------------------------- agrandir / verrouiller le panneau
+// enregistré dans %LOCALAPPDATA%\Ilot\layout.json : { big, locked }
+let big = false;
+let locked = false; // verrouillé : ne se replie pas quand la souris sort
+// panneau agrandi : presque tout l'écran, sans dépasser 1400×860
+const bigSize = () => ({
+  w: Math.max(OPEN.w, Math.min(1400, screen.width - 160)),
+  h: Math.max(OPEN.h, Math.min(860, screen.height - 120)),
+});
+const WIN_PAD = { w: 60, h: 60 }; // marge de la fenêtre autour du panneau (oreilles)
+function setBig(on, save = true) {
+  big = on;
+  const s = sizeFor('open');
+  // la fenêtre grandit avant le panneau, et rétrécit après l'animation
+  if (on) invoke('win_resize', { w: s.w + WIN_PAD.w, h: s.h + WIN_PAD.h });
+  else setTimeout(() => { if (!big) invoke('win_resize', { w: OPEN.w + WIN_PAD.w, h: OPEN.h + WIN_PAD.h }); }, 550);
+  island.style.setProperty('--open-w', s.w + 'px');
+  island.style.setProperty('--open-h', s.h + 'px');
+  island.classList.toggle('big', on);
+  const b = $('[data-tool="big"]');
+  b.classList.toggle('on', on);
+  b.title = on ? 'Réduire' : 'Agrandir';
+  b.querySelector('.ms').textContent = on ? 'close_fullscreen' : 'open_in_full';
+  applySize();
+  setTimeout(moveIndicator, 520);
+  if (save) saveLayout();
+}
+function setLocked(on, save = true) {
+  locked = on;
+  const b = $('[data-tool="lock"]');
+  b.classList.toggle('on', on);
+  b.title = on ? 'Déverrouiller : l\'îlot se replie quand la souris sort' : 'Verrouiller : l\'îlot reste ouvert';
+  b.querySelector('.ms').textContent = on ? 'lock' : 'lock_open';
+  if (on) clearTimeout(leaveTimer);
+  if (save) saveLayout();
+}
+function saveLayout() { invoke('store_set', { key: 'layout', value: { big, locked } }); }
+$('[data-tool="big"]').addEventListener('click', () => setBig(!big));
+$('[data-tool="lock"]').addEventListener('click', () => setLocked(!locked));
+invoke('store_get', { key: 'layout' }).then(l => {
+  if (l && l.big) setBig(true, false);
+  if (l && l.locked) setLocked(true, false);
 });
 listen('open', ({ payload }) => { pinned = true; open(payload); });
 listen('launcher', () => {
@@ -242,6 +286,8 @@ $$('#tabs button').forEach(b => b.addEventListener('click', () => {
   if (b.dataset.tab === 'apps') $('#q').focus();
 }));
 document.fonts.ready.then(moveIndicator);
+// largeur des onglets changée (police d'icônes chargée, libellé actif) : on recale
+new ResizeObserver(moveIndicator).observe($('#tabs'));
 
 function onOpen() {
   moveIndicator();
@@ -255,6 +301,11 @@ function onTab(tab) {
   if (tab === 'settings') loadSettings();
   if (tab === 'ctrl') enterCtrl();
   if (tab === 'home') refreshEvents();
+  // onglets PC et Tâches : rafraîchis tant qu'ils sont affichés
+  clearInterval(pcTimer);
+  if (tab === 'pc') { refreshPc(); pcTimer = setInterval(() => state === 'open' && currentTab === 'pc' ? refreshPc() : clearInterval(pcTimer), 3000); }
+  clearInterval(taskTimer);
+  if (tab === 'tasks') { refreshTasks(); taskTimer = setInterval(() => state === 'open' && currentTab === 'tasks' ? refreshTasks() : clearInterval(taskTimer), 2000); }
 }
 
 // ================================================================ horloge
@@ -312,8 +363,10 @@ function renderCal() {
     const today = day.toDateString() === now.toDateString();
     const we = i % 7 >= 5;
     const el = document.createElement('button');
-    el.className = `d${out ? ' out' : ''}${today ? ' today' : ''}${we ? ' we' : ''}${busy.has(dayKey(day)) ? ' ev' : ''}`;
+    const note = calNotes[noteKey(day)];
+    el.className = `d${out ? ' out' : ''}${today ? ' today' : ''}${we ? ' we' : ''}${busy.has(dayKey(day)) ? ' ev' : ''}${note ? ' noted' : ''}`;
     el.textContent = day.getDate();
+    if (note) el.title = note;
     const d = new Date(day);
     el.addEventListener('click', () => showDay(d));
     grid.append(el);
@@ -342,9 +395,24 @@ function showDay(d) {
       box.append(el);
     }
   }
+  noteDay = noteKey(from);
+  calNote.value = calNotes[noteDay] || '';
   $('.cal-card').classList.add('day');
 }
 $('#cal-back').addEventListener('click', () => $('.cal-card').classList.remove('day'));
+
+// --- notes par date, dans %LOCALAPPDATA%\Ilot\calnotes.json : { "AAAA-MM-JJ": "texte" }
+let calNotes = {};
+let noteDay = null;
+const noteKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const calNote = $('.cal-note');
+calNote.addEventListener('focus', () => { pinned = true; });
+calNote.addEventListener('input', () => {
+  if (calNote.value.trim()) calNotes[noteDay] = calNote.value; else delete calNotes[noteDay];
+  invoke('store_set', { key: 'calnotes', value: calNotes });
+  renderCal();
+});
+invoke('store_get', { key: 'calnotes' }).then(n => { if (n && typeof n === 'object') { calNotes = n; renderCal(); } });
 $$('[data-cal]').forEach(b => b.addEventListener('click', () => {
   calOffset += Number(b.dataset.cal);
   renderCal();
@@ -939,7 +1007,7 @@ function renderNotifs() {
   const box = $('.notif-list');
   const n = notifs.length;
   $('.notif-count').textContent = n ? n : '';
-  const badge = $('#tabs .badge');
+  const badge = $('[data-tab="ctrl"] .badge');
   badge.hidden = !n;
   badge.textContent = n > 9 ? '9+' : n;
   if (!n) {
@@ -1191,8 +1259,12 @@ function renderApps() {
   listBox.hidden = true;
   grid.hidden = false;
   listMode = 'apps';
+  renderFolders();
   const q = norm(t.trim());
-  appView = !q ? apps : apps
+  const folder = folders.list.find(f => f.id === folders.sel);
+  const inGames = folders.sel === GAMES;
+  const pool = sortItems(inGames ? launcherItems() : folder ? folderItems(folder) : apps.filter(a => !isHidden(a.id)));
+  appView = !q ? pool : pool
     .map(a => {
       const n = norm(a.name);
       const score = n.startsWith(q) ? 0 : n.split(/[\s\-_.]/).some(w => w.startsWith(q)) ? 1 : n.includes(q) ? 2 : 9;
@@ -1204,6 +1276,8 @@ function renderApps() {
   // un calcul tapé directement s'affiche en tête
   const mathRow = looksLikeMath(t.trim()) ? calc(t.trim()) : null;
   appSel = Math.min(appSel, Math.max(0, appView.length - 1));
+  grid.classList.toggle('games', inGames);
+  if (inGames) return renderGames(grid, q);
   if (!apps.length) { grid.innerHTML = '<div class="empty">Chargement des applications…</div>'; return; }
   grid.innerHTML = '';
   if (mathRow !== null) {
@@ -1213,16 +1287,23 @@ function renderApps() {
     m.addEventListener('click', () => { invoke('clip_text', { text: String(mathRow) }); m.classList.add('done'); });
     grid.append(m);
   }
-  if (!appView.length) { grid.insertAdjacentHTML('beforeend', '<div class="empty">Aucune application</div>'); return; }
+  if (!appView.length) {
+    grid.insertAdjacentHTML('beforeend', folder && !q
+      ? '<div class="empty">Dossier vide : glisse une appli sur le dossier, dépose un fichier ici, ou clic droit sur une application.</div>'
+      : '<div class="empty">Aucune application</div>');
+    return;
+  }
   appView.forEach((a, i) => {
     const el = document.createElement('button');
-    el.className = 'app' + (q && i === appSel ? ' sel' : '');
-    el.title = a.name;
+    el.className = 'app' + (q && i === appSel ? ' sel' : '') + (a.missing ? ' missing' : '');
+    el.title = (a.file ? a.file : a.name) + (a.added ? `\nAjoutée le ${fmtAdded.format(a.added)}` : '');
     el.innerHTML = a.icon ? `<img src="${a.icon}" alt="">` : `<div class="ph">${esc(a.name[0] || '?')}</div>`;
     const label = document.createElement('span');
     label.textContent = a.name;
     el.append(label);
-    el.addEventListener('click', () => launch(a));
+    el.addEventListener('click', () => { if (!dragJustEnded) launch(a); });
+    el.addEventListener('contextmenu', e => { e.preventDefault(); appMenu(a, e); });
+    el.addEventListener('pointerdown', e => dragStart(a, el, e));
     grid.append(el);
   });
 }
@@ -1288,7 +1369,9 @@ function pickEmoji(e, el) {
 }
 
 function launch(a) {
-  invoke('app_launch', { id: a.id });
+  if (a.file) invoke('file_open', { path: a.file });
+  else if (a.source) invoke('game_launch', { id: a.id });
+  else invoke('app_launch', { id: a.id });
   $('#q').value = '';
   setState('collapsed');
 }
@@ -1311,25 +1394,1143 @@ $('#q').addEventListener('keydown', e => {
     }
     return;
   }
-  const cols = 7;
+  // nombre de colonnes réel (varie avec le panneau agrandi et le Launcher)
+  const cols = getComputedStyle($('.app-grid')).gridTemplateColumns.split(' ').length;
   const moves = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols };
   if (e.key in moves) {
     e.preventDefault();
     appSel = Math.max(0, Math.min(appView.length - 1, appSel + moves[e.key]));
-    $$('.app').forEach((el, i) => el.classList.toggle('sel', i === appSel));
-    $$('.app')[appSel]?.scrollIntoView({ block: 'nearest' });
+    const tiles = $$('.app-grid > .app, .app-grid > .game');
+    tiles.forEach((el, i) => el.classList.toggle('sel', i === appSel));
+    tiles[appSel]?.scrollIntoView({ block: 'nearest' });
   } else if (e.key === 'Enter' && e.ctrlKey && $('.calc-row')) {
     $('.calc-row').click();
   } else if (e.key === 'Enter' && appView[appSel]) {
     launch(appView[appSel]);
   }
 });
-listen('apps', ({ payload }) => { apps = payload; if (currentTab === 'apps') renderApps(); renderNotifs(); });
-invoke('apps_get').then(l => { if (l.length) { apps = l; renderNotifs(); } });
+listen('apps', ({ payload }) => { apps = payload; seedGames(); if (currentTab === 'apps') renderApps(); renderNotifs(); });
+invoke('apps_get').then(l => { if (l.length) { apps = l; seedGames(); renderNotifs(); } });
+
+// ================================================== dossiers d'apps et Launcher
+// Launcher de jeux (src/games.rs), dossiers, glisser-déposer, tri, menu contextuel
+let games = [];
+const GAMES = '@games'; // pseudo-dossier « Launcher de jeux »
+const SOURCE = { steam: 'Steam', epic: 'Epic', ubisoft: 'Ubisoft', gog: 'GOG' };
+
+// --------------------------------------------- glisser une appli sur un dossier
+// fait à la main (pointer events) : le glisser-déposer HTML5 est désactivé par
+// la webview tant qu'elle accepte les fichiers venus de l'Explorateur
+let drag = null;
+let dragJustEnded = false;
+function dragStart(a, el, e) {
+  if (e.button !== 0) return;
+  drag = { a, el, x: e.clientX, y: e.clientY, ghost: null };
+}
+function chipAt(x, y) {
+  const c = document.elementFromPoint(x, y)?.closest('.fchip[data-id]');
+  return c && findFolder(c.dataset.id) ? c : null;
+}
+// dossier réel, ou le Launcher (jeux détectés + éléments ajoutés à la main)
+function findFolder(id) {
+  return id === GAMES ? launcherFolder() : folders.list.find(f => f.id === id);
+}
+function launcherFolder() {
+  folders.games = folders.games || [];
+  return {
+    id: GAMES, name: 'Launcher',
+    get apps() { return folders.games; },
+    set apps(v) { folders.games = v; },
+  };
+}
+const isHiddenGame = id => (folders.hiddenGames || []).includes(id);
+function launcherItems() {
+  const extra = (folders.games || [])
+    .map(id => id.startsWith(FILE) ? fileItem(id) : apps.find(a => a.id === id))
+    .filter(Boolean);
+  return [...games.filter(g => !isHiddenGame(g.id)), ...extra];
+}
+function markDrop(chip) {
+  $$('.fchip.drop').forEach(c => c !== chip && c.classList.remove('drop'));
+  chip?.classList.add('drop');
+}
+addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (!drag.ghost) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+    drag.ghost = document.createElement('div');
+    drag.ghost.className = 'drag-ghost';
+    drag.ghost.innerHTML = drag.a.icon ? `<img src="${drag.a.icon}" alt="">` : '<span class="ms">draft</span>';
+    document.body.append(drag.ghost);
+    drag.el.classList.add('dragging');
+    hideCtx();
+  }
+  drag.ghost.style.transform = `translate(${e.clientX - 20}px, ${e.clientY - 20}px)`;
+  markDrop(chipAt(e.clientX, e.clientY));
+});
+addEventListener('pointerup', e => {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  if (!d.ghost) return;
+  d.ghost.remove();
+  d.el.classList.remove('dragging');
+  markDrop(null);
+  // le clic qui suit le relâchement ne doit pas lancer l'appli
+  dragJustEnded = true;
+  setTimeout(() => (dragJustEnded = false), 0);
+  const chip = chipAt(e.clientX, e.clientY);
+  const f = chip && findFolder(chip.dataset.id);
+  if (f && !f.apps.includes(d.a.id)) {
+    f.apps.push(d.a.id);
+    saveFolders();
+    renderApps();
+  }
+});
+
+// ------------------------------------- fichiers déposés depuis l'Explorateur
+// rangés dans le dossier visé sous l'id « file:<chemin> »
+const FILE = 'file:';
+const fileCache = {}; // chemin -> { id, file, name, icon, missing }
+function fileItem(id) {
+  const path = id.slice(FILE.length);
+  if (!fileCache[path]) {
+    const base = path.split('\\').pop() || path;
+    fileCache[path] = { id, file: path, name: base.replace(/\.(lnk|url|exe)$/i, ''), icon: '', added: (folders.added || {})[id] || 0 };
+    invoke('file_info', { path }).then(info => {
+      if (info) Object.assign(fileCache[path], info);
+      else fileCache[path].missing = true;
+      if (currentTab === 'apps') renderApps();
+    });
+  }
+  return fileCache[path];
+}
+function folderItems(f) {
+  return f.apps
+    .map(id => id.startsWith(FILE) ? fileItem(id) : apps.find(a => a.id === id))
+    .filter(a => a && (a.file || !isHidden(a.id)));
+}
+function addFiles(f, paths) {
+  folders.added = folders.added || {};
+  paths.forEach(p => {
+    if (f.apps.includes(FILE + p)) return;
+    f.apps.push(FILE + p);
+    folders.added[FILE + p] = Date.now();
+    if (fileCache[p]) fileCache[p].added = folders.added[FILE + p];
+  });
+  folders.sel = f.id;
+  saveFolders();
+  renderApps();
+}
+let fileDragOpened = false;
+listen('tauri://drag-enter', () => {
+  // déposer sur l'îlot l'ouvre sur les applis
+  if (state !== 'open' || currentTab !== 'apps') { fileDragOpened = true; pinned = true; open('apps'); }
+  island.classList.add('filedrag');
+});
+const dropPoint = pos => ({ clientX: pos.x / devicePixelRatio, clientY: pos.y / devicePixelRatio });
+listen('tauri://drag-over', ({ payload }) => {
+  const p = dropPoint(payload.position);
+  markDrop(chipAt(p.clientX, p.clientY));
+});
+listen('tauri://drag-leave', () => {
+  island.classList.remove('filedrag');
+  markDrop(null);
+  if (fileDragOpened) { fileDragOpened = false; close(); }
+});
+listen('tauri://drag-drop', ({ payload }) => {
+  island.classList.remove('filedrag');
+  markDrop(null);
+  fileDragOpened = false;
+  const paths = payload.paths || [];
+  if (!paths.length) return;
+  const p = dropPoint(payload.position);
+  const chip = chipAt(p.clientX, p.clientY);
+  const target = findFolder(chip ? chip.dataset.id : folders.sel);
+  if (target) return addFiles(target, paths);
+  // déposé hors d'un dossier : demander lequel
+  const what = paths.length > 1 ? `${paths.length} éléments` : paths[0].split('\\').pop();
+  showCtx(p, box => {
+    ctxTitle(box, `Ranger ${what} dans…`);
+    ctxItem(box, 'stadia_controller', 'Launcher de jeux', () => { hideCtx(); addFiles(launcherFolder(), paths); });
+    folders.list.forEach(f => ctxItem(box, folderIcon(f.name), f.name, () => { hideCtx(); addFiles(f, paths); }));
+    ctxItem(box, 'create_new_folder', 'Nouveau dossier…', () => askName(p, 'Nouveau dossier', '', name => addFiles(newFolder(name), paths)));
+  });
+});
+
+// ------------------------------------------- applis masquées de l'îlot
+const isHidden = id => (folders.hidden || []).includes(id);
+function removeEverywhere(id) {
+  folders.list.forEach(f => (f.apps = f.apps.filter(x => x !== id)));
+  folders.games = (folders.games || []).filter(x => x !== id);
+}
+
+// ---------------------------------------------------- tri : nom ou date d'ajout
+// date d'ajout : installation de l'appli (côté Rust) ou dépôt du fichier dans l'îlot
+const SORTS = {
+  name: ['sort_by_alpha', 'Nom', 'Nom (A → Z)'],
+  'name-desc': ['sort_by_alpha', 'Nom ↓', 'Nom (Z → A)'],
+  recent: ['schedule', 'Récentes', 'Ajout le plus récent'],
+  old: ['history', 'Anciennes', 'Ajout le plus ancien'],
+};
+const fmtAdded = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+function sortItems(list) {
+  const late = a => a.added || Number.MAX_SAFE_INTEGER; // dates inconnues à la fin
+  const byName = (x, y) => x.name.localeCompare(y.name, 'fr');
+  const by = {
+    name: byName,
+    'name-desc': (x, y) => byName(y, x),
+    recent: (x, y) => (y.added || 0) - (x.added || 0) || byName(x, y),
+    old: (x, y) => late(x) - late(y) || byName(x, y),
+  }[folders.sort] || byName;
+  return [...list].sort(by);
+}
+function renderSortBtn() {
+  const [icon, short] = SORTS[folders.sort] || SORTS.name;
+  $('.sort-btn .ms').textContent = icon;
+  $('.sort-lbl').textContent = short;
+}
+$('.sort-btn').addEventListener('click', e => {
+  e.preventDefault();
+  showCtx(e, box => {
+    ctxTitle(box, 'Trier par');
+    Object.entries(SORTS).forEach(([k, [icon, , label]]) => {
+      const b = ctxItem(box, (folders.sort || 'name') === k ? 'check' : icon, label, () => {
+        folders.sort = k;
+        saveFolders();
+        hideCtx();
+        renderSortBtn();
+        renderApps();
+      });
+      if ((folders.sort || 'name') === k) b.classList.add('on');
+    });
+  });
+});
+
+// ------------------------------------------------------- launcher de jeux
+// jeux Steam / Epic / Ubisoft / GOG détectés côté Rust (src/games.rs)
+function renderGames(grid, q) {
+  if (!appView.length) {
+    grid.innerHTML = q ? '<div class="empty">Aucun jeu</div>'
+      : '<div class="empty">Aucun jeu trouvé (Steam, Epic Games, Ubisoft Connect, GOG).</div>';
+    return;
+  }
+  grid.innerHTML = '';
+  appView.forEach((g, i) => {
+    const el = document.createElement('button');
+    el.className = 'game' + (q && i === appSel ? ' sel' : '') + (g.cover ? '' : ' nocover');
+    el.title = g.name + (g.added ? `\nInstallé le ${fmtAdded.format(g.added)}` : '');
+    el.innerHTML = g.cover ? `<img class="cov" src="${g.cover}" alt="" loading="lazy">`
+      : g.icon ? `<img class="ico" src="${g.icon}" alt="">` : `<div class="ph">${g.name[0] || '?'}</div>`;
+    const cap = document.createElement('span');
+    cap.className = 'cap';
+    const b = document.createElement('b');
+    b.textContent = g.name;
+    cap.append(b);
+    cap.insertAdjacentHTML('beforeend', `<i>${SOURCE[g.source] || ''}</i>`);
+    el.append(cap);
+    el.addEventListener('click', () => launch(g));
+    el.addEventListener('contextmenu', e => { e.preventDefault(); gameMenu(g, e); });
+    grid.append(el);
+  });
+}
+function gameMenu(g, e) {
+  showCtx(e, box => {
+    ctxTitle(box, g.name);
+    ctxItem(box, 'play_arrow', 'Lancer', () => { hideCtx(); launch(g); });
+    const extra = !g.source; // ajouté à la main (fichier déposé ou appli)
+    ctxItem(box, 'folder_open', 'Ouvrir le dossier du jeu', () => openFolder(() =>
+      g.file ? invoke('folder_open', { path: g.file.replace(/\\[^\\]*$/, '') })
+        : extra ? invoke('app_folder', { id: g.id, name: g.name })
+          : invoke('game_folder', { id: g.id })));
+    box.insertAdjacentHTML('beforeend', '<hr class="ctx-sep">');
+    // jeu détecté : masqué (réaffichable) ; ajout manuel : retiré du Launcher
+    ctxItem(box, 'delete', 'Supprimer de l’îlot', ev => {
+      const b = ev.currentTarget;
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.lastChild.textContent = 'Confirmer'; return; }
+      if (extra) folders.games = (folders.games || []).filter(x => x !== g.id);
+      else folders.hiddenGames = [...(folders.hiddenGames || []), g.id];
+      saveFolders();
+      hideCtx();
+      renderApps();
+    }, 'danger');
+  });
+}
+// clic droit sur « Launcher » : réafficher les jeux supprimés
+function hiddenGamesMenu(e) {
+  showCtx(e, box => {
+    const list = (folders.hiddenGames || []).map(id => games.find(g => g.id === id)).filter(Boolean);
+    ctxTitle(box, list.length ? 'Jeux supprimés de l’îlot' : 'Aucun jeu supprimé');
+    list.forEach(g => ctxItem(box, 'visibility', g.name, () => {
+      folders.hiddenGames = folders.hiddenGames.filter(x => x !== g.id);
+      saveFolders();
+      hideCtx();
+      renderApps();
+    }));
+    if (list.length > 1) {
+      ctxItem(box, 'select_all', 'Tout réafficher', () => {
+        folders.hiddenGames = [];
+        saveFolders();
+        hideCtx();
+        renderApps();
+      });
+    }
+  });
+}
+// ouvre l'Explorateur puis replie l'îlot ; sinon le signale dans le menu
+async function openFolder(call) {
+  const ok = await call();
+  if (ok) { hideCtx(); setState('collapsed'); return; }
+  showCtx(lastCtxEvent, box => ctxTitle(box, 'Dossier introuvable'));
+  setTimeout(hideCtx, 1500);
+}
+listen('games', ({ payload }) => { games = payload; if (currentTab === 'apps' && folders.sel === GAMES) renderApps(); });
+invoke('games_get').then(l => { if (l.length) games = l; });
+
+// ---------------------------------------------------------- dossiers d'apps
+// enregistrés dans %LOCALAPPDATA%\Ilot\folders.json : { list: [{ id, name, apps: [id…] }], sel }
+let folders = { list: [], sel: '' };
+const FOLDER_ICONS = [
+  [/jeu|game|gaming/, 'sports_esports'], [/cours|ecole|etude|school|fac|lycee/, 'school'],
+  [/travail|boulot|work|bureau/, 'work'], [/musique|music|audio/, 'music_note'],
+  [/video|film|stream/, 'movie'], [/dev|code|prog/, 'code'], [/photo|image|design|dessin/, 'palette'],
+  [/internet|web|navigat/, 'language'], [/social|discu|chat|message/, 'forum'],
+  [/outil|util|tool|systeme/, 'build'], [/app/, 'apps'],
+];
+const folderIcon = name => (FOLDER_ICONS.find(([re]) => re.test(norm(name))) || [, 'folder'])[1];
+// premier lancement : quelques dossiers, et les jeux reconnus rangés d'office
+const GAME_HINTS = /steam|epic games|roblox|minecraft|riot client|valorant|league of legends|battle\.net|ubisoft|ea app|gog galaxy|fortnite|rockstar|xbox|playnite|heroic|curseforge|lunar client|genshin|hoyoplay/;
+
+function saveFolders() { invoke('store_set', { key: 'folders', value: folders }); }
+
+function renderFolders() {
+  const bar = $('.folder-bar');
+  bar.innerHTML = '';
+  const chip = (id, icon, name, count) => {
+    const b = document.createElement('button');
+    b.className = 'fchip' + (folders.sel === id ? ' on' : '');
+    b.dataset.id = id;
+    b.innerHTML = `<span class="ms">${icon}</span>`;
+    const n = document.createElement('span');
+    n.textContent = name;
+    b.append(n);
+    if (count != null) b.insertAdjacentHTML('beforeend', `<i>${count}</i>`);
+    b.addEventListener('click', () => { folders.sel = id; saveFolders(); renderApps(); });
+    bar.append(b);
+    return b;
+  };
+  chip('', 'grid_view', 'Toutes').addEventListener('contextmenu', e => { e.preventDefault(); hiddenMenu(e); });
+  const gc = chip(GAMES, 'stadia_controller', 'Launcher', launcherItems().length || null);
+  gc.classList.add('games-chip');
+  gc.addEventListener('contextmenu', e => { e.preventDefault(); hiddenGamesMenu(e); });
+  folders.list.forEach(f => {
+    const n = f.apps.filter(id => id.startsWith(FILE) || (apps.some(a => a.id === id) && !isHidden(id))).length;
+    const b = chip(f.id, folderIcon(f.name), f.name, n);
+    b.addEventListener('contextmenu', e => { e.preventDefault(); folderMenu(f, e); });
+  });
+  const add = document.createElement('button');
+  add.className = 'fchip add';
+  add.title = 'Nouveau dossier';
+  add.innerHTML = '<span class="ms">create_new_folder</span>';
+  add.addEventListener('click', e => askName(e, 'Nouveau dossier', '', name => {
+    const f = newFolder(name);
+    folders.sel = f.id;
+    saveFolders();
+    renderApps();
+  }));
+  bar.append(add);
+}
+
+function newFolder(name) {
+  const f = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, apps: [] };
+  folders.list.push(f);
+  return f;
+}
+
+// --- menu contextuel (clic droit)
+const ctx = $('.ctx');
+let lastCtxEvent = null;
+function showCtx(e, build) {
+  lastCtxEvent = e;
+  ctx.innerHTML = '';
+  build(ctx);
+  ctx.hidden = false;
+  const page = $('[data-page="apps"]').getBoundingClientRect();
+  const r = ctx.getBoundingClientRect();
+  ctx.style.left = Math.min(e.clientX - page.left, page.width - r.width - 4) + 'px';
+  ctx.style.top = Math.min(e.clientY - page.top, page.height - r.height - 4) + 'px';
+}
+function hideCtx() { ctx.hidden = true; }
+function ctxItem(box, icon, label, fn, cls = '') {
+  const b = document.createElement('button');
+  b.className = 'ctx-item ' + cls;
+  b.innerHTML = `<span class="ms">${icon}</span>`;
+  const t = document.createElement('span');
+  t.textContent = label;
+  b.append(t);
+  b.addEventListener('click', ev => { ev.stopPropagation(); fn(ev); });
+  box.append(b);
+  return b;
+}
+function ctxTitle(box, text) {
+  const t = document.createElement('div');
+  t.className = 'ctx-title';
+  t.textContent = text;
+  box.append(t);
+}
+// petite saisie de nom dans le menu (pas de prompt() dans la webview)
+function ctxInput(box, value, done) {
+  const inp = document.createElement('input');
+  inp.className = 'ctx-input';
+  inp.value = value;
+  inp.placeholder = 'Nom du dossier';
+  inp.spellcheck = false;
+  inp.addEventListener('keydown', ev => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter' && inp.value.trim()) { done(inp.value.trim()); hideCtx(); }
+    if (ev.key === 'Escape') hideCtx();
+  });
+  box.append(inp);
+  setTimeout(() => { inp.focus(); inp.select(); }, 0);
+}
+function askName(e, title, value, done) {
+  showCtx(e, box => { ctxTitle(box, title); ctxInput(box, value, done); });
+}
+
+function appMenu(a, e) {
+  showCtx(e, box => {
+    ctxTitle(box, a.name);
+    ctxItem(box, 'folder_open', 'Ouvrir l’emplacement du fichier', () => openFolder(() =>
+      a.file ? invoke('folder_open', { path: a.file.replace(/\\[^\\]*$/, '') }) : invoke('app_folder', { id: a.id, name: a.name })));
+    const cur = folders.list.find(f => f.id === folders.sel);
+    if (cur && cur.apps.includes(a.id)) {
+      ctxItem(box, 'remove_circle_outline', `Retirer de « ${cur.name} »`, () => {
+        cur.apps = cur.apps.filter(x => x !== a.id);
+        saveFolders();
+        hideCtx();
+        renderApps();
+      });
+    }
+    // fichier déposé : on l'enlève de tous les dossiers ; appli : on la masque
+    ctxItem(box, a.file ? 'delete' : 'visibility_off', a.file ? 'Supprimer de l’îlot' : 'Masquer de l’îlot', ev => {
+      const b = ev.currentTarget;
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.lastChild.textContent = 'Confirmer'; return; }
+      removeEverywhere(a.id);
+      if (!a.file) folders.hidden = [...(folders.hidden || []), a.id];
+      saveFolders();
+      hideCtx();
+      renderApps();
+    }, 'danger');
+    box.insertAdjacentHTML('beforeend', '<hr class="ctx-sep">');
+    [launcherFolder(), ...folders.list].forEach(f => {
+      const inside = f.apps.includes(a.id);
+      ctxItem(box, inside ? 'check_box' : 'check_box_outline_blank', f.name, () => {
+        if (inside) f.apps = f.apps.filter(x => x !== a.id); else f.apps.push(a.id);
+        saveFolders();
+        hideCtx();
+        renderApps();
+      });
+    });
+    ctxItem(box, 'create_new_folder', 'Nouveau dossier…', () => askName(e, 'Nouveau dossier pour ' + a.name, '', name => {
+      newFolder(name).apps.push(a.id);
+      saveFolders();
+      renderApps();
+    }));
+  });
+}
+
+// clic droit sur « Toutes » : réafficher les applis masquées
+function hiddenMenu(e) {
+  showCtx(e, box => {
+    const list = (folders.hidden || []).map(id => apps.find(a => a.id === id)).filter(Boolean);
+    ctxTitle(box, list.length ? 'Applis masquées' : 'Aucune appli masquée');
+    list.forEach(a => ctxItem(box, 'visibility', a.name, () => {
+      folders.hidden = folders.hidden.filter(x => x !== a.id);
+      saveFolders();
+      hideCtx();
+      renderApps();
+    }));
+    if (list.length > 1) {
+      ctxItem(box, 'select_all', 'Tout réafficher', () => {
+        folders.hidden = [];
+        saveFolders();
+        hideCtx();
+        renderApps();
+      });
+    }
+  });
+}
+
+function folderMenu(f, e) {
+  showCtx(e, box => {
+    ctxTitle(box, f.name);
+    // dossier réel associé (ex. Documents\Cours) pour y accéder vite
+    ctxItem(box, 'folder_open', 'Ouvrir l’emplacement du fichier', async () => {
+      if (!f.path) {
+        hideCtx();
+        const p = await invoke('pick_folder', { title: `Emplacement du dossier « ${f.name} »` });
+        if (!p) return;
+        f.path = p;
+        saveFolders();
+      }
+      openFolder(() => invoke('folder_open', { path: f.path }));
+    });
+    if (f.path) {
+      ctxItem(box, 'drive_file_move', 'Changer l’emplacement…', async () => {
+        hideCtx();
+        const p = await invoke('pick_folder', { title: `Emplacement du dossier « ${f.name} »` });
+        if (p) { f.path = p; saveFolders(); }
+      });
+    }
+    box.insertAdjacentHTML('beforeend', '<hr class="ctx-sep">');
+    ctxItem(box, 'edit', 'Renommer', () => askName(e, 'Renommer', f.name, name => {
+      f.name = name;
+      saveFolders();
+      renderApps();
+    }));
+    ctxItem(box, 'delete', 'Supprimer le dossier', ev => {
+      // second clic pour confirmer (les applis ne sont pas supprimées)
+      const b = ev.currentTarget;
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.lastChild.textContent = 'Confirmer la suppression'; return; }
+      folders.list = folders.list.filter(x => x !== f);
+      if (folders.sel === f.id) folders.sel = '';
+      saveFolders();
+      hideCtx();
+      renderApps();
+    }, 'danger');
+  });
+}
+document.addEventListener('mousedown', e => { if (!ctx.hidden && !ctx.contains(e.target)) hideCtx(); });
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !ctx.hidden) { hideCtx(); e.stopImmediatePropagation(); }
+}, true);
+
+invoke('store_get', { key: 'folders' }).then(saved => {
+  if (saved && Array.isArray(saved.list)) {
+    folders = {
+      ...saved, sel: saved.sel || '', hidden: saved.hidden || [], added: saved.added || {}, sort: saved.sort || 'name',
+      games: saved.games || [], hiddenGames: saved.hiddenGames || [],
+    };
+    renderSortBtn();
+  } else {
+    folders = { list: [], sel: '' };
+    newFolder('Jeux');
+    newFolder('Apps');
+    newFolder('Cours');
+    folders.seeded = false;
+  }
+  seedGames();
+  if (currentTab === 'apps') renderApps();
+});
+// range les jeux reconnus dans « Jeux » au premier lancement (dès que la liste d'applis est là)
+function seedGames() {
+  if (folders.seeded !== false || !apps.length) return;
+  const jeux = folders.list.find(f => f.name === 'Jeux');
+  if (jeux) jeux.apps = apps.filter(a => GAME_HINTS.test(a.name.toLowerCase()) && !/studio|editor|server/i.test(a.name)).map(a => a.id);
+  delete folders.seeded;
+  saveFolders();
+}
+
+// =================================================================== mail
+// comptes IMAP gérés côté Rust (src/mail.rs) ; vérification toutes les 2 min
+let inbox = { accounts: [], mails: [] };
+let mailAcc = ''; // filtre : '' = tous les comptes
+let mailOpen = null; // message affiché dans le lecteur
+let mailBusy = false;
+const fmtHour = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const fmtMailDay = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
+function mailDate(ts) {
+  const d = new Date(ts * 1000);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return fmtHour.format(d);
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'Hier';
+  return fmtMailDay.format(d);
+}
+
+function mailView(v) { // 'list' | 'reader' | 'setup'
+  $('.mail-main').hidden = v !== 'list';
+  $('.mail-reader').hidden = v !== 'reader';
+  $('.mail-setup').hidden = v !== 'setup';
+  if (v === 'setup') renderAccounts();
+}
+
+function applyInbox(ib) {
+  inbox = ib;
+  if (mailAcc && !inbox.accounts.some(a => a.email === mailAcc)) mailAcc = '';
+  const unread = inbox.accounts.reduce((n, a) => n + a.unread, 0);
+  const badge = $('[data-tab="mail"] .badge');
+  badge.hidden = !unread;
+  badge.textContent = unread > 99 ? '99+' : unread;
+  $('.ind-mail').hidden = !unread;
+  if (state === 'collapsed') applySize();
+  $('.peek-mail').hidden = !unread;
+  $('.peek-mail b').textContent = unread;
+  renderMail();
+  if (!$('.mail-setup').hidden) renderAccounts();
+}
+
+function renderMail() {
+  const seg = $('.mail-seg');
+  seg.hidden = inbox.accounts.length < 2;
+  seg.innerHTML = '';
+  if (inbox.accounts.length > 1) {
+    [{ email: '', label: 'Tous' }, ...inbox.accounts.map(a => ({ email: a.email, label: a.email.split('@')[0], unread: a.unread }))]
+      .forEach(a => {
+        const b = document.createElement('button');
+        b.className = mailAcc === a.email ? 'on' : '';
+        b.textContent = a.label;
+        b.title = a.email || 'Tous les comptes';
+        b.addEventListener('click', () => { mailAcc = a.email; renderMail(); });
+        seg.append(b);
+      });
+  }
+  const errs = inbox.accounts.filter(a => a.error);
+  const unread = inbox.accounts.filter(a => !mailAcc || a.email === mailAcc).reduce((n, a) => n + a.unread, 0);
+  $('.mail-note').textContent = errs.length
+    ? `⚠ ${errs[0].email} : ${errs[0].error}`
+    : inbox.accounts.length ? (unread ? `${unread} non lu${unread > 1 ? 's' : ''}` : 'Tout est lu') : '';
+  $('.mail-note').classList.toggle('err', !!errs.length);
+
+  const box = $('.mail-list');
+  if (!inbox.accounts.length) {
+    box.innerHTML = '<div class="empty">Aucun compte.<br><button class="text-btn primary" id="mail-first"><span class="ms">add</span>Ajouter un compte</button></div>';
+    $('#mail-first').addEventListener('click', () => mailView('setup'));
+    return;
+  }
+  const list = inbox.mails.filter(m => !mailAcc || m.account === mailAcc);
+  if (!list.length) {
+    box.innerHTML = `<div class="empty">${mailBusy ? 'Chargement…' : 'Boîte de réception vide'}</div>`;
+    return;
+  }
+  box.innerHTML = '';
+  const multi = inbox.accounts.length > 1 && !mailAcc;
+  list.forEach(m => {
+    const el = document.createElement('button');
+    el.className = 'mail-item' + (m.seen ? '' : ' unread');
+    el.innerHTML = '<i class="dot"></i><div class="mi-text"><div class="mi-top"><b></b><time></time></div><div class="mi-sub"></div></div>';
+    el.querySelector('b').textContent = m.from || m.from_addr || '(inconnu)';
+    el.querySelector('time').textContent = mailDate(m.date);
+    el.querySelector('.mi-sub').textContent = m.subject || '(sans objet)';
+    el.title = (multi ? m.account + '\n' : '') + m.from_addr;
+    if (multi) el.querySelector('.mi-top').insertAdjacentHTML('beforeend', `<span class="mi-acc">${m.account.split('@')[0].replace(/[<>&"]/g, '')}</span>`);
+    el.addEventListener('click', () => readMail(m));
+    box.append(el);
+  });
+}
+
+async function refreshMail() {
+  if (mailBusy) return;
+  mailBusy = true;
+  $('#mail-refresh').classList.add('busy');
+  try { applyInbox(await invoke('mail_refresh')); } finally {
+    mailBusy = false;
+    $('#mail-refresh').classList.remove('busy');
+  }
+}
+
+// le message est affiché dans une iframe sans scripts ; les liens partent dans le navigateur
+function mailDoc(body) {
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const content = body.html || `<pre>${esc(body.text || '(message vide)')}</pre>`;
+  return `<!doctype html><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data: cid:; style-src 'unsafe-inline' https:; font-src https: data:">
+<style>html{background:#fff;color:#1d1b20;font:14px/1.45 'Segoe UI',sans-serif}body{margin:16px;word-wrap:break-word}
+pre{white-space:pre-wrap;font:inherit}img{max-width:100%;height:auto}a{color:#6750a4}</style>${content}`;
+}
+async function readMail(m) {
+  mailOpen = m;
+  mailView('reader');
+  $('.mr-subject').textContent = m.subject || '(sans objet)';
+  $('.mr-from').textContent = `${m.from}${m.from !== m.from_addr ? ' <' + m.from_addr + '>' : ''} · ${new Date(m.date * 1000).toLocaleString('fr-FR')}`;
+  $('#mr-web').hidden = !m.link;
+  const frame = $('.mr-body');
+  frame.srcdoc = mailDoc({ text: 'Chargement…' });
+  try {
+    const body = await invoke('mail_read', { account: m.account, uid: m.uid });
+    if (mailOpen !== m) return;
+    frame.srcdoc = mailDoc(body);
+  } catch (e) {
+    if (mailOpen === m) frame.srcdoc = mailDoc({ text: 'Impossible de charger le message : ' + e });
+  }
+}
+$('.mr-body').addEventListener('load', () => {
+  const doc = $('.mr-body').contentDocument;
+  if (!doc) return;
+  doc.addEventListener('click', e => {
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    e.preventDefault();
+    if (/^https?:/i.test(a.href)) invoke('open_url', { url: a.href });
+  });
+});
+$('#mr-back').addEventListener('click', () => { mailOpen = null; mailView('list'); });
+$('#mr-web').addEventListener('click', () => { if (mailOpen?.link) { invoke('open_url', { url: mailOpen.link }); setState('collapsed'); } });
+$('#mail-refresh').addEventListener('click', refreshMail);
+$('#mail-accounts').addEventListener('click', () => mailView('setup'));
+$('#ms-back').addEventListener('click', () => mailView('list'));
+
+function renderAccounts() {
+  const box = $('.acc-list');
+  box.innerHTML = inbox.accounts.length ? '' : '<div class="acc-none">Aucun compte pour l\'instant.</div>';
+  inbox.accounts.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'acc';
+    el.innerHTML = '<span class="ms">account_circle</span><div><b></b><small></small></div><button class="icon-btn small" title="Retirer ce compte"><span class="ms">delete</span></button>';
+    el.querySelector('b').textContent = a.email;
+    el.querySelector('small').textContent = a.error ? '⚠ ' + a.error : `${a.host} · ${a.unread} non lu${a.unread > 1 ? 's' : ''}`;
+    el.querySelector('small').classList.toggle('err', !!a.error);
+    const del = el.querySelector('button');
+    del.addEventListener('click', async () => {
+      if (!del.classList.contains('armed')) { del.classList.add('armed'); del.title = 'Cliquer encore pour retirer'; setTimeout(() => del.classList.remove('armed'), 3000); return; }
+      applyInbox(await invoke('mail_remove', { email: a.email }));
+    });
+    box.append(el);
+  });
+}
+$('.acc-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.currentTarget;
+  const btn = f.querySelector('button[type=submit]');
+  const err = $('.acc-err');
+  err.textContent = 'Connexion…';
+  err.classList.remove('err');
+  btn.disabled = true;
+  try {
+    applyInbox(await invoke('mail_add', { email: f.email.value, pass: f.pass.value, host: f.host.value || null }));
+    f.reset();
+    err.textContent = '';
+    mailView('list');
+  } catch (ex) {
+    err.textContent = String(ex);
+    err.classList.add('err');
+  } finally {
+    btn.disabled = false;
+  }
+});
+$$('.acc-form input').forEach(i => i.addEventListener('focus', () => { pinned = true; }));
+$$('[data-url]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); invoke('open_url', { url: a.dataset.url }); }));
+listen('mail', ({ payload }) => applyInbox(payload));
+invoke('mail_get').then(applyInbox);
+
+// ===================================================== média : playlists
+// --- panneaux latéraux (playlists, apparence)
+function togglePanel(id) {
+  const p = $(id);
+  const show = p.hidden;
+  $$('.side-panel').forEach(x => (x.hidden = true));
+  p.hidden = !show;
+}
+$$('.side-panel [data-close]').forEach(b => b.addEventListener('click', () => (b.closest('.side-panel').hidden = true)));
+$('#mp-lists').addEventListener('click', () => togglePanel('#pl-panel'));
+$$('.side-panel input').forEach(i => i.addEventListener('focus', () => { pinned = true; }));
+
+// ================================================== playlists favorites
+// %LOCALAPPDATA%\Ilot\playlists.json : [{ name, url }]
+let playlists = [];
+const plIcon = url => /spotify/.test(url) ? 'music_note' : /deezer/.test(url) ? 'graphic_eq' : /youtu/.test(url) ? 'smart_display' : 'queue_music';
+// les liens open.spotify.com s'ouvrent directement dans l'appli Spotify
+const plTarget = url => {
+  const m = url.match(/open\.spotify\.com\/(?:intl-\w+\/)?(playlist|album|artist|track)\/(\w+)/);
+  return m ? `spotify:${m[1]}:${m[2]}` : url;
+};
+function renderPlaylists() {
+  const box = $('.pl-list');
+  box.innerHTML = playlists.length ? '' : '<div class="sp-hint">Aucune playlist enregistrée.</div>';
+  playlists.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'pl-item';
+    el.innerHTML = `<button class="pl-open"><span class="ms">${plIcon(p.url)}</span><span></span></button><button class="icon-btn small" title="Retirer"><span class="ms">close</span></button>`;
+    el.querySelector('.pl-open span:last-child').textContent = p.name;
+    el.querySelector('.pl-open').title = p.url;
+    el.querySelector('.pl-open').addEventListener('click', () => { invoke('open_url', { url: plTarget(p.url) }); setState('collapsed'); });
+    el.querySelector('.icon-btn').addEventListener('click', () => {
+      playlists.splice(i, 1);
+      invoke('store_set', { key: 'playlists', value: playlists });
+      renderPlaylists();
+    });
+    box.append(el);
+  });
+}
+$('.pl-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.currentTarget;
+  const url = f.url.value.trim();
+  if (!/^(https?:\/\/|spotify:|deezer:\/\/)/.test(url)) { f.url.setCustomValidity('Lien http(s) ou spotify: attendu'); f.url.reportValidity(); return; }
+  playlists.push({ name: f.name.value.trim(), url });
+  invoke('store_set', { key: 'playlists', value: playlists });
+  f.reset();
+  renderPlaylists();
+});
+$('.pl-form [name=url]').addEventListener('input', e => e.target.setCustomValidity(''));
+invoke('store_get', { key: 'playlists' }).then(l => { if (Array.isArray(l)) playlists = l; renderPlaylists(); });
+
+// =================================================================== PC
+// --- Discord : RPC (src/discord.rs) si configuré, sinon mélangeur de volume Windows
+let dc = { status: 'setup', people: [] };
+const DC_STATUS = { setup: 'Mode simple', closed: 'Discord fermé', authorizing: 'Autorise Ilot dans Discord…', ready: 'Connecté', error: 'Erreur' };
+const dcRpc = () => dc.status === 'ready';
+let dcLocal = { mic: false, out: false }; // sourdines Windows (mode simple)
+
+function renderDiscord() {
+  $('.dc-status').textContent = DC_STATUS[dc.status] || dc.status;
+  $('.dc-status').classList.toggle('ok', dcRpc());
+  $('.dc-status').classList.toggle('bad', dc.status === 'error');
+  const mic = dcRpc() ? dc.mute : dcLocal.mic;
+  const deaf = dcRpc() ? dc.deaf : dcLocal.out;
+  $('#dc-mic').classList.toggle('off', mic);
+  $('#dc-mic .ms').textContent = mic ? 'mic_off' : 'mic';
+  $('#dc-mic').title = mic ? 'Réactiver le micro' : 'Couper le micro';
+  $('#dc-deaf').classList.toggle('off', deaf);
+  $('#dc-deaf .ms').textContent = deaf ? 'headset_off' : 'headphones';
+  $('#dc-deaf').title = deaf ? 'Réactiver le son' : 'Couper le son (sourdine)';
+
+  const setup = $('.dc-setup');
+  const showSetup = dc.status === 'setup' || dc.status === 'error' || setup.dataset.open === '1';
+  setup.hidden = !showSetup;
+  $('#dc-forget').hidden = dc.status === 'setup';
+  $('.dc-err').textContent = dc.status === 'error' ? dc.error : '';
+  $('.dc-err').classList.toggle('err', dc.status === 'error');
+
+  const chan = $('.dc-chan');
+  const box = $('.dc-people');
+  box.innerHTML = '';
+  if (showSetup) { chan.textContent = ''; return; }
+  if (!dcRpc()) {
+    chan.textContent = dc.status === 'authorizing'
+      ? 'Une fenêtre d’autorisation s’est ouverte dans Discord : clique sur « Autoriser ».'
+      : 'Lance Discord pour voir les personnes du salon.';
+    return;
+  }
+  chan.innerHTML = dc.channel ? `<span class="ms">volume_up</span>` : '';
+  chan.append(dc.channel ? dc.channel : 'Pas dans un salon vocal');
+  if (dc.error) chan.insertAdjacentHTML('beforeend', ` <small class="err">(${dc.error.replace(/[<>&]/g, '')})</small>`);
+  dc.people.forEach(p => {
+    if (p.id === dc.me_id) return box.append(selfRow(p));
+    const el = document.createElement('div');
+    el.className = 'dc-person' + (p.speaking ? ' speaking' : '') + (p.mute ? ' muted' : '');
+    el.innerHTML = `<span class="av">${p.avatar ? `<img src="${p.avatar}" alt="">` : ''}</span>
+      <div class="dp-main"><div class="dp-name"><b></b><span class="dp-flags"></span></div>
+      <input type="range" class="slider" min="0" max="200" value="${Math.round(p.volume)}"></div>
+      <span class="dp-val">${Math.round(p.volume)}%</span>
+      <button class="icon-btn small" title="${p.mute ? 'Réactiver' : 'Rendre muet (pour moi)'}"><span class="ms">${p.mute ? 'volume_off' : 'volume_up'}</span></button>`;
+    el.querySelector('b').textContent = p.name;
+    if (!p.avatar) el.querySelector('.av').textContent = (p.name[0] || '?').toUpperCase();
+    el.querySelector('.dp-flags').innerHTML = (p.self_mute ? '<span class="ms">mic_off</span>' : '') + (p.self_deaf ? '<span class="ms">headset_off</span>' : '');
+    const r = el.querySelector('input');
+    r.style.setProperty('--p', (p.volume / 2) + '%');
+    r.addEventListener('input', () => {
+      r.style.setProperty('--p', (r.value / 2) + '%');
+      el.querySelector('.dp-val').textContent = r.value + '%';
+      p.volume = Number(r.value);
+      invoke('discord_user', { userId: p.id, volume: p.volume });
+    });
+    r.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
+    el.querySelector('button').addEventListener('click', () => invoke('discord_user', { userId: p.id, mute: !p.mute }).then(() => { p.mute = !p.mute; renderDiscord(); }));
+    box.append(el);
+  });
+}
+// sa propre ligne : Discord ignore le volume « utilisateur » qu'on s'applique,
+// le curseur règle donc le volume du micro (0-100) et le bouton la sourdine micro
+function selfRow(p) {
+  const el = document.createElement('div');
+  const vol = Math.round(dc.mic_volume ?? 100);
+  el.className = 'dc-person me' + (p.speaking ? ' speaking' : '') + (dc.mute ? ' muted' : '');
+  el.innerHTML = `<span class="av">${p.avatar ? `<img src="${p.avatar}" alt="">` : ''}</span>
+    <div class="dp-main"><div class="dp-name"><b></b><span class="dp-flags"><span class="ms" title="Volume de ton micro">mic</span></span></div>
+    <input type="range" class="slider" min="0" max="100" value="${vol}" title="Volume de ton micro dans Discord"></div>
+    <span class="dp-val">${vol}%</span>
+    <button class="icon-btn small" title="${dc.mute ? 'Réactiver le micro' : 'Couper le micro'}"><span class="ms">${dc.mute ? 'mic_off' : 'mic'}</span></button>`;
+  el.querySelector('b').textContent = p.name + ' (toi)';
+  if (!p.avatar) el.querySelector('.av').textContent = (p.name[0] || '?').toUpperCase();
+  const r = el.querySelector('input');
+  r.style.setProperty('--p', vol + '%');
+  r.addEventListener('input', () => {
+    r.style.setProperty('--p', r.value + '%');
+    el.querySelector('.dp-val').textContent = r.value + '%';
+    dc.mic_volume = Number(r.value);
+    invoke('discord_mic', { volume: dc.mic_volume });
+  });
+  r.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
+  el.querySelector('button').addEventListener('click', () => invoke('discord_self', { mute: !dc.mute }));
+  return el;
+}
+// pendant qu'on fait glisser un curseur, on ne reconstruit pas la liste
+listen('discord', ({ payload }) => {
+  dc = payload;
+  if (document.activeElement?.closest?.('.dc-people')) return;
+  renderDiscord();
+});
+invoke('discord_get').then(s => { dc = s; renderDiscord(); });
+
+$('#dc-mic').addEventListener('click', async () => {
+  if (dcRpc()) return invoke('discord_self', { mute: !dc.mute });
+  dcLocal.mic = !dcLocal.mic;
+  const ok = await invoke('app_volume_set', { app: 'discord', mic: true, muted: dcLocal.mic });
+  if (!ok) dcLocal.mic = false;
+  renderDiscord();
+});
+$('#dc-deaf').addEventListener('click', async () => {
+  if (dcRpc()) return invoke('discord_self', { deaf: !dc.deaf });
+  dcLocal.out = !dcLocal.out;
+  const ok = await invoke('app_volume_set', { app: 'discord', muted: dcLocal.out });
+  if (!ok) dcLocal.out = false;
+  renderDiscord();
+});
+const dcVol = $('#dc-vol');
+function showDcVolume(v) {
+  dcVol.disabled = !v;
+  const n = v ? Math.round(v.level * 100) : 0;
+  dcVol.value = n;
+  dcVol.style.setProperty('--p', n + '%');
+  $('.dc-vol-val').textContent = v ? n : '–';
+  $('.dc-vol').title = v ? 'Volume de Discord (mélangeur Windows)' : 'Discord ne joue pas de son pour l’instant';
+  if (v && !dcRpc()) dcLocal.out = v.muted;
+}
+dcVol.addEventListener('input', () => {
+  showDcVolume({ level: dcVol.value / 100, muted: false });
+  invoke('app_volume_set', { app: 'discord', level: dcVol.value / 100 });
+});
+dcVol.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
+$('#dc-settings').addEventListener('click', () => {
+  const s = $('.dc-setup');
+  s.dataset.open = s.dataset.open === '1' ? '' : '1';
+  renderDiscord();
+});
+$('.dc-setup').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.currentTarget;
+  try {
+    await invoke('discord_setup', { clientId: f.cid.value, secret: f.secret.value });
+    f.reset();
+    f.dataset.open = '';
+    $('.dc-err').textContent = '';
+  } catch (ex) {
+    $('.dc-err').textContent = String(ex);
+    $('.dc-err').classList.add('err');
+  }
+});
+$('#dc-forget').addEventListener('click', () => { invoke('discord_forget'); $('.dc-setup').dataset.open = ''; });
+$$('.dc-setup input').forEach(i => i.addEventListener('focus', () => { pinned = true; }));
+
+// --- logiciels constructeur : nom dans le menu Démarrer + exécutable de leur interface
+const HARDWARE = [
+  { match: /^msi center/i, exe: 'DCv2', label: 'MSI Center', icon: 'memory' },
+  { match: /^armoury crate/i, exe: 'ArmouryCrate', label: 'Armoury Crate', icon: 'developer_board' },
+  { match: /^logitech g hub/i, exe: 'lghub', label: 'Logitech G HUB', icon: 'mouse' },
+];
+async function renderHardware() {
+  const list = HARDWARE.map(h => ({ ...h, app: apps.find(a => h.match.test(a.name)) }));
+  const running = await invoke('procs_running', { names: list.map(h => h.exe) });
+  const box = $('.hw-list');
+  box.innerHTML = '';
+  list.forEach((h, i) => {
+    const b = document.createElement('button');
+    b.className = 'hw' + (running[i] ? ' on' : '') + (h.app ? '' : ' missing');
+    b.innerHTML = (h.app?.icon ? `<img src="${h.app.icon}" alt="">` : `<span class="ms">${h.icon}</span>`) + '<span class="hw-name"></span><i></i>';
+    b.querySelector('.hw-name').textContent = h.label;
+    b.querySelector('i').textContent = !h.app ? 'non installé' : running[i] ? 'ouvert' : '';
+    b.disabled = !h.app;
+    b.addEventListener('click', () => { invoke('app_launch', { id: h.app.id }); setState('collapsed'); });
+    b.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (h.app) invoke('app_folder', { id: h.app.id, name: h.app.name }).then(ok => ok && setState('collapsed'));
+    });
+    box.append(b);
+  });
+}
+
+// --- mode d'alimentation de Windows 11
+async function refreshPower() {
+  const m = await invoke('power_get');
+  $$('.pw-modes button').forEach(b => b.classList.toggle('on', b.dataset.pw === m));
+  $('.pw-note').textContent = m ? '' : 'Mode non disponible avec le plan d’alimentation actuel (il faut « Utilisation normale »).';
+}
+$$('.pw-modes button').forEach(b => b.addEventListener('click', async () => {
+  $$('.pw-modes button').forEach(x => x.classList.toggle('on', x === b));
+  if (!await invoke('power_set', { mode: b.dataset.pw })) refreshPower();
+}));
+
+
+let pcTimer = null;
+function refreshPc() {
+  renderHardware();
+  refreshPower();
+  invoke('app_volume_get', { app: 'discord' }).then(v => { showDcVolume(v); renderDiscord(); });
+}
+
+// ================================================ gestionnaire des tâches
+// processus regroupés par programme (src/tasks.rs), rafraîchis toutes les 2 s
+let taskTimer = null;
+let tasks = [];
+let taskSort = 'cpu';
+let taskArmed = ''; // fin de tâche en attente de confirmation
+let taskBusy = false;
+const fmtMem = b => b >= 1024 ** 3 ? (b / 1024 ** 3).toFixed(1) + ' Go' : Math.round(b / 1024 ** 2) + ' Mo';
+// débit réseau en bits/s, comme Windows
+const fmtNet = b => {
+  const k = b * 8 / 1e3;
+  return k < 1 ? '0' : k < 1000 ? Math.round(k) + ' k' : k < 10000 ? (k / 1e3).toFixed(1) + ' M' : Math.round(k / 1e3) + ' M';
+};
+const fmtRate = b => b < 0.05 * 1024 ** 2 ? '0 Mo/s' : (b / 1024 ** 2).toFixed(1) + ' Mo/s';
+const DISK_FULL = 100 * 1024 ** 2; // 100 Mo/s = case « pleine »
+const NET_FULL = 12.5 * 1024 ** 2; // 100 Mbit/s
+const CONN_FULL = 40; // connexions actives
+let netRate = { down: 0, up: 0 };
+// une couleur par colonne (comme les graphiques de Windows), plus intense avec
+// la charge ; au-delà de 75 % la case vire au rouge
+const HUES = { cpu: 210, mem: 275, disk: 135, net: 30 };
+function heat(el, frac, kind) {
+  const f = Math.max(0, Math.min(1, frac || 0));
+  const hue = f >= 0.75 ? 0 : HUES[kind] ?? 50;
+  el.style.setProperty('--heat', `hsl(${hue} 85% 55% / ${0.1 + 0.6 * Math.sqrt(f)})`);
+  el.style.setProperty('--bar', `hsl(${hue} 90% 60%)`);
+  el.style.setProperty('--fill', Math.max(f * 100, f > 0.002 ? 3 : 0) + '%');
+  el.classList.toggle('hot', f >= 0.5);
+}
+async function refreshTasks() {
+  if (taskBusy) return;
+  taskBusy = true;
+  try {
+    const r = await invoke('tasks_get');
+    tasks = r.list;
+    netRate = { down: r.net_down, up: r.net_up };
+  } finally { taskBusy = false; }
+  renderTasks();
+}
+function renderTasks() {
+  const q = norm($('#task-q').value.trim());
+  const by = {
+    cpu: (x, y) => y.cpu - x.cpu || y.mem - x.mem,
+    mem: (x, y) => y.mem - x.mem,
+    disk: (x, y) => y.disk - x.disk || y.cpu - x.cpu,
+    net: (x, y) => y.net - x.net || y.cpu - x.cpu,
+    name: (x, y) => x.name.localeCompare(y.name, 'fr'),
+  }[taskSort];
+  const list = tasks.filter(t => !q || norm(t.name).includes(q)).sort(by);
+  const procs = tasks.reduce((n, t) => n + t.count, 0);
+  const cpu = Math.min(100, tasks.reduce((n, t) => n + t.cpu, 0));
+  const mem = tasks.reduce((n, t) => n + t.mem, 0);
+  const disk = tasks.reduce((n, t) => n + t.disk, 0);
+  const memTotal = lastSys?.mem_total || 16 * 1024 ** 3;
+  $('.task-sum').textContent = `${procs} processus`;
+  // en-têtes : totaux colorés, comme le Gestionnaire des tâches
+  const head = (k, frac, text) => {
+    const h = $(`.task-headrow [data-h="${k}"]`);
+    heat(h, frac, k);
+    h.querySelector('b').textContent = text;
+  };
+  head('cpu', cpu / 100, Math.round(cpu) + ' %');
+  head('mem', (lastSys ? lastSys.mem_used : mem) / memTotal, Math.round((lastSys ? lastSys.mem_used : mem) / memTotal * 100) + ' %');
+  head('disk', disk / DISK_FULL, fmtRate(disk));
+  head('net', (netRate.down + netRate.up) / NET_FULL, `↓${fmtNet(netRate.down)} ↑${fmtNet(netRate.up)}`);
+  const box = $('.task-list');
+  if (!list.length) { box.innerHTML = '<div class="empty">Aucun processus</div>'; return; }
+  box.innerHTML = '';
+  list.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'task-row task';
+    row.innerHTML = t.icon ? `<img src="${t.icon}" alt="">` : '<span class="ms">memory</span>';
+    const name = document.createElement('span');
+    name.className = 'task-name';
+    name.textContent = t.name;
+    if (t.count > 1) name.insertAdjacentHTML('beforeend', ` <i>(${t.count})</i>`);
+    row.append(name);
+    [
+      ['cpu', t.cpu / 100, t.cpu.toFixed(1) + ' %'],
+      ['mem', t.mem / memTotal, fmtMem(t.mem)],
+      ['disk', t.disk / DISK_FULL, fmtRate(t.disk)],
+      ['net', t.net / CONN_FULL, t.net ? `${t.net} conn.` : '–'],
+    ].forEach(([kind, frac, text]) => {
+      const c = document.createElement('span');
+      c.className = 'task-cell';
+      c.textContent = text;
+      heat(c, frac, kind);
+      row.append(c);
+    });
+    const kill = document.createElement('button');
+    kill.className = 'task-kill' + (taskArmed === t.name ? ' armed' : '');
+    kill.disabled = t.protected;
+    kill.title = t.protected ? 'Processus Windows protégé' : 'Fin de tâche';
+    kill.innerHTML = `<span class="ms">${t.protected ? 'shield' : 'close'}</span><span>${taskArmed === t.name ? 'Confirmer' : ''}</span>`;
+    kill.addEventListener('click', async () => {
+      // premier clic : arme ; second clic : termine tous les processus du programme
+      if (taskArmed !== t.name) {
+        taskArmed = t.name;
+        renderTasks();
+        setTimeout(() => { if (taskArmed === t.name) { taskArmed = ''; renderTasks(); } }, 3000);
+        return;
+      }
+      taskArmed = '';
+      await invoke('task_kill', { name: t.name });
+      refreshTasks();
+    });
+    row.append(kill);
+    box.append(row);
+  });
+}
+$$('.task-seg button').forEach(b => b.addEventListener('click', () => {
+  taskSort = b.dataset.s;
+  $$('.task-seg button').forEach(x => x.classList.toggle('on', x === b));
+  renderTasks();
+}));
+$('#task-q').addEventListener('input', renderTasks);
+$('#taskmgr').addEventListener('click', () => { invoke('taskmgr_open'); setState('collapsed'); });
+
+
+// ============================================================== bloc-notes
+// dans l'onglet presse-papiers ; enregistré dans %LOCALAPPDATA%\Ilot\notes.json
+const notes = $('.notes');
+let clipView = 'hist';
+let clipCount = '';
+let noteTimer = null;
+function showClipView(v) {
+  clipView = v;
+  $$('.clip-seg button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  $('.clip-list').hidden = v !== 'hist';
+  notes.hidden = v !== 'notes';
+  $('#clip-clear').hidden = v !== 'hist';
+  $('#note-copy').hidden = v !== 'notes';
+  noteStatus();
+  if (v === 'notes') notes.focus();
+}
+function noteStatus(msg) {
+  if (clipView !== 'notes') { $('.clip-count').textContent = clipCount; return; }
+  const n = notes.value.length;
+  $('.clip-count').textContent = msg || (n ? `${n} caractère${n > 1 ? 's' : ''}` : 'Bloc-notes vide');
+}
+function saveNotes() {
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(async () => {
+    const ok = await invoke('store_set', { key: 'notes', value: { text: notes.value } });
+    noteStatus(ok ? 'Enregistré' : 'Erreur d’enregistrement');
+    setTimeout(() => noteStatus(), 1500);
+  }, 400);
+}
+function addToNotes(t) {
+  const v = notes.value.replace(/\s+$/, '');
+  notes.value = (v ? v + '\n\n' : '') + t;
+  saveNotes();
+}
+notes.addEventListener('input', () => { noteStatus(); saveNotes(); });
+// on écrit : l'îlot reste ouvert même si la souris sort
+notes.addEventListener('focus', () => { pinned = true; });
+$$('.clip-seg button').forEach(b => b.addEventListener('click', () => showClipView(b.dataset.v)));
+$('#note-copy').addEventListener('click', () => {
+  invoke('clip_text', { text: notes.value });
+  noteStatus('Copié');
+  setTimeout(() => noteStatus(), 1200);
+});
+invoke('store_get', { key: 'notes' }).then(n => { if (n && typeof n.text === 'string') notes.value = n.text; noteStatus(); });
+
+// mémoire totale, pour colorer la colonne Mémoire
+let lastSys = null;
+listen('sys', ({ payload }) => { lastSys = payload; });
 
 // ========================================================= presse-papiers
 function renderClips(list) {
-  $('.clip-count').textContent = list.length ? `${list.length} élément${list.length > 1 ? 's' : ''}` : 'Historique vide';
+  clipCount = list.length ? `${list.length} élément${list.length > 1 ? 's' : ''}` : 'Historique vide';
+  if (clipView === 'hist') $('.clip-count').textContent = clipCount;
   const box = $('.clip-list');
   box.innerHTML = list.length ? '' : '<div class="empty">Copiez du texte ou une image : ils apparaîtront ici.</div>';
   list.forEach(c => {
@@ -1341,6 +2542,15 @@ function renderClips(list) {
       el.append(p);
     } else {
       el.innerHTML = `<img src="${c.thumb}" alt=""><small>${c.w} × ${c.h}</small>`;
+    }
+    if (c.text !== null && c.text !== undefined) {
+      el.insertAdjacentHTML('beforeend', '<span class="ms to-note" title="Ajouter au bloc-notes">note_add</span>');
+      el.querySelector('.to-note').addEventListener('click', e => {
+        e.stopPropagation();
+        addToNotes(c.text);
+        el.classList.add('done');
+        setTimeout(() => el.classList.remove('done'), 1200);
+      });
     }
     el.insertAdjacentHTML('beforeend', '<span class="ms">check</span>');
     el.addEventListener('click', () => {
@@ -1520,6 +2730,7 @@ function renderSettings() {
   $('#set-notif').checked = cfg.notif_popups;
   $('#set-osd').checked = cfg.osd;
   $$('#set-rotate button').forEach(b => b.classList.toggle('on', Number(b.dataset.v) === cfg.rotate_min));
+  $$('#set-island-bg button').forEach(b => b.classList.toggle('on', b.dataset.v === (cfg.island_bg || 'solid')));
   $('.city-cur').textContent = cfg.city ? cfg.city.name : 'Aucune ville choisie';
   renderVariants();
   renderIcals();
@@ -1550,6 +2761,31 @@ $('#set-win-mode').addEventListener('change', e => setCfg({ win_mode: e.target.c
 $('#set-notif').addEventListener('change', e => setCfg({ notif_popups: e.target.checked }));
 $('#set-osd').addEventListener('change', e => setCfg({ osd: e.target.checked }));
 $$('#set-rotate button').forEach(b => b.addEventListener('click', () => setCfg({ rotate_min: Number(b.dataset.v) })));
+$$('#set-island-bg button').forEach(b => b.addEventListener('click', () => setCfg({ island_bg: b.dataset.v })));
+
+// --- fond de l'îlot : opacité de la couleur de surface (en %), ou fond d'écran flouté
+const ISLAND_ALPHA = { solid: 100, glass: 80, clear: 55, wall: 50 };
+const WALL_BLEED = 30; // débord du calque flouté (évite les bords clairs du flou)
+async function applyIslandBg(src = currentThumb) {
+  const mode = cfg.island_bg || 'solid';
+  const a = ISLAND_ALPHA[mode] ?? 100;
+  island.style.setProperty('--island-bg', a === 100 ? 'var(--surface)' : `color-mix(in srgb, var(--surface) ${a}%, transparent)`);
+  const wall = mode === 'wall' && src;
+  island.classList.toggle('wall-bg', !!wall);
+  if (!wall) return;
+  // le fond d'écran, calé comme à l'écran (« remplir ») : l'îlot est centré en haut
+  try {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    const s = Math.max(screen.width / img.naturalWidth, screen.height / img.naturalHeight);
+    const w = img.naturalWidth * s, h = img.naturalHeight * s;
+    const el = $('.island-wall');
+    el.style.backgroundImage = `url("${src}")`;
+    el.style.backgroundSize = `${w}px ${h}px`;
+    el.style.backgroundPosition = `center ${WALL_BLEED - (h - screen.height) / 2}px`;
+  } catch {}
+}
 
 // --- ville (géocodage Open-Meteo)
 let cityTimer = null;
@@ -1615,6 +2851,7 @@ $('#ical-url').addEventListener('focus', () => invoke('grab_focus'));
 // les réglages ont changé (ici ou par une commande)
 function onSettings() {
   applyTheme();
+  applyIslandBg();
   updateIndicators();
   renderTiles();
   renderNotifs();
@@ -1686,6 +2923,7 @@ async function themeFrom(src) {
     sourceArgb = await sourceColorFromImage(img);
     store.set('source', sourceArgb);
     applyTheme();
+    applyIslandBg(src);
     if (state === 'open' && currentTab === 'settings') renderVariants();
   } catch (e) {
     console.warn('thème', e);

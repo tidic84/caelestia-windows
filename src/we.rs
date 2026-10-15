@@ -38,7 +38,7 @@ impl WeWall {
     }
 }
 
-fn steam_dir() -> PathBuf {
+pub(crate) fn steam_dir() -> PathBuf {
     let mut buf = [0u16; 520];
     let mut len = (buf.len() * 2) as u32;
     let r = unsafe {
@@ -63,7 +63,7 @@ fn steam_dir() -> PathBuf {
 }
 
 /// Bibliotheques Steam (libraryfolders.vdf), bibliotheque principale incluse.
-fn libraries() -> Vec<PathBuf> {
+pub(crate) fn libraries() -> Vec<PathBuf> {
     let steam = steam_dir();
     let mut libs = vec![steam.clone()];
     if let Ok(vdf) = std::fs::read_to_string(steam.join(r"steamapps\libraryfolders.vdf")) {
