@@ -379,10 +379,12 @@ pub fn watch_keys(app: AppHandle) {
 
 // --------------------------------------------------------------------- web
 
-/// Ouvre une adresse dans le navigateur par defaut.
+/// Ouvre une adresse dans le navigateur par defaut, ou un lien d'appli
+/// musicale (playlists favorites : spotify:, deezer://).
 #[tauri::command(async)]
 pub fn open_url(url: String) {
-    if url.starts_with("https://") {
+    const OK: &[&str] = &["https://", "http://", "spotify:", "deezer://"];
+    if OK.iter().any(|p| url.starts_with(p)) {
         let _ = Command::new("explorer.exe").arg(url).creation_flags(CREATE_NO_WINDOW).spawn();
     }
 }

@@ -26,8 +26,11 @@ pour ouvrir le panneau. Les couleurs suivent votre fond d'écran (Material You).
 | **Accueil** | Profil (avatar Windows, durée d'allumage), météo, horloge, calendrier avec vos agendas iCal (clic sur un jour : ses événements), lecteur avec visualiseur, CPU / RAM / disque / batterie, volume, verrouiller · veille · déconnexion · redémarrer · éteindre (second clic pour confirmer) |
 | **Média** | Lecteur complet avec avance dans le morceau et visualiseur audio. Fonctionne avec tout ce que Windows voit (Spotify, navigateurs…) |
 | **Contrôles** | Wi-Fi (réseaux, connexion avec mot de passe), Bluetooth, caféine (empêche la veille), ne pas déranger, mode sombre, minuteur / Pomodoro, luminosité, sortie audio, volume par application, centre de notifications |
-| **Apps** | Toutes les applis du menu Démarrer avec icônes, recherche, navigation clavier. Préfixes : `>` commandes (fond au hasard, variantes de couleurs, minuteur, Wi-Fi, session…), `=` calculatrice, `:` emoji, `?` recherche web. Un calcul tapé directement s'affiche aussi. **Ctrl+Alt+Espace** ouvre le lanceur, ainsi que la touche Windows seule si le réglage est activé (la touche est alors remappée au niveau du pilote clavier pour que Windows n'ouvre plus le menu Démarrer : droits administrateur et redémarrage requis ; les raccourcis Win+… restent ceux de Windows, Ctrl+Échap ouvre le menu Démarrer) |
-| **Presse-papiers** | Les 40 derniers textes et images copiés, un clic pour recopier |
+| **Apps** | Toutes les applis du menu Démarrer avec icônes, recherche, navigation clavier. Préfixes : `>` commandes (fond au hasard, variantes de couleurs, minuteur, Wi-Fi, session…), `=` calculatrice, `:` emoji, `?` recherche web. Un calcul tapé directement s'affiche aussi. **Ctrl+Alt+Espace** ouvre le lanceur, ainsi que la touche Windows seule si le réglage est activé (la touche est alors remappée au niveau du pilote clavier pour que Windows n'ouvre plus le menu Démarrer : droits administrateur et redémarrage requis ; les raccourcis Win+… restent ceux de Windows, Ctrl+Échap ouvre le menu Démarrer). **Dossiers** (clic droit sur une appli, ou glisser une appli sur un dossier), fichiers et raccourcis déposés depuis l'Explorateur, applis masquées (clic droit sur « Toutes » pour les réafficher), tri par nom ou date d'ajout. **Launcher** de jeux : Steam, Epic Games, Ubisoft Connect et GOG avec jaquettes, plus les jeux ajoutés à la main |
+| **Mail** | Comptes IMAP (Gmail, Yahoo, iCloud, Orange…) avec mot de passe d'application chiffré (DPAPI), boîte de réception de chaque compte, lecture du message ; nombre de non-lus sur l'onglet et dans la pilule |
+| **PC** | Discord : micro, sourdine, volume de chaque personne du salon et de son propre micro (RPC, avec une application Discord à soi ; sinon mélangeur Windows). Logiciels du PC (MSI Center, Armoury Crate, G HUB) et mode d'alimentation de Windows 11 |
+| **Tâches** | Gestionnaire des tâches : programmes regroupés avec CPU, mémoire, disque et connexions réseau (colonnes colorées selon la charge), tri, filtre, fin de tâche (processus Windows protégés) |
+| **Presse-papiers** | Les 40 derniers textes et images copiés, un clic pour recopier ; bloc-notes enregistré automatiquement |
 | **Fonds** | Vos images de `Images\Wallpapers` + celles de Windows ; choisir un fond recalcule la palette. Avec **Wallpaper Engine**, un second onglet liste vos fonds WE. Bouton « Au hasard » |
 | **Réglages** (⚙) | Démarrage avec Windows, écran de l'îlot, mode clair / sombre / auto, variante Material You (Tonal Spot, Vibrant, Expressive…), accent et mode appliqués à Windows, ville de la météo, agendas iCal, rotation automatique des fonds, notifications et indicateurs |
 
@@ -41,6 +44,10 @@ La pilule s'agrandit aussi un instant pour signaler :
 - la fin du minuteur.
 
 Autres comportements :
+- en haut à droite du panneau : **agrandir** (presque tout l'écran) et **verrouiller** (l'îlot reste ouvert quand la souris sort) ;
+- calendrier : une **note** par jour (clic sur un jour) ;
+- Média : **playlists** favorites (liens Spotify, Deezer, YouTube) ;
+- Réglages › Apparence : **fond de l'îlot** (et de la barre) opaque, translucide ou fond d'écran flouté ;
 - hors de l'îlot, les clics passent aux fenêtres en dessous ;
 - l'îlot se cache quand un jeu ou une vidéo est en plein écran ;
 - une icône dans la zone de notification permet d'ouvrir les réglages, de recharger ou de quitter.
@@ -53,6 +60,10 @@ Autres comportements :
 - **Visualiseur** : capture « loopback » WASAPI de la sortie par défaut + FFT, uniquement quand de la musique joue.
 - **Agenda** : adresse iCal secrète (Google Agenda : Paramètres › Intégrer l'agenda ; Outlook : Publier un calendrier). Les événements récurrents sont gérés.
 - **Météo** : [Open-Meteo](https://open-meteo.com), sans clé.
+- **Mail** : IMAP en TLS ; les mots de passe sont chiffrés avec DPAPI (déchiffrables seulement par la session Windows) dans `%LOCALAPPDATA%\Ilot\mail.json`.
+- **Discord** : RPC local (`\\.\pipe\discord-ipc-0`), avec une application créée sur le portail développeurs Discord (redirection `http://localhost`) ; jetons chiffrés avec DPAPI.
+- **Tâches** : `sysinfo` pour CPU / mémoire / disque ; connexions TCP par processus via `GetExtendedTcpTable` (le débit réseau par processus demanderait ETW et des droits administrateur).
+- **Dossiers, notes, playlists** : petits fichiers JSON dans `%LOCALAPPDATA%\Ilot`.
 - **Accent Windows** : écrit dans le registre (`AccentPalette`, `AccentColor`…) et désactive la couleur automatique de Windows.
 
 ## Wallpaper Engine

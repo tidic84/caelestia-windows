@@ -2,14 +2,18 @@
 //! menu Demarrer : applis classiques et UWP), avec leurs icones.
 
 use std::os::windows::process::CommandExt;
+use std::path::Path;
 use std::process::Command;
 use std::sync::Mutex;
+use std::time::UNIX_EPOCH;
 
 use base64::Engine;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use windows::core::Interface;
-use windows::Win32::Foundation::SIZE;
+use windows::Win32::Foundation::{PROPERTYKEY, SIZE};
+use windows::Win32::UI::Shell::IShellItem2;
+use windows::Win32::UI::Shell::PropertiesSystem::PSGetPropertyKeyFromName;
 use windows::Win32::Graphics::Gdi::{
     DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO,
     BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ,
@@ -30,9 +34,37 @@ pub struct App {
     name: String,
     id: String,
     icon: String,
+    /// date d'installation approximative (ms depuis 1970), 0 si inconnue
+    added: i64,
 }
 
 pub struct Apps(pub Mutex<Vec<App>>);
+
+fn prop_str(item: &IShellItem2, name: &str) -> Option<String> {
+    unsafe {
+        let mut key = PROPERTYKEY::default();
+        PSGetPropertyKeyFromName(&HSTRING::from(name), &mut key).ok()?;
+        let p = item.GetString(&key).ok()?;
+        let s = p.to_string().ok();
+        CoTaskMemFree(Some(p.0 as _));
+        s
+    }
+}
+
+/// Date de creation du dossier de l'appli : cible du raccourci (applis
+/// classiques) ou dossier du paquet (Store, recree a chaque mise a jour).
+fn added_of(item: &IShellItem) -> i64 {
+    let Ok(item2) = item.cast::<IShellItem2>() else { return 0 };
+    for key in ["System.Link.TargetParsingPath", "System.AppUserModel.PackageInstallPath"] {
+        let Some(path) = prop_str(&item2, key) else { continue };
+        let p = Path::new(&path);
+        let Some(dir) = (if p.is_dir() { Some(p) } else { p.parent() }) else { continue };
+        if let Ok(t) = std::fs::metadata(dir).and_then(|m| m.created()) {
+            return t.duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+        }
+    }
+    0
+}
 
 fn name_of(item: &IShellItem, kind: SIGDN) -> Option<String> {
     unsafe {
@@ -120,7 +152,7 @@ pub(crate) fn bitmap_bgra(hbmp: HBITMAP) -> Option<(u32, u32, Vec<u8>)> {
 /// demandent en meme temps : une seule extraction a la fois.
 static ICON_LOCK: Mutex<()> = Mutex::new(());
 
-fn icon_of(item: &IShellItem) -> String {
+pub(crate) fn icon_of(item: &IShellItem) -> String {
     let _one = ICON_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     unsafe {
         let Ok(f) = item.cast::<IShellItemImageFactory>() else {
@@ -209,7 +241,8 @@ fn scan() -> windows::core::Result<Vec<App>> {
                 continue;
             }
             let icon = icon_of(&item);
-            out.push(App { name, id, icon });
+            let added = added_of(&item);
+            out.push(App { name, id, icon, added });
         }
     }
     out.sort_by_key(|a| a.name.to_lowercase());
