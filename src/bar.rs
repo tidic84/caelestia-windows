@@ -1,5 +1,5 @@
 //! Barre facon Waybar : fenetres ouvertes, bureaux virtuels, reservation du
-//! haut de l'ecran (AppBar) et masquage de la barre des taches Windows.
+//! haut des ecrans (AppBar) et masquage des barres des taches Windows.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
@@ -13,9 +13,8 @@ use windows::core::{w, BOOL, GUID, HSTRING, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, PROPERTYKEY, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows::Win32::Graphics::Gdi::{
-    CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits, MonitorFromWindow,
-    ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ, HMONITOR,
-    MONITOR_DEFAULTTONEAREST,
+    CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits, ReleaseDC,
+    SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ,
 };
 use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
 use windows::Win32::System::Com::CoTaskMemFree;
@@ -76,8 +75,8 @@ static PEEK: AtomicBool = AtomicBool::new(false);
 static HIDE: AtomicBool = AtomicBool::new(false);
 /// Barres des taches masquees par l'ilot, a reafficher.
 static HIDDEN: Mutex<Vec<isize>> = Mutex::new(Vec::new());
-/// Zone reservee en haut de l'ecran (AppBar).
-static RESERVED: Mutex<Option<(isize, RECT)>> = Mutex::new(None);
+/// Zone reservee en haut de chaque ecran (AppBar), par fenetre.
+static RESERVED: Mutex<Vec<(isize, RECT)>> = Mutex::new(Vec::new());
 
 fn hwnd(id: isize) -> HWND {
     HWND(id as _)
@@ -471,7 +470,8 @@ pub fn desktop_go(index: usize) {
 pub fn reserve(win: &WebviewWindow, rect: Option<RECT>) {
     let Ok(h) = win.hwnd() else { return };
     let mut st = RESERVED.lock().unwrap();
-    if st.map(|s| s.1) == rect {
+    let i = st.iter().position(|s| s.0 == h.0 as isize);
+    if i.map(|i| st[i].1) == rect {
         return;
     }
     let mut d = APPBARDATA {
@@ -485,17 +485,20 @@ pub fn reserve(win: &WebviewWindow, rect: Option<RECT>) {
         match rect {
             None => {
                 SHAppBarMessage(ABM_REMOVE, &mut d);
-                *st = None;
+                st.retain(|s| s.0 != h.0 as isize);
             }
             Some(r) => {
-                if st.is_none() {
+                if i.is_none() {
                     SHAppBarMessage(ABM_NEW, &mut d);
                 }
                 d.rc = r;
                 SHAppBarMessage(ABM_QUERYPOS, &mut d);
                 d.rc.bottom = d.rc.top + (r.bottom - r.top);
                 SHAppBarMessage(ABM_SETPOS, &mut d);
-                *st = Some((h.0 as isize, r));
+                match i {
+                    Some(i) => st[i].1 = r,
+                    None => st.push((h.0 as isize, r)),
+                }
             }
         }
     }
@@ -521,12 +524,12 @@ fn autohide_set(on: bool) {
     }
 }
 
-/// Barres des taches (principale et secondaires) affichees sur `mon`.
-fn trays_on(mon: HMONITOR) -> Vec<HWND> {
+/// Barres des taches de tous les ecrans (principale et secondaires) : les
+/// autres ecrans ont chacun leur barre (voir `screens`).
+fn trays() -> Vec<HWND> {
     top_windows()
         .into_iter()
         .filter(|&h| matches!(class_of(h).as_str(), "Shell_TrayWnd" | "Shell_SecondaryTrayWnd"))
-        .filter(|&h| unsafe { MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST) } == mon)
         .collect()
 }
 
@@ -538,22 +541,13 @@ fn show_trays() {
     }
 }
 
-/// Masque la barre des taches de l'ecran de l'ilot. Windows la reaffiche
-/// parfois (menu Demarrer...) : appele en boucle.
-fn hide_trays(own: HWND) {
-    let mon = unsafe { MonitorFromWindow(own, MONITOR_DEFAULTTONEAREST) };
-    let now = trays_on(mon);
+/// Masque les barres des taches. Windows les reaffiche parfois (menu
+/// Demarrer...) : appele en boucle.
+fn hide_trays() {
+    let now = trays();
     let mut hidden = HIDDEN.lock().unwrap();
-    // l'ilot a change d'ecran : on rend celles de l'ancien
-    hidden.retain(|&h| {
-        let keep = now.iter().any(|n| n.0 as isize == h);
-        if !keep {
-            unsafe {
-                let _ = ShowWindow(hwnd(h), SW_SHOWNA);
-            }
-        }
-        keep
-    });
+    // barre disparue (ecran debranche, explorer relance) : rien a rendre
+    hidden.retain(|&h| now.iter().any(|n| n.0 as isize == h));
     for h in now {
         unsafe {
             if IsWindowVisible(h).as_bool() {
@@ -568,7 +562,6 @@ fn hide_trays(own: HWND) {
 
 /// Applique les reglages : barre des taches Windows masquee ou non.
 pub fn sync(app: &AppHandle) {
-    let Some(win) = app.get_webview_window("island") else { return };
     let (bar, hide, prev) = {
         let st = app.state::<Settings>();
         let c = st.0.lock().unwrap();
@@ -585,9 +578,7 @@ pub fn sync(app: &AppHandle) {
         if !cur {
             autohide_set(true);
         }
-        if let Ok(own) = win.hwnd() {
-            hide_trays(own);
-        }
+        hide_trays();
     } else {
         show_trays();
         if let Some(p) = prev {
@@ -618,7 +609,7 @@ pub fn restore(app: &AppHandle) {
         autohide_set(p);
         crate::settings::update(app, |c| c.taskbar_autohide = None);
     }
-    if let Some(win) = app.get_webview_window("island") {
+    for win in app.webview_windows().into_values() {
         reserve(&win, None);
     }
 }
@@ -720,7 +711,7 @@ pub fn watch(win: WebviewWindow) {
             if HIDE.load(Ordering::Relaxed) {
                 let fg = unsafe { GetForegroundWindow() };
                 if !SHELL_UI.contains(&class_of(fg).as_str()) {
-                    hide_trays(own);
+                    hide_trays();
                 }
             }
             if !enabled(&app) {

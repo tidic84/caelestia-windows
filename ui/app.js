@@ -2887,7 +2887,9 @@ const WALL_BLEED = 30; // débord du calque flouté (évite les bords clairs du 
 async function applyIslandBg(src = currentThumb) {
   const mode = cfg.island_bg || 'solid';
   const a = ISLAND_ALPHA[mode] ?? 100;
-  document.documentElement.style.setProperty('--island-bg', a === 100 ? 'var(--surface)' : `color-mix(in srgb, var(--surface) ${a}%, transparent)`);
+  const bg = a === 100 ? 'var(--surface)' : `color-mix(in srgb, var(--surface) ${a}%, transparent)`;
+  document.documentElement.style.setProperty('--island-bg', bg);
+  store.set('islandBg', bg);
   const wall = mode === 'wall' && src;
   island.classList.toggle('wall-bg', !!wall);
   if (!wall) return;
@@ -3333,6 +3335,7 @@ function applyPalette(p) {
 function applyTheme() {
   const dark = isDark();
   document.documentElement.classList.toggle('light', !dark);
+  store.set('light', !dark); // pour les barres des autres écrans (bar.html)
   if (sourceArgb === null) return;
   const V = VARIANTS.find(v => v.id === cfg.variant) || VARIANTS[0];
   const scheme = new V.C(Hct.fromInt(sourceArgb), dark, 0);

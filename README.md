@@ -20,7 +20,7 @@ pour ouvrir le panneau. Les couleurs suivent votre fond d'écran (Material You).
 
 | Onglet | Contenu |
 |---|---|
-| **Barre** | Façon Waybar, l'îlot au centre : lanceur, bureaux virtuels (clic ou molette), fenêtres ouvertes, regroupées par appli (clic : activer / réduire ou fenêtre suivante, clic molette : fermer ; au survol, aperçu de chaque fenêtre pour choisir ou fermer), CPU / RAM, Wi-Fi, Bluetooth, volume (molette), batterie, notifications, date. Le haut de l'écran est réservé (les fenêtres maximisées s'arrêtent dessous) et la barre des tâches Windows peut être masquée. Options : îlots séparés (sans fond, chaque groupe flotte seul), fenêtres ouvertes affichées ou non, masquage automatique (la barre apparaît quand la souris touche le haut de l'écran) |
+| **Barre** | Façon Waybar, l'îlot au centre : lanceur, bureaux virtuels (clic ou molette), fenêtres ouvertes, regroupées par appli (clic : activer / réduire ou fenêtre suivante, clic molette : fermer ; au survol, aperçu de chaque fenêtre pour choisir ou fermer), CPU / RAM, Wi-Fi, Bluetooth, volume (molette), batterie, notifications, date. Le haut de l'écran est réservé (les fenêtres maximisées s'arrêtent dessous) et la barre des tâches Windows peut être masquée, sur tous les écrans. Les autres écrans ont aussi leur barre, avec l'heure au centre ; ses boutons ouvrent l'îlot sur son écran. Options : îlots séparés (sans fond, chaque groupe flotte seul), fenêtres ouvertes affichées ou non, masquage automatique (la barre apparaît quand la souris touche le haut de l'écran) |
 | **Îlot replié** | Heure ; pochette qui tourne et égaliseur qui suit vraiment le son ; icônes caféine, ne pas déranger et minuteur en cours |
 | **Survol** | Titre, artiste, progression, lecture/pause ; sinon date et météo |
 | **Accueil** | Profil (avatar Windows, durée d'allumage), météo, horloge, calendrier avec vos agendas iCal (clic sur un jour : ses événements), lecteur avec visualiseur, CPU / RAM / disque / batterie, volume, verrouiller · veille · déconnexion · redémarrer · éteindre (second clic pour confirmer) |
@@ -116,7 +116,7 @@ notifications, visualiseur, HTTP) sans lancer l'interface.
   Un thread Rust suit le curseur et ne rend la fenêtre cliquable que lorsqu'il
   est au-dessus de la zone de l'îlot (signalée par l'interface).
 - **Média** : `GlobalSystemMediaTransportControls` (WinRT).
-- **Barre** : zone réservée via `SHAppBarMessage` (AppBar) ; bureaux virtuels lus dans le registre (`VirtualDesktopIDs`), changés par Ctrl+Win+←/→ faute d'API publique. La barre des tâches Windows est passée en masquage automatique puis cachée, et tout est rétabli en quittant l'îlot (si l'îlot plante, redémarrer l'Explorateur la fait revenir).
+- **Barre** : zone réservée via `SHAppBarMessage` (AppBar) ; bureaux virtuels lus dans le registre (`VirtualDesktopIDs`), changés par Ctrl+Win+←/→ faute d'API publique. Sur les autres écrans, une fenêtre `bar-*` par écran (`ui/bar.html`, `src/screens.rs`) reprend le thème de l'îlot via le `localStorage`. La barre des tâches Windows (principale et secondaires) est passée en masquage automatique puis cachée, et tout est rétabli en quittant l'îlot (si l'îlot plante, redémarrer l'Explorateur la fait revenir).
 - **Volume** : Core Audio (`IAudioEndpointVolume`).
 - **Apps** : dossier virtuel `shell:AppsFolder`, icônes via `IShellItemImageFactory`.
 - **Wallpaper Engine** : lecture de `config.json` et des `project.json`, application via sa ligne de commande.

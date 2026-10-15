@@ -1731,7 +1731,7 @@ dependencies = [
 
 [[package]]
 name = "ilot"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "arboard",
  "base64 0.22.1",

@@ -11,6 +11,7 @@ mod media;
 mod net;
 mod notif;
 mod pc;
+mod screens;
 mod settings;
 mod store;
 mod system;
@@ -20,7 +21,7 @@ mod wall;
 mod we;
 mod winkey;
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -73,16 +74,30 @@ impl Hit {
 /// Zones interactives et hauteur de la bande du haut de l'ecran qui affiche
 /// la barre masquee automatiquement (0 : pas de bande).
 #[derive(Default)]
-struct Hits {
+pub(crate) struct Hits {
     rects: Vec<Hit>,
     top: f64,
 }
 
-struct HitState(Arc<Mutex<Hits>>);
+impl Hits {
+    /// (dans une zone, dans le premier rectangle, dans la bande du haut) pour
+    /// un point en pixels CSS relatifs a la fenetre, de largeur `w`.
+    pub(crate) fn test(&self, x: f64, y: f64, w: f64) -> (bool, bool, bool) {
+        let first = self.rects.first().is_some_and(|r| r.contains(x, y));
+        let top = self.top > 0.0 && x >= 0.0 && x < w && y >= 0.0 && y <= self.top;
+        (first || self.rects.iter().any(|r| r.contains(x, y)), first, top)
+    }
+}
+
+/// Zones interactives de chaque fenetre (l'ilot et les barres des autres
+/// ecrans), par label.
+pub(crate) type HitMap = Arc<Mutex<HashMap<String, Hits>>>;
+
+struct HitState(HitMap);
 
 #[tauri::command]
-fn set_hit(st: State<HitState>, rects: Vec<Hit>, top: Option<f64>) {
-    *st.0.lock().unwrap() = Hits { rects, top: top.unwrap_or(0.0) };
+fn set_hit(win: WebviewWindow, st: State<HitState>, rects: Vec<Hit>, top: Option<f64>) {
+    st.0.lock().unwrap().insert(win.label().to_string(), Hits { rects, top: top.unwrap_or(0.0) });
 }
 
 /// `ilot.exe --open <onglet>` : ouvre le panneau au demarrage (tests, captures).
@@ -116,7 +131,7 @@ fn release_focus(win: WebviewWindow) {
 
 /// Vrai si l'ilot est deplie, d'apres la zone que l'interface a declaree
 fn island_open(app: &AppHandle) -> bool {
-    app.state::<HitState>().0.lock().unwrap().rects.first().is_some_and(|r| r.h > 100.0)
+    app.state::<HitState>().0.lock().unwrap().get("island").is_some_and(|h| h.rects.first().is_some_and(|r| r.h > 100.0))
 }
 
 /// Taille de la fenetre en pixels CSS, changee par le panneau agrandi
@@ -170,7 +185,7 @@ pub fn place(win: &WebviewWindow) {
 /// Suit le curseur : active/desactive le passage des clics selon qu'il est
 /// dans une zone interactive, et previent l'interface quand il entre dans
 /// l'ilot ou en sort (`hover`), ou dans la bande du haut (`top-hover`).
-fn track_cursor(win: WebviewWindow, hit: Arc<Mutex<Hits>>) {
+fn track_cursor(win: WebviewWindow, hit: HitMap) {
     std::thread::spawn(move || {
         let mut inside = false;
         let mut over = false;
@@ -234,12 +249,11 @@ fn track_cursor(win: WebviewWindow, hit: Arc<Mutex<Hits>>) {
             };
             let cx = (pt.x - pos.x) as f64 / scale;
             let cy = (pt.y - pos.y) as f64 / scale;
-            let (now, island, top) = {
-                let h = hit.lock().unwrap();
-                let island = h.rects.first().is_some_and(|r| r.contains(cx, cy));
-                let top = h.top > 0.0 && pt.x >= pos.x && pt.x < pos.x + size.width as i32 && cy >= 0.0 && cy <= h.top;
-                (island || h.rects.iter().any(|r| r.contains(cx, cy)), island, top)
-            };
+            let (now, island, top) = hit
+                .lock()
+                .unwrap()
+                .get("island")
+                .map_or((false, false, false), |h| h.test(cx, cy, size.width as f64 / scale));
             if top != at_top {
                 at_top = top;
                 let _ = win.emit("top-hover", top);
@@ -259,7 +273,7 @@ fn track_cursor(win: WebviewWindow, hit: Arc<Mutex<Hits>>) {
 /// Vrai si la fenetre au premier plan est en plein ecran (jeu, video...) sur
 /// l'ecran de l'ilot. Les fenetres simplement maximisees ne comptent pas :
 /// avec une barre des taches masquee, elles couvrent aussi tout l'ecran.
-fn fullscreen_foreground(own: HWND) -> bool {
+pub(crate) fn fullscreen_foreground(own: HWND) -> bool {
     unsafe {
         let fg = GetForegroundWindow();
         if fg.is_invalid() || fg == own || IsZoomed(fg).as_bool() {
@@ -290,7 +304,7 @@ fn fullscreen_foreground(own: HWND) -> bool {
 
 /// Les clics restent geres par `track_cursor` : rendre ici la fenetre
 /// cliquable bloquerait tout l'ecran qu'elle couvre, curseur hors de l'ilot.
-fn toggle_launcher(app: &AppHandle) {
+pub(crate) fn toggle_launcher(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("island") {
         // replie, l'ilot rendra lui-meme la main (release_focus)
         if !island_open(app) {
@@ -300,7 +314,7 @@ fn toggle_launcher(app: &AppHandle) {
     }
 }
 
-fn open_tab(app: &AppHandle, tab: &str) {
+pub(crate) fn open_tab(app: &AppHandle, tab: &str) {
     if let Some(win) = app.get_webview_window("island") {
         let _ = win.set_focus();
         let _ = win.emit("open", tab);
@@ -366,7 +380,7 @@ fn main() {
     if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
         return;
     }
-    let hit = Arc::new(Mutex::new(Hits::default()));
+    let hit: HitMap = Arc::new(Mutex::new(HashMap::new()));
     // `ilot.exe --check-imap <hote> <fichier>` : test de connexion IMAP
     if let Some(i) = args.iter().position(|a| a == "--check-imap") {
         let host = args.get(i + 1).map(String::as_str).unwrap_or("imap.gmail.com");
@@ -405,6 +419,7 @@ fn main() {
             track_cursor(win.clone(), hit.clone());
             bar::sync(app.handle());
             bar::watch(win.clone());
+            screens::watch(app.handle().clone(), hit.clone());
 
             let w2 = win.clone();
             win.on_window_event(move |e| match e {
@@ -523,6 +538,7 @@ fn main() {
             bar::task_thumb,
             bar::desktop_go,
             bar::taskbar_peek,
+            screens::bar_open,
             audio::app_volume_get,
             audio::app_volume_set,
             games::games_get,

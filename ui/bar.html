@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Ilot</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* pas d'îlot au centre : l'heure prend sa place */
+    .bar-side { max-width: calc(50% - 50px); }
+    .bar-clock { position: absolute; left: 50%; transform: translateX(-50%); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .bar-islands .bar-clock { height: 24px; background: var(--island-bg, var(--surface)); box-shadow: 0 2px 10px rgb(0 0 0 / .28); }
+    .bar-islands .bar-clock:hover { background: var(--surface-c-high); }
+  </style>
+</head>
+<body>
+  <!-- barre d'un écran sans îlot : mêmes modules que celle de l'îlot -->
+  <div id="bar" class="hidden">
+    <div class="bar-side bar-l">
+      <button class="bar-btn bar-launch" title="Applications (Ctrl+Alt+Espace ou touche Windows)"><span class="ms">apps</span></button>
+      <div class="ws" title="Bureaux virtuels"></div>
+      <div class="tasks"></div>
+    </div>
+    <button class="bar-pill bar-clock" data-open="home">--:--</button>
+    <div class="bar-side bar-r">
+      <button class="bar-pill bar-res" data-open="home" title="Processeur · mémoire">
+        <span class="ms">memory</span><b class="bar-cpu">–</b>
+        <span class="ms">developer_board</span><b class="bar-mem">–</b>
+      </button>
+      <div class="bar-pill bar-status">
+        <button class="bar-wifi" data-open="ctrl" hidden><span class="ms">wifi</span></button>
+        <button class="bar-bt" data-open="ctrl" hidden><span class="ms">bluetooth</span></button>
+        <button class="bar-vol" title="Clic : couper · molette : volume"><span class="ms">volume_up</span><b>–</b></button>
+        <button class="bar-bat" data-open="home" hidden><span class="ms">battery_full</span><b></b></button>
+      </div>
+      <button class="bar-pill bar-notif" data-open="ctrl" title="Notifications"><span class="ms">notifications_none</span><b></b></button>
+      <button class="bar-pill bar-date" data-open="home"></button>
+      <button class="bar-btn bar-taskbar" title="Afficher la barre des tâches Windows" hidden><span class="ms">desktop_windows</span></button>
+      <button class="bar-btn bar-power" data-open="home" title="Session"><span class="ms">power_settings_new</span></button>
+    </div>
+  </div>
+
+  <!-- aperçu des fenêtres d'une appli de la barre -->
+  <div id="task-preview" class="out"><div class="tp-cards"></div></div>
+
+  <script type="module" src="bar.js"></script>
+</body>
+</html>
