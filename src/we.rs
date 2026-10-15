@@ -27,6 +27,9 @@ pub struct WeWall {
 }
 
 impl WeWall {
+    pub fn path(&self) -> &str {
+        &self.path
+    }
     pub fn thumb_is_empty(&self) -> bool {
         self.thumb.is_empty()
     }
@@ -167,7 +170,7 @@ pub fn active() -> Option<(String, String)> {
 pub struct WeState {
     installed: bool,
     running: bool,
-    current: String,
+    pub current: String,
 }
 
 #[tauri::command(async)]

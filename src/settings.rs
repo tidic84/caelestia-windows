@@ -1,10 +1,11 @@
-//! Reglages : lancement au demarrage de Windows et ecran de l'ilot.
+//! Reglages : lancement au demarrage, ecran de l'ilot, apparence, meteo,
+//! calendriers, fonds, notifications.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use windows::core::{w, PCWSTR};
 use windows::Win32::System::Registry::{
     RegDeleteKeyValueW, RegGetValueW, RegSetKeyValueW, HKEY_CURRENT_USER, REG_SZ, RRF_RT_REG_SZ,
@@ -15,11 +16,60 @@ const RUN_NAME: PCWSTR = w!("Ilot");
 
 /// Ce qui est enregistre dans `%APPDATA%\io.github.tidic84.ilot\settings.json`.
 /// Le lancement au demarrage n'y figure pas : le registre fait foi.
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Config {
     /// Nom Windows de l'ecran (`\\.\DISPLAY2`) ; `None` = ecran principal.
-    #[serde(default)]
     pub monitor: Option<String>,
+    /// Variante Material You : tonalspot, vibrant, expressive...
+    pub variant: String,
+    /// auto (suit Windows), dark, light
+    pub mode: String,
+    /// Applique la couleur d'accent a Windows
+    pub win_accent: bool,
+    /// Applique le mode clair / sombre a Windows
+    pub win_mode: bool,
+    pub city: Option<City>,
+    /// Adresses iCal (Google Agenda, Outlook...)
+    pub icals: Vec<String>,
+    /// Rotation des fonds, en minutes (0 = jamais)
+    pub rotate_min: u32,
+    /// Affiche les notifications dans l'ilot
+    pub notif_popups: bool,
+    /// Ne pas deranger : plus de notifications dans l'ilot
+    pub dnd: bool,
+    /// OSD du volume et de la luminosite
+    pub osd: bool,
+    /// Notifications masquees (« tout effacer » : tout ce qui est <= cet id)
+    pub notif_cleared: i64,
+    pub notif_hidden: Vec<i64>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct City {
+    pub name: String,
+    pub lat: f64,
+    pub lon: f64,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            monitor: None,
+            variant: "tonalspot".into(),
+            mode: "dark".into(),
+            win_accent: false,
+            win_mode: false,
+            city: None,
+            icals: Vec::new(),
+            rotate_min: 0,
+            notif_popups: true,
+            dnd: false,
+            osd: true,
+            notif_cleared: 0,
+            notif_hidden: Vec::new(),
+        }
+    }
 }
 
 pub struct Settings(pub Mutex<Config>);
@@ -109,8 +159,9 @@ pub fn target_monitor(win: &WebviewWindow) -> Option<tauri::Monitor> {
 #[derive(Serialize)]
 pub struct SettingsView {
     autostart: bool,
-    monitor: Option<String>,
     monitors: Vec<Monitor>,
+    #[serde(flatten)]
+    cfg: Config,
 }
 
 #[tauri::command]
@@ -135,8 +186,8 @@ pub fn settings_get(win: WebviewWindow, st: State<Settings>) -> SettingsView {
     monitors.sort_by(|a, b| a.label.cmp(&b.label));
     SettingsView {
         autostart: autostart_on(),
-        monitor: st.0.lock().unwrap().monitor.clone(),
         monitors,
+        cfg: st.0.lock().unwrap().clone(),
     }
 }
 
@@ -155,6 +206,39 @@ pub fn settings_monitor(win: WebviewWindow, st: State<Settings>, id: Option<Stri
     };
     save(win.app_handle(), &cfg);
     crate::place(&win);
+}
+
+/// Modifie la config, l'enregistre et previent l'interface (`settings`).
+pub fn update(app: &AppHandle, f: impl FnOnce(&mut Config)) -> Config {
+    let cfg = {
+        let st = app.state::<Settings>();
+        let mut cfg = st.0.lock().unwrap();
+        f(&mut cfg);
+        let cleared = cfg.notif_cleared;
+        cfg.notif_hidden.retain(|&id| id > cleared);
+        cfg.clone()
+    };
+    save(app, &cfg);
+    let _ = app.emit("settings", &cfg);
+    cfg
+}
+
+/// Fusionne `patch` (un objet JSON partiel) dans la config.
+#[tauri::command]
+pub fn settings_set(app: AppHandle, patch: serde_json::Value) -> Config {
+    update(&app, |cfg| {
+        let mut v = serde_json::to_value(&*cfg).unwrap_or_default();
+        if let (Some(obj), Some(p)) = (v.as_object_mut(), patch.as_object()) {
+            for (k, val) in p {
+                if k != "monitor" {
+                    obj.insert(k.clone(), val.clone());
+                }
+            }
+        }
+        if let Ok(new) = serde_json::from_value(v) {
+            *cfg = new;
+        }
+    })
 }
 
 pub fn init(app: &AppHandle) {

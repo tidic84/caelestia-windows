@@ -14,10 +14,12 @@ use windows::Win32::Graphics::Gdi::{
     DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO,
     BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ,
 };
+use windows::core::{HSTRING, PCWSTR};
+use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::{
     BHID_EnumItems, FOLDERID_AppsFolder, IEnumShellItems, IShellItem, IShellItemImageFactory,
-    SHGetKnownFolderItem, KF_FLAG_DEFAULT, SIGDN, SIGDN_NORMALDISPLAY,
+    SHCreateItemFromParsingName, SHGetKnownFolderItem, KF_FLAG_DEFAULT, SIGDN, SIGDN_NORMALDISPLAY,
     SIGDN_PARENTRELATIVEPARSING, SIIGBF_ICONONLY,
 };
 
@@ -116,6 +118,45 @@ fn icon_of(item: &IShellItem) -> String {
             }
             Err(_) => String::new(),
         }
+    }
+}
+
+/// Icone d'un fichier (executable...) en data URL.
+pub(crate) fn file_icon(path: &str) -> String {
+    unsafe { SHCreateItemFromParsingName::<_, _, IShellItem>(&HSTRING::from(path), None) }
+        .map(|item| icon_of(&item))
+        .unwrap_or_default()
+}
+
+/// « Description du fichier » d'un executable (ex. « Google Chrome »).
+pub(crate) fn file_description(path: &str) -> Option<String> {
+    if path.is_empty() {
+        return None;
+    }
+    let wide = HSTRING::from(path);
+    unsafe {
+        let size = GetFileVersionInfoSizeW(&wide, None);
+        if size == 0 {
+            return None;
+        }
+        let mut buf = vec![0u8; size as usize];
+        GetFileVersionInfoW(&wide, None, size, buf.as_mut_ptr() as _).ok()?;
+        let mut ptr = std::ptr::null_mut();
+        let mut len = 0u32;
+        let tr = HSTRING::from(r"\VarFileInfo\Translation");
+        let lang = if VerQueryValueW(buf.as_ptr() as _, PCWSTR(tr.as_ptr()), &mut ptr, &mut len).as_bool() && len >= 4 {
+            let p = ptr as *const u16;
+            format!("{:04x}{:04x}", *p, *p.add(1))
+        } else {
+            "040904b0".into()
+        };
+        let key = HSTRING::from(format!(r"\StringFileInfo\{lang}\FileDescription"));
+        if !VerQueryValueW(buf.as_ptr() as _, PCWSTR(key.as_ptr()), &mut ptr, &mut len).as_bool() || len == 0 {
+            return None;
+        }
+        let s = String::from_utf16_lossy(std::slice::from_raw_parts(ptr as *const u16, len as usize));
+        let s = s.trim_end_matches('\0').trim().to_string();
+        (!s.is_empty()).then_some(s)
     }
 }
 

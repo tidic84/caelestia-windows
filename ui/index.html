@@ -13,7 +13,10 @@
       <div class="pill-mini">
         <img class="mini-art" alt="">
         <span class="eq"><i></i><i></i><i></i></span>
+        <span class="ind ind-caf" hidden><span class="ms">coffee</span></span>
+        <span class="ind ind-dnd" hidden><span class="ms">do_not_disturb_on</span></span>
         <span class="mini-clock">--:--</span>
+        <span class="ind ind-timer" hidden><span class="ms">timer</span><b></b></span>
       </div>
       <div class="pill-peek">
         <div class="peek-media">
@@ -28,8 +31,11 @@
         <div class="peek-idle">
           <span class="peek-clock">--:--</span>
           <span class="peek-date"></span>
+          <span class="peek-wx" hidden><span class="ms"></span><b></b></span>
         </div>
       </div>
+      <!-- activité : OSD, notification, Bluetooth, capture… -->
+      <div class="pill-act"></div>
     </div>
 
     <!-- panneau ouvert -->
@@ -38,6 +44,7 @@
         <div class="tab-ind"></div>
         <button data-tab="home"><span class="ms">dashboard</span><span>Accueil</span></button>
         <button data-tab="media"><span class="ms">music_note</span><span>Média</span></button>
+        <button data-tab="ctrl"><span class="ms">tune</span><span>Contrôles</span><i class="badge" hidden></i></button>
         <button data-tab="apps"><span class="ms">apps</span><span>Apps</span></button>
         <button data-tab="clips"><span class="ms">content_paste</span><span>Presse-papiers</span></button>
         <button data-tab="walls"><span class="ms">wallpaper</span><span>Fonds</span></button>
@@ -48,17 +55,42 @@
         <!-- ACCUEIL -->
         <section class="page" data-page="home">
           <div class="home-grid">
+            <div class="home-head">
+              <div class="card user-card">
+                <div class="avatar"><img alt=""><span></span></div>
+                <div class="user-text">
+                  <b class="user-name"></b>
+                  <small class="uptime"></small>
+                </div>
+              </div>
+              <button class="card wx-card">
+                <span class="ms wx-icon">cloud</span>
+                <span class="wx-temp">--°</span>
+                <span class="wx-text">
+                  <b class="wx-desc">Météo</b>
+                  <small class="wx-place">Choisir une ville</small>
+                </span>
+              </button>
+            </div>
             <div class="card clock-card">
               <div class="big-clock"><span class="hh">--</span><span class="mm">--</span></div>
               <div class="big-date"></div>
             </div>
             <div class="card cal-card">
               <div class="cal-head">
-                <button class="icon-btn small" data-cal="-1">‹</button>
+                <button class="icon-btn small" data-cal="-1"><span class="ms">chevron_left</span></button>
                 <span class="cal-title"></span>
-                <button class="icon-btn small" data-cal="1">›</button>
+                <button class="icon-btn small" data-cal="1"><span class="ms">chevron_right</span></button>
               </div>
               <div class="cal-grid"></div>
+              <div class="cal-day">
+                <div class="cal-head">
+                  <button class="icon-btn small" id="cal-back"><span class="ms">arrow_back</span></button>
+                  <span class="cal-day-title"></span>
+                  <span class="cal-pad"></span>
+                </div>
+                <div class="cal-events"></div>
+              </div>
             </div>
             <div class="card home-media">
               <div class="disc"><img class="disc-art" alt=""><span class="ms disc-ph">music_note</span></div>
@@ -69,6 +101,7 @@
                 <button class="icon-btn filled" data-media="toggle"><span class="ms play-icon">play_arrow</span></button>
                 <button class="icon-btn" data-media="next"><span class="ms">skip_next</span></button>
               </div>
+              <canvas class="viz viz-home" width="400" height="80"></canvas>
             </div>
             <div class="card res-card">
               <div class="gauge" data-g="cpu"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">memory</span><b>CPU</b><em>-</em></div>
@@ -94,6 +127,7 @@
         <!-- MÉDIA -->
         <section class="page" data-page="media">
           <div class="mp-bg"></div>
+          <canvas class="viz viz-media" width="1400" height="240"></canvas>
           <div class="mp">
             <div class="mp-art"><img alt=""><span class="ms">music_note</span></div>
             <div class="mp-info">
@@ -114,13 +148,106 @@
           </div>
         </section>
 
+        <!-- CONTRÔLES -->
+        <section class="page" data-page="ctrl">
+          <div class="ctrl-grid">
+            <div class="ctrl-main">
+              <div class="tiles">
+                <div class="tile" data-tile="wifi">
+                  <button class="tile-main"><span class="ms">wifi</span><span class="tile-text"><b>Wi-Fi</b><small>…</small></span></button>
+                  <button class="tile-more" title="Réseaux"><span class="ms">chevron_right</span></button>
+                </div>
+                <div class="tile" data-tile="bt">
+                  <button class="tile-main"><span class="ms">bluetooth</span><span class="tile-text"><b>Bluetooth</b><small>…</small></span></button>
+                </div>
+                <div class="tile" data-tile="caf">
+                  <button class="tile-main"><span class="ms">coffee</span><span class="tile-text"><b>Caféine</b><small>Veille normale</small></span></button>
+                </div>
+                <div class="tile" data-tile="dnd">
+                  <button class="tile-main"><span class="ms">do_not_disturb_on</span><span class="tile-text"><b>Ne pas déranger</b><small>Désactivé</small></span></button>
+                </div>
+                <div class="tile" data-tile="dark">
+                  <button class="tile-main"><span class="ms">dark_mode</span><span class="tile-text"><b>Mode sombre</b><small>…</small></span></button>
+                </div>
+                <div class="tile" data-tile="timer">
+                  <button class="tile-main"><span class="ms">timer</span><span class="tile-text"><b>Minuteur</b><small>Arrêté</small></span></button>
+                  <button class="tile-more" title="Minuteur"><span class="ms">chevron_right</span></button>
+                </div>
+              </div>
+              <div class="card ctrl-row bright-row" hidden>
+                <span class="ms">brightness_6</span>
+                <input type="range" class="slider" id="bright" min="0" max="100" value="50">
+                <span class="row-val bright-val">50</span>
+              </div>
+              <div class="card mixer">
+                <button class="out-btn"><span class="ms">speaker</span><span class="out-name">Sortie audio</span><span class="ms">unfold_more</span></button>
+                <div class="mix-list"></div>
+              </div>
+
+              <!-- feuilles qui glissent par-dessus -->
+              <div class="sheet" data-sheet="wifi">
+                <div class="sheet-head">
+                  <button class="icon-btn small" data-close-sheet><span class="ms">arrow_back</span></button>
+                  <b>Réseaux Wi-Fi</b>
+                  <button class="icon-btn small" id="wifi-scan" title="Rechercher"><span class="ms">refresh</span></button>
+                </div>
+                <div class="sheet-body wifi-list"></div>
+              </div>
+              <div class="sheet" data-sheet="out">
+                <div class="sheet-head">
+                  <button class="icon-btn small" data-close-sheet><span class="ms">arrow_back</span></button>
+                  <b>Sortie audio</b>
+                  <span class="cal-pad"></span>
+                </div>
+                <div class="sheet-body out-list"></div>
+              </div>
+              <div class="sheet" data-sheet="timer">
+                <div class="sheet-head">
+                  <button class="icon-btn small" data-close-sheet><span class="ms">arrow_back</span></button>
+                  <b>Minuteur</b>
+                  <span class="cal-pad"></span>
+                </div>
+                <div class="sheet-body timer-body">
+                  <div class="timer-face">
+                    <svg viewBox="0 0 120 120"><circle class="trk" cx="60" cy="60" r="54"/><circle class="val" cx="60" cy="60" r="54"/></svg>
+                    <div class="timer-text"><b class="timer-time">05:00</b><small class="timer-phase"></small></div>
+                  </div>
+                  <div class="timer-side">
+                    <div class="timer-presets">
+                      <button data-min="1">1 min</button><button data-min="5">5 min</button><button data-min="10">10 min</button>
+                      <button data-min="15">15 min</button><button data-min="30">30 min</button><button data-min="60">1 h</button>
+                    </div>
+                    <div class="timer-actions">
+                      <button class="icon-btn" id="timer-minus" title="−1 min"><span class="ms">remove</span></button>
+                      <button class="icon-btn filled" id="timer-go"><span class="ms">play_arrow</span></button>
+                      <button class="icon-btn" id="timer-plus" title="+1 min"><span class="ms">add</span></button>
+                      <button class="icon-btn" id="timer-reset" title="Réinitialiser"><span class="ms">replay</span></button>
+                    </div>
+                    <button class="text-btn" id="pomodoro"><span class="ms">nest_eco_leaf</span>Pomodoro 25 / 5</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card notif-card">
+              <div class="notif-head">
+                <b>Notifications</b>
+                <span class="notif-count"></span>
+                <button class="icon-btn small" id="notif-clear" title="Tout effacer"><span class="ms">clear_all</span></button>
+              </div>
+              <div class="notif-list"></div>
+            </div>
+          </div>
+        </section>
+
         <!-- APPS -->
         <section class="page" data-page="apps">
           <label class="search">
-            <span class="ms">search</span>
-            <input id="q" placeholder="Rechercher une application…" autocomplete="off" spellcheck="false">
+            <span class="ms search-icon">search</span>
+            <input id="q" placeholder="Rechercher…   > commandes   = calcul   : emoji   ? web" autocomplete="off" spellcheck="false">
           </label>
           <div class="app-grid"></div>
+          <div class="cmd-list" hidden></div>
         </section>
 
         <!-- PRESSE-PAPIERS -->
@@ -141,6 +268,7 @@
             </span>
             <span class="wall-note">Les couleurs suivent le fond d'écran</span>
             <span>
+              <button class="text-btn" id="wall-random"><span class="ms">shuffle</span>Au hasard</button>
               <button class="text-btn" id="wall-refresh"><span class="ms">refresh</span>Actualiser</button>
               <button class="text-btn" id="wall-folder"><span class="ms">folder_open</span>Dossier</button>
             </span>
@@ -168,6 +296,89 @@
                 </span>
               </div>
               <div class="mon-list"></div>
+            </div>
+
+            <div class="card set-block">
+              <div class="set-row">
+                <span class="ms set-icon">palette</span>
+                <span class="set-text">
+                  <b>Apparence</b>
+                  <small>Les couleurs sont tirées du fond d'écran</small>
+                </span>
+                <span class="seg" id="set-mode">
+                  <button data-mode="auto">Auto</button>
+                  <button data-mode="dark">Sombre</button>
+                  <button data-mode="light">Clair</button>
+                </span>
+              </div>
+              <div class="variant-list"></div>
+              <label class="set-row sub">
+                <span class="set-text"><b>Appliquer la couleur d'accent à Windows</b><small>Barre des tâches, menu Démarrer, bordures de fenêtres</small></span>
+                <input type="checkbox" class="switch" id="set-win-accent">
+              </label>
+              <label class="set-row sub">
+                <span class="set-text"><b>Appliquer le mode clair / sombre à Windows</b><small>Quand le mode n'est pas « Auto »</small></span>
+                <input type="checkbox" class="switch" id="set-win-mode">
+              </label>
+            </div>
+
+            <div class="card set-block">
+              <div class="set-row">
+                <span class="ms set-icon">partly_cloudy_day</span>
+                <span class="set-text">
+                  <b>Météo</b>
+                  <small class="city-cur">Aucune ville choisie</small>
+                </span>
+              </div>
+              <label class="search small">
+                <span class="ms">search</span>
+                <input id="city-q" placeholder="Rechercher une ville…" autocomplete="off" spellcheck="false">
+              </label>
+              <div class="city-list"></div>
+            </div>
+
+            <div class="card set-block">
+              <div class="set-row">
+                <span class="ms set-icon">event</span>
+                <span class="set-text">
+                  <b>Agenda</b>
+                  <small>Adresse iCal secrète (Google Agenda : Paramètres › Intégrer l'agenda ; Outlook : Publier un calendrier)</small>
+                </span>
+              </div>
+              <div class="ical-list"></div>
+              <form class="ical-add">
+                <input id="ical-url" placeholder="https://… .ics" autocomplete="off" spellcheck="false">
+                <button class="text-btn" type="submit"><span class="ms">add</span>Ajouter</button>
+              </form>
+            </div>
+
+            <div class="card set-block">
+              <div class="set-row">
+                <span class="ms set-icon">autorenew</span>
+                <span class="set-text">
+                  <b>Changer de fond automatiquement</b>
+                  <small>Au hasard parmi vos fonds (ou ceux de Wallpaper Engine s'il tourne)</small>
+                </span>
+              </div>
+              <div class="chips" id="set-rotate">
+                <button data-v="0">Jamais</button><button data-v="15">15 min</button><button data-v="30">30 min</button>
+                <button data-v="60">1 h</button><button data-v="180">3 h</button><button data-v="1440">1 jour</button>
+              </div>
+            </div>
+
+            <div class="card set-block">
+              <label class="set-row">
+                <span class="ms set-icon">notifications</span>
+                <span class="set-text">
+                  <b>Notifications dans l'îlot</b>
+                  <small>Les notifications Windows s'affichent aussi dans la pilule</small>
+                </span>
+                <input type="checkbox" class="switch" id="set-notif">
+              </label>
+              <label class="set-row sub">
+                <span class="set-text"><b>Indicateurs de volume et de luminosité</b><small>La pilule s'agrandit quand le volume ou la luminosité change</small></span>
+                <input type="checkbox" class="switch" id="set-osd">
+              </label>
             </div>
           </div>
         </section>

@@ -1,9 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod apps;
+mod audio;
+mod display;
 mod media;
+mod net;
+mod notif;
 mod settings;
 mod system;
+mod theme;
 mod wall;
 mod we;
 
@@ -203,6 +208,32 @@ fn main() {
         let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("we-check.txt"), report);
         return;
     }
+    // `ilot.exe --check-all <fichier>` : diagnostic des modules systeme
+    if let Some(i) = args.iter().position(|a| a == "--check-all") {
+        com_init_mta();
+        let j = |v: serde_json::Result<String>| v.unwrap_or_default();
+        let notifs = notif::snapshot();
+        let report = [
+            format!("devices: {}", j(serde_json::to_string(&audio::audio_devices()))),
+            format!("mixer: {}", j(serde_json::to_string(&audio::mixer_get()).map(|s| s.chars().take(600).collect()))),
+            format!("net: {}", j(serde_json::to_string(&net::net_get()))),
+            format!("wifi: {}", j(serde_json::to_string(&net::wifi_list(false)))),
+            format!("user: {}", j(serde_json::to_string(&system::user_info()).map(|s| s.chars().take(120).collect()))),
+            format!("win_light: {}", theme::windows_light()),
+            format!("peaks: {}", audio::peaks_report()),
+            format!("viz: {:?}", audio::viz_probe(3)),
+            // reapplique la sortie actuelle : verifie IPolicyConfig sans rien changer
+            format!("set_default: {}", audio::default_id().map(audio::audio_set_default).unwrap_or(false)),
+            format!("notifs: {}", match notifs {
+                Ok(l) => format!("{} : {}", l.len(), j(serde_json::to_string(&l.iter().take(3).collect::<Vec<_>>()).map(|s| s.chars().take(600).collect()))),
+                Err(e) => e,
+            }),
+            format!("http: {}", system::http_get("https://api.open-meteo.com/v1/forecast?latitude=45.75&longitude=4.85&current=temperature_2m".into()).map(|s| format!("{} o : {}", s.len(), s.chars().take(200).collect::<String>())).unwrap_or_else(|e| format!("ERR {e:?}"))),
+        ]
+        .join("\n");
+        let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("check.txt"), report);
+        return;
+    }
     let hit = Arc::new(Mutex::new(Hit::default()));
     tauri::Builder::default()
         .plugin(
@@ -217,6 +248,7 @@ fn main() {
         .manage(HitState(hit.clone()))
         .manage(system::Clips(Mutex::new(VecDeque::new())))
         .manage(apps::Apps(Mutex::new(Vec::new())))
+        .manage(notif::Notifs(Mutex::new(Vec::new())))
         .setup(move |app| {
             settings::init(app.handle());
             let win = app.get_webview_window("island").expect("fenetre island");
@@ -238,6 +270,13 @@ fn main() {
             system::watch(h.clone());
             system::watch_clipboard(h.clone());
             we::watch(h.clone());
+            audio::watch_volume(h.clone());
+            display::watch(h.clone());
+            net::watch(h.clone());
+            notif::watch(h.clone());
+            theme::watch(h.clone());
+            system::watch_keys(h.clone());
+            wall::watch_rotation(h.clone());
             apps::load(h);
 
             // Ctrl+Alt+Espace : lanceur d'applications
@@ -280,7 +319,30 @@ fn main() {
             system::clips_get,
             system::clip_copy,
             system::clips_clear,
+            system::clip_text,
             system::session_action,
+            system::caffeine_set,
+            system::caffeine_get,
+            system::user_info,
+            system::http_get,
+            system::open_url,
+            audio::audio_devices,
+            audio::audio_set_default,
+            audio::mixer_get,
+            audio::mixer_set,
+            audio::viz_set,
+            display::brightness_get,
+            display::brightness_set,
+            net::net_get,
+            net::radio_set,
+            net::wifi_list,
+            net::wifi_connect,
+            net::wifi_disconnect,
+            notif::notifs_get,
+            notif::notifs_dismiss,
+            notif::notif_open,
+            theme::win_theme_get,
+            theme::win_theme_apply,
             apps::apps_get,
             apps::apps_refresh,
             apps::app_launch,
@@ -288,12 +350,14 @@ fn main() {
             wall::wall_current,
             wall::wall_set,
             wall::walls_open_folder,
+            wall::wall_random,
             we::we_state,
             we::we_walls,
             we::we_set,
             settings::settings_get,
             settings::settings_autostart,
             settings::settings_monitor,
+            settings::settings_set,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Ilot");

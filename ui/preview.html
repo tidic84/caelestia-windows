@@ -3,198 +3,79 @@
 <head>
   <meta charset="utf-8">
   <title>Ilot</title>
-  <link rel="stylesheet" href="style.css"><script>
+  <link rel="stylesheet" href="style.css">
+  <!-- Aperçu sans le backend : le corps de index.html est chargé tel quel et
+       les commandes Tauri renvoient des données factices. -->
+  <script>
 function grad(a,b){const c=document.createElement('canvas');c.width=320;c.height=200;const g=c.getContext('2d');const l=g.createLinearGradient(0,0,320,200);l.addColorStop(0,a);l.addColorStop(1,b);g.fillStyle=l;g.fillRect(0,0,320,200);g.fillStyle='rgba(255,255,255,.25)';g.beginPath();g.arc(220,70,40,0,7);g.fill();return c.toDataURL('image/jpeg');}
+const P=new URLSearchParams(location.search);
 const ART=grad('#e07a3f','#5b2a86');
+const now=Date.now();
 const D={
  media_get:{has:true,title:'Nightcall',artist:'Kavinsky',album:'OutRun',app:'Spotify',playing:true,position:83,duration:258},
  media_art:ART, volume_get:{level:.62,muted:false},
  apps_get:['Blender','Calculatrice','Chrome','Discord','Explorateur','GIMP','Godot','Notepad++','OBS Studio','Paramètres','Roblox Studio','Spotify','Steam','Terminal','VLC','Visual Studio Code','WhatsApp','Word'].map(n=>({name:n,id:n,icon:''})),
- clips_get:['https://github.com/tidic84/Soundbridge','cargo build --release','Rendez-vous demain à 14h devant la médiathèque, n\'oublie pas le chargeur.','tidic84'],
+ clips_get:[{id:1,text:'https://github.com/tidic84/Soundbridge',thumb:''},{id:2,text:null,thumb:grad('#264653','#2a9d8f'),w:1920,h:1080},{id:3,text:'cargo build --release',thumb:''},{id:4,text:'Rendez-vous demain à 14h devant la médiathèque, n\'oublie pas le chargeur.',thumb:''}],
  walls_get:[['#264653','#2a9d8f'],['#f4a261','#e76f51'],['#3d348b','#7678ed'],['#0b090a','#e5383b'],['#606c38','#dda15e'],['#03045e','#00b4d8'],['#ff006e','#8338ec'],['#14213d','#fca311']].map((g,i)=>({path:'C:\\w'+i+'.jpg',thumb:grad(g[0],g[1])})),
- wall_current:null, startup_tab:new URLSearchParams(location.search).get('tab'),
+ startup_tab:P.get('tab'),
+ user_info:{name:'Tidic',avatar:grad('#ffb703','#fb8500')},
+ caffeine_get:false, caffeine_set:true, win_theme_get:false,
+ net_get:{radios:{wifi:true,bluetooth:true},ssid:'Livebox-5G',bt_devices:['WH-1000XM4']},
+ wifi_list:[{ssid:'Livebox-5G',signal:92,secure:true,connected:true,known:true},{ssid:'Freebox-Salon',signal:60,secure:true,connected:false,known:false},{ssid:'Café Wifi',signal:28,secure:false,connected:false,known:false}],
+ brightness_get:{level:.7,source:'ddc'},
+ audio_devices:[{id:'a',name:'Haut-parleurs (Realtek)',default:true},{id:'b',name:'Casque WH-1000XM4',default:false}],
+ mixer_get:[{pids:[1],name:'Spotify',icon:'',level:.8,muted:false},{pids:[2],name:'Google Chrome',icon:'',level:.45,muted:false},{pids:[3],name:'Discord',icon:'',level:1,muted:true},{pids:[0],name:'Sons système',icon:'',level:.6,muted:false}],
+ notifs_get:[{id:3,app:'Discord',title:'Alex',body:'On lance la partie ce soir ?',time:now-120000,image:''},{id:2,app:'Outlook',title:'Réunion projet',body:'Demain 10:00 – Salle B',time:now-3600000*3,image:''},{id:1,app:'Steam',title:'Téléchargement terminé',body:'Hollow Knight est prêt à jouer.',time:now-86400000,image:''}],
+ http_get:null,
 };
-D.settings_get={autostart:true,monitor:null,monitors:[{id:'\\\\.\\DISPLAY1',label:'Écran 1',width:2560,height:1440,primary:true},{id:'\\\\.\\DISPLAY2',label:'Écran 2',width:1920,height:1080,primary:false}]};
+D.settings_get={autostart:true,monitor:null,monitors:[{id:'\\\\.\\DISPLAY1',label:'Écran 1',width:2560,height:1440,primary:true},{id:'\\\\.\\DISPLAY2',label:'Écran 2',width:1920,height:1080,primary:false}],
+ variant:'tonalspot',mode:'dark',win_accent:false,win_mode:false,city:{name:'Lyon',lat:45.75,lon:4.85},icals:['https://calendar.google.com/calendar/ical/abc/private-123/basic.ics'],rotate_min:30,notif_popups:true,dnd:false,osd:true,notif_cleared:0,notif_hidden:[]};
 D.settings_autostart=true;
 D.wall_current={path:'C:\\w2.jpg',thumb:D.walls_get[2].thumb};
 D.walls_get.forEach((w,i)=>w.cur=i===2);
 D.we_state={installed:true,running:true,current:'C:\\we0'};
 D.we_walls=[["Idyll's Fall",'scene','#1d3557','#a8dadc'],['Night City','video','#10002b','#e0aaff'],['Lofi Room','scene','#3a0ca3','#f72585'],['Aurora','web','#003049','#2a9d8f'],['Neon Rain','video','#240046','#ff4d6d'],['Beach','scene','#0077b6','#ffd166']].map((x,i)=>({path:'C:\\we'+i,title:x[0],kind:x[1],thumb:grad(x[2],x[3])}));
-window.__TAURI__={core:{invoke:async(c)=>D[c]??null},event:{listen:async(e,f)=>{if(e==='sys')setTimeout(()=>f({payload:{cpu:23,mem_used:11.2*2**30,mem_total:32*2**30,disk_used:612*2**30,disk_total:931*2**30,battery:-1,charging:false,uptime:9000}}),300);if(e==='hover'&&new URLSearchParams(location.search).get('peek'))setTimeout(()=>f({payload:true}),200);}}};
-</script>
-<style>body{background:#6b7f99 !important}</style><script>if(location.search.includes("static"))document.write("<style>*,*::before,*::after{transition:none!important}</style>")</script>
-
+const WX={current:{temperature_2m:14.2,apparent_temperature:12.8,weather_code:2,is_day:1},daily:{temperature_2m_min:[9],temperature_2m_max:[17]}};
+const d0=new Date();const ymd=k=>{const d=new Date(d0);d.setDate(d.getDate()+k);return d.toISOString().slice(0,10).replace(/-/g,'');};
+const ICS=`BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:1\nDTSTART:${ymd(0)}T100000\nDTEND:${ymd(0)}T110000\nSUMMARY:Point d'équipe\nLOCATION:Salle B\nEND:VEVENT\nBEGIN:VEVENT\nUID:2\nDTSTART;VALUE=DATE:${ymd(0)}\nDTEND;VALUE=DATE:${ymd(1)}\nSUMMARY:Anniversaire de Léa\nEND:VEVENT\nBEGIN:VEVENT\nUID:3\nDTSTART:${ymd(2)}T183000\nDTEND:${ymd(2)}T200000\nRRULE:FREQ=WEEKLY\nSUMMARY:Escalade\nEND:VEVENT\nEND:VCALENDAR`;
+const L={};
+const fire=(e,p)=>(L[e]||[]).forEach(f=>f({payload:p}));
+window.__TAURI__={core:{invoke:async(c,a)=>{
+  if(c==='http_get') return a.url.includes('forecast')?JSON.stringify(WX):a.url.includes('geocoding')?JSON.stringify({results:[{name:'Lyon',admin1:'Auvergne-Rhône-Alpes',country:'France',latitude:45.75,longitude:4.85}]}):ICS;
+  if(c==='settings_set'){Object.assign(D.settings_get,a.patch);return D.settings_get;}
+  return D[c]??null;
+}},event:{listen:async(e,f)=>{
+  (L[e]=L[e]||[]).push(f);
+  if(e==='sys')setTimeout(()=>f({payload:{cpu:23,mem_used:11.2*2**30,mem_total:32*2**30,disk_used:612*2**30,disk_total:931*2**30,battery:-1,charging:false,uptime:11520}}),300);
+  if(e==='hover'&&P.get('peek'))setTimeout(()=>f({payload:true}),200);
+  if(e==='viz')setInterval(()=>f({payload:Array.from({length:24},(_,i)=>Math.max(0,Math.round(80-i*2.4+Math.random()*25)))}),33);
+}}};
+// ?act=osd|notif|bt|shot|caps : montre une activité
+setTimeout(()=>{const a=P.get('act');if(!a)return;
+  if(a==='osd')fire('osd',{kind:'volume',value:.62,muted:false});
+  if(a==='notif')fire('notif',D.notifs_get[0]);
+  if(a==='bt')fire('activity',{kind:'bt',name:'WH-1000XM4',on:true});
+  if(a==='shot')fire('activity',{kind:'shot',thumb:D.walls_get[5].thumb});
+  if(a==='caps')fire('activity',{kind:'caps',on:true});
+},700);
+  </script>
+  <style>body{background:#6b7f99 !important}</style>
+  <script>if(location.search.includes("static"))document.write("<style>*,*::before,*::after{transition:none!important}</style>")</script>
 </head>
 <body>
-  <div id="island" class="collapsed">
-  <div class="island-clip">
-    <!-- état replié / survol -->
-    <div id="pill">
-      <div class="pill-mini">
-        <img class="mini-art" alt="">
-        <span class="eq"><i></i><i></i><i></i></span>
-        <span class="mini-clock">--:--</span>
-      </div>
-      <div class="pill-peek">
-        <div class="peek-media">
-          <img class="peek-art" alt="">
-          <div class="peek-text">
-            <div class="peek-title"></div>
-            <div class="peek-artist"></div>
-            <div class="peek-bar"><div></div></div>
-          </div>
-          <button class="icon-btn filled" data-media="toggle"><span class="ms play-icon">play_arrow</span></button>
-        </div>
-        <div class="peek-idle">
-          <span class="peek-clock">--:--</span>
-          <span class="peek-date"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- panneau ouvert -->
-    <div id="panel">
-      <nav id="tabs">
-        <div class="tab-ind"></div>
-        <button data-tab="home"><span class="ms">dashboard</span><span>Accueil</span></button>
-        <button data-tab="media"><span class="ms">music_note</span><span>Média</span></button>
-        <button data-tab="apps"><span class="ms">apps</span><span>Apps</span></button>
-        <button data-tab="clips"><span class="ms">content_paste</span><span>Presse-papiers</span></button>
-        <button data-tab="walls"><span class="ms">wallpaper</span><span>Fonds</span></button>
-        <button data-tab="settings" title="Réglages"><span class="ms">settings</span></button>
-      </nav>
-
-      <div id="pages">
-        <!-- ACCUEIL -->
-        <section class="page" data-page="home">
-          <div class="home-grid">
-            <div class="card clock-card">
-              <div class="big-clock"><span class="hh">--</span><span class="mm">--</span></div>
-              <div class="big-date"></div>
-            </div>
-            <div class="card cal-card">
-              <div class="cal-head">
-                <button class="icon-btn small" data-cal="-1">‹</button>
-                <span class="cal-title"></span>
-                <button class="icon-btn small" data-cal="1">›</button>
-              </div>
-              <div class="cal-grid"></div>
-            </div>
-            <div class="card home-media">
-              <div class="disc"><img class="disc-art" alt=""><span class="ms disc-ph">music_note</span></div>
-              <div class="hm-title">Rien en lecture</div>
-              <div class="hm-artist"></div>
-              <div class="controls">
-                <button class="icon-btn" data-media="prev"><span class="ms">skip_previous</span></button>
-                <button class="icon-btn filled" data-media="toggle"><span class="ms play-icon">play_arrow</span></button>
-                <button class="icon-btn" data-media="next"><span class="ms">skip_next</span></button>
-              </div>
-            </div>
-            <div class="card res-card">
-              <div class="gauge" data-g="cpu"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">memory</span><b>CPU</b><em>-</em></div>
-              <div class="gauge" data-g="mem"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">developer_board</span><b>RAM</b><em>-</em></div>
-              <div class="gauge" data-g="disk"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">hard_drive</span><b>C:</b><em>-</em></div>
-              <div class="gauge" data-g="bat" hidden><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">battery_full</span><b>Batt.</b><em>-</em></div>
-            </div>
-            <div class="card vol-card">
-              <button class="icon-btn" id="mute"><span class="ms vol-icon">volume_up</span></button>
-              <input type="range" class="slider" id="vol" min="0" max="100" value="50">
-              <span class="vol-val">50</span>
-            </div>
-            <div class="card session-card">
-              <button class="sess" data-sess="lock" title="Verrouiller"><span class="ms">lock</span></button>
-              <button class="sess" data-sess="sleep" title="Veille"><span class="ms">bedtime</span></button>
-              <button class="sess" data-sess="logout" data-confirm title="Déconnexion"><span class="ms">logout</span></button>
-              <button class="sess" data-sess="restart" data-confirm title="Redémarrer"><span class="ms">restart_alt</span></button>
-              <button class="sess danger" data-sess="shutdown" data-confirm title="Éteindre"><span class="ms">power_settings_new</span></button>
-            </div>
-          </div>
-        </section>
-
-        <!-- MÉDIA -->
-        <section class="page" data-page="media">
-          <div class="mp-bg"></div>
-          <div class="mp">
-            <div class="mp-art"><img alt=""><span class="ms">music_note</span></div>
-            <div class="mp-info">
-              <span class="chip mp-app"></span>
-              <div class="mp-title">Rien en lecture</div>
-              <div class="mp-artist"></div>
-              <div class="mp-album"></div>
-              <div class="mp-seek">
-                <input type="range" class="slider" id="seek" min="0" max="1000" value="0">
-                <div class="mp-times"><span class="t-pos">0:00</span><span class="t-dur">0:00</span></div>
-              </div>
-              <div class="controls big">
-                <button class="icon-btn" data-media="prev"><span class="ms">skip_previous</span></button>
-                <button class="icon-btn filled" data-media="toggle"><span class="ms play-icon">play_arrow</span></button>
-                <button class="icon-btn" data-media="next"><span class="ms">skip_next</span></button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- APPS -->
-        <section class="page" data-page="apps">
-          <label class="search">
-            <span class="ms">search</span>
-            <input id="q" placeholder="Rechercher une application…" autocomplete="off" spellcheck="false">
-          </label>
-          <div class="app-grid"></div>
-        </section>
-
-        <!-- PRESSE-PAPIERS -->
-        <section class="page" data-page="clips">
-          <div class="page-head">
-            <span class="clip-count">Historique vide</span>
-            <button class="text-btn" id="clip-clear"><span class="ms">delete</span>Effacer</button>
-          </div>
-          <div class="clip-list"></div>
-        </section>
-
-        <!-- FONDS D'ÉCRAN -->
-        <section class="page" data-page="walls">
-          <div class="page-head">
-            <span class="seg" hidden>
-              <button data-src="win" class="on">Windows</button>
-              <button data-src="we">Wallpaper Engine</button>
-            </span>
-            <span class="wall-note">Les couleurs suivent le fond d'écran</span>
-            <span>
-              <button class="text-btn" id="wall-refresh"><span class="ms">refresh</span>Actualiser</button>
-              <button class="text-btn" id="wall-folder"><span class="ms">folder_open</span>Dossier</button>
-            </span>
-          </div>
-          <div class="wall-grid"><div class="empty">Chargement…</div></div>
-        </section>
-
-        <!-- RÉGLAGES -->
-        <section class="page" data-page="settings">
-          <div class="set-list">
-            <label class="card set-row">
-              <span class="ms set-icon">rocket_launch</span>
-              <span class="set-text">
-                <b>Lancer au démarrage de Windows</b>
-                <small>L'îlot s'ouvre automatiquement à l'ouverture de session</small>
-              </span>
-              <input type="checkbox" class="switch" id="set-autostart">
-            </label>
-            <div class="card set-block">
-              <div class="set-row">
-                <span class="ms set-icon">desktop_windows</span>
-                <span class="set-text">
-                  <b>Écran de l'îlot</b>
-                  <small>Si l'écran choisi est débranché, l'îlot revient sur l'écran principal</small>
-                </span>
-              </div>
-              <div class="mon-list"></div>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  </div>
-  </div>
-  <script type="module" src="app.js"></script>
+  <script type="module">
+    const html = await (await fetch('index.html')).text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    document.body.prepend(doc.getElementById('island'));
+    if (P.get('light')) D.settings_get.mode = 'light';
+    await import('./app.js');
+    const q = P.get('q');
+    if (q !== null) setTimeout(() => { const i = document.querySelector('#q'); i.value = q; i.dispatchEvent(new Event('input')); }, 300);
+    const sheet = P.get('sheet');
+    if (sheet) setTimeout(() => document.querySelector(sheet === 'wifi' ? '[data-tile=wifi] .tile-more' : sheet === 'out' ? '.out-btn' : '[data-tile=timer] .tile-more').click(), 400);
+    const scroll = P.get('scroll');
+    if (scroll) setTimeout(() => (document.querySelector('.set-list').scrollTop = +scroll), 600);
+    if (P.get('day')) setTimeout(() => document.querySelector('.cal-grid .today').click(), 600);
+  </script>
 </body>
 </html>

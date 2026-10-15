@@ -72,16 +72,21 @@ fn collect(dir: &Path, depth: u32, out: &mut Vec<PathBuf>) {
 
 /// Miniature JPEG en data URL, mise en cache selon chemin + date de modif.
 pub(crate) fn thumb(p: &Path) -> Option<String> {
+    thumb_sized(p, 400)
+}
+
+pub(crate) fn thumb_sized(p: &Path, size: u32) -> Option<String> {
     let meta = std::fs::metadata(p).ok()?;
     let mut h = std::collections::hash_map::DefaultHasher::new();
     p.hash(&mut h);
     meta.modified().ok().hash(&mut h);
+    size.hash(&mut h);
     let cached = cache_dir().join(format!("{:016x}.jpg", h.finish()));
     let bytes = match std::fs::read(&cached) {
         Ok(b) => b,
         Err(_) => {
             let img = image::ImageReader::open(p).ok()?.with_guessed_format().ok()?.decode().ok()?;
-            let t = img.thumbnail(400, 400).to_rgb8();
+            let t = img.thumbnail(size, size).to_rgb8();
             let mut out = std::io::Cursor::new(Vec::new());
             t.write_to(&mut out, image::ImageFormat::Jpeg).ok()?;
             let b = out.into_inner();
@@ -183,4 +188,65 @@ pub fn wall_set(path: String) -> bool {
 #[tauri::command(async)]
 pub fn walls_open_folder() {
     let _ = std::process::Command::new("explorer.exe").arg(user_dir()).spawn();
+}
+
+// ---------------------------------------------------------------- rotation
+
+/// Petit generateur pseudo-aleatoire (pas besoin de crate pour ca).
+fn random(n: usize) -> usize {
+    let t = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    let mut x = t ^ 0x9E37_79B9_7F4A_7C15;
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+    (x % n.max(1) as u64) as usize
+}
+
+/// Passe a un autre fond, au hasard, dans la source visible (Wallpaper
+/// Engine s'il tourne, sinon Windows).
+#[tauri::command(async)]
+pub fn wall_random(app: tauri::AppHandle) -> bool {
+    use tauri::Emitter;
+    let ok = if crate::we::install_dir().is_some() && crate::we::running() {
+        let cur = crate::we::we_state().current;
+        let list: Vec<String> = crate::we::we_walls()
+            .into_iter()
+            .map(|w| w.path().to_string())
+            .filter(|p| !p.eq_ignore_ascii_case(&cur))
+            .collect();
+        !list.is_empty() && crate::we::we_set(list[random(list.len())].clone())
+    } else {
+        let list: Vec<String> = walls_get().into_iter().filter(|w| !w.cur).map(|w| w.path).collect();
+        !list.is_empty() && wall_set(list[random(list.len())].clone())
+    };
+    if ok {
+        // Wallpaper Engine met un instant a charger le fond
+        std::thread::sleep(std::time::Duration::from_millis(900));
+        let _ = app.emit("wall-changed", ());
+    }
+    ok
+}
+
+/// Change de fond toutes les `rotate_min` minutes (0 = jamais).
+pub fn watch_rotation(app: tauri::AppHandle) {
+    use tauri::Manager;
+    std::thread::spawn(move || {
+        let mut elapsed = 0u32;
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(60));
+            let every = app.state::<crate::settings::Settings>().0.lock().unwrap().rotate_min;
+            if every == 0 {
+                elapsed = 0;
+                continue;
+            }
+            elapsed += 1;
+            if elapsed >= every {
+                elapsed = 0;
+                wall_random(app.clone());
+            }
+        }
+    });
 }
