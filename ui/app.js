@@ -64,9 +64,11 @@ function sizeFor(s) {
   return { w, h: 30 };
 }
 
-// avec la barre (pleine et affichée), les coins concaves ne poussent que
-// sous son bord
-const earFor = h => (barDocked() ? Math.max(0, Math.min(EAR, h - BAR_H)) : EAR);
+// rayon des coins bas (comme --r dans style.css)
+const radiusFor = s => s === 'open' ? 30 : s === 'peek' ? (hasMedia ? 26 : 22) : act ? 20 : 15;
+// un coin concave s'arrête où commence l'arrondi du bas (sinon il dépasse) ;
+// avec la barre (pleine et affichée), il ne pousse que sous son bord
+const earFor = h => Math.max(0, Math.min(EAR, h - radiusFor(state) - (barDocked() ? BAR_H : 0)));
 
 function applySize() {
   const { w, h } = sizeFor(state);
@@ -184,6 +186,17 @@ function setLocked(on, save = true) {
 function saveLayout() { invoke('store_set', { key: 'layout', value: { big, locked } }); }
 $('[data-tool="big"]').addEventListener('click', () => setBig(!big));
 $('[data-tool="lock"]').addEventListener('click', () => setLocked(!locked));
+// quitter l'îlot : second clic pour confirmer
+$('[data-tool="quit"]').addEventListener('click', e => {
+  const b = e.currentTarget;
+  if (!b.classList.contains('armed')) {
+    b.classList.add('armed');
+    b.title = "Quitter l'îlot ?";
+    setTimeout(() => { b.classList.remove('armed'); b.title = "Quitter l'îlot"; }, 3000);
+    return;
+  }
+  invoke('quit_app');
+});
 invoke('store_get', { key: 'layout' }).then(l => {
   if (l && l.big) setBig(true, false);
   if (l && l.locked) setLocked(true, false);
@@ -1268,6 +1281,7 @@ function commands(q) {
     { icon: 'settings', title: 'Réglages', keys: 'reglages parametres settings options', run: () => open('settings'), stay: true },
     { icon: 'content_paste_off', title: "Vider l'historique du presse-papiers", keys: 'vider effacer presse-papiers clipboard', run: () => invoke('clips_clear') },
     { icon: 'notifications_off', title: 'Effacer les notifications', keys: 'effacer notifications', run: () => invoke('notifs_dismiss', { id: null }) },
+    { icon: 'close', title: "Quitter l'îlot", keys: 'quitter fermer ilot exit quit', danger: true, run: () => invoke('quit_app') },
     { icon: 'lock', title: 'Verrouiller', keys: 'verrouiller lock session', run: () => invoke('session_action', { action: 'lock' }) },
     { icon: 'bedtime', title: 'Mettre en veille', keys: 'veille sleep suspendre', run: () => invoke('session_action', { action: 'sleep' }) },
     { icon: 'logout', title: 'Se déconnecter', keys: 'deconnexion logout session', danger: true, run: () => invoke('session_action', { action: 'logout' }) },

@@ -44,7 +44,7 @@ La pilule s'agrandit aussi un instant pour signaler :
 - la fin du minuteur.
 
 Autres comportements :
-- en haut à droite du panneau : **agrandir** (presque tout l'écran) et **verrouiller** (l'îlot reste ouvert quand la souris sort) ;
+- en haut à droite du panneau : **agrandir** (presque tout l'écran), **verrouiller** (l'îlot reste ouvert quand la souris sort) et **quitter l'îlot** (second clic pour confirmer ; aussi la commande `>quitter` du lanceur) ;
 - calendrier : une **note** par jour (clic sur un jour) ;
 - Média : **playlists** favorites (liens Spotify, Deezer, YouTube) ;
 - Réglages › Apparence : **fond de l'îlot** (et de la barre) opaque, translucide ou fond d'écran flouté ;

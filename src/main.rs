@@ -123,6 +123,12 @@ fn island_open(app: &AppHandle) -> bool {
 static WIN_SIZE: Mutex<(f64, f64)> = Mutex::new((800.0, 600.0));
 
 /// Taille de la fenetre (pixels CSS) pour le panneau agrandi, puis recentrage.
+// bouton « Quitter l'îlot » du panneau (comme le menu de la zone de notification)
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 #[tauri::command]
 fn win_resize(win: WebviewWindow, w: f64, h: f64) {
     *WIN_SIZE.lock().unwrap() = (w, h);
@@ -462,6 +468,7 @@ fn main() {
             winkey::winkey_status,
             winkey::winkey_remap,
             win_resize,
+            quit_app,
             media::media_get,
             media::media_art,
             media::media_action,

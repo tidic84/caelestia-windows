@@ -69,20 +69,26 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   --r: 15px;
   width: 132px; height: 30px;
   transition: width .5s var(--spring), height .5s var(--spring), border-radius .4s var(--std);
+  --ear-top: 0px;
   box-shadow: 0 6px 22px rgb(0 0 0 / .0);
 }
 /* coins concaves : l'îlot « sort » du bord de l'écran, comme les tiroirs de Caelestia */
+/* Un coin concave ne doit pas descendre plus bas que le bord droit de l'îlot
+   (hauteur - rayon du bas), sinon il dépasse sur l'arrondi. Au repos, --ear
+   est calculé pour (earFor) ; pendant les animations, la hauteur en % (résolue
+   à la mise en page, sans recalcul de style) coupe ce qui dépasserait. */
 #island::before, #island::after {
-  content: ''; position: absolute; top: 0; width: calc(var(--ear) + 1px); height: var(--ear); pointer-events: none;
+  content: ''; position: absolute; top: var(--ear-top); width: calc(var(--ear) + 1px);
+  height: max(0px, min(var(--ear), 100% - var(--r) - var(--ear-top))); pointer-events: none;
 }
-#island::before { left: calc(-1 * var(--ear)); background: radial-gradient(circle var(--ear) at 0 100%, transparent calc(100% - .75px), var(--surface) 100%); }
-#island::after { right: calc(-1 * var(--ear)); background: radial-gradient(circle var(--ear) at 100% 100%, transparent calc(100% - .75px), var(--surface) 100%); }
+#island::before { left: calc(-1 * var(--ear)); background: radial-gradient(circle var(--ear) at 0 var(--ear), transparent calc(100% - .75px), var(--island-bg, var(--surface)) 100%); }
+#island::after { right: calc(-1 * var(--ear)); background: radial-gradient(circle var(--ear) at 100% var(--ear), transparent calc(100% - .75px), var(--island-bg, var(--surface)) 100%); }
 #pill, #panel { position: absolute; top: 0; left: 50%; transform: translateX(-50%); }
 
 #island.hidden { transform: translateX(-50%) translateY(-40px); opacity: 0; transition: transform .35s var(--std), opacity .25s; }
 #island { transition: width .5s var(--spring), height .5s var(--spring), border-radius .4s var(--std), transform .4s var(--emph), opacity .3s, --ear .4s var(--std); }
 /* avec la barre, l'îlot sort de son bord inférieur */
-.with-bar #island::before, .with-bar #island::after { top: var(--bar-h); }
+.with-bar #island { --ear-top: var(--bar-h); }
 #island.peek { --r: 22px; }
 #island.peek.media { --r: 26px; }
 #island.act { --r: 20px; }
@@ -643,8 +649,6 @@ label.set-row { cursor: pointer; }
 
 /* ---------------------------------------------- fond de l'îlot (Réglages) */
 #island { background: var(--island-bg, var(--surface)); }
-#island::before { background: radial-gradient(circle var(--ear) at 0 100%, transparent calc(100% - .75px), var(--island-bg, var(--surface)) 100%); }
-#island::after { background: radial-gradient(circle var(--ear) at 100% 100%, transparent calc(100% - .75px), var(--island-bg, var(--surface)) 100%); }
 .island-wall { position: absolute; inset: -30px; display: none; background-repeat: no-repeat; filter: blur(22px) saturate(1.4); pointer-events: none; }
 .island-wall::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--surface) 50%, transparent); }
 #island.wall-bg .island-wall { display: block; }
@@ -655,6 +659,7 @@ label.set-row { cursor: pointer; }
 .panel-tools { position: absolute; top: 12px; right: 18px; display: flex; gap: 4px; z-index: 2; }
 .panel-tools .icon-btn { width: 34px; height: 34px; color: var(--on-surface-variant); }
 .panel-tools .icon-btn .ms { font-size: 19px; }
+.panel-tools [data-tool="quit"]:hover, .panel-tools [data-tool="quit"].armed { background: var(--error); color: var(--on-error); border-radius: 12px; }
 .panel-tools .icon-btn.on { background: var(--secondary-container); color: var(--on-secondary-container); border-radius: 12px; }
 #island.big .home-grid { grid-template-columns: 180px 1fr 300px; }
 #island.big .big-clock { font-size: 72px; }
