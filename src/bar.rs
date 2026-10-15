@@ -699,7 +699,7 @@ pub fn check_icons() -> String {
 }
 
 #[tauri::command]
-pub fn tasks_get(win: WebviewWindow) -> Tasks {
+pub fn bar_windows(win: WebviewWindow) -> Tasks {
     crate::com_init_sta();
     let own = win.hwnd().unwrap_or_default();
     snapshot(own, &mut Vec::new(), &mut HashMap::new())
