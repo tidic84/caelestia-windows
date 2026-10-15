@@ -29,6 +29,8 @@ pub struct Config {
     pub win_accent: bool,
     /// Applique le mode clair / sombre a Windows
     pub win_mode: bool,
+    /// Fond de l'ilot : solid, glass, clear, wall (fond d'ecran floute)
+    pub island_bg: String,
     pub city: Option<City>,
     /// Adresses iCal (Google Agenda, Outlook...)
     pub icals: Vec<String>,
@@ -60,6 +62,7 @@ impl Default for Config {
             mode: "dark".into(),
             win_accent: false,
             win_mode: false,
+            island_bg: "solid".into(),
             city: None,
             icals: Vec::new(),
             rotate_min: 0,

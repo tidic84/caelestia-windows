@@ -2,12 +2,18 @@
 
 mod apps;
 mod audio;
+mod discord;
 mod display;
+mod games;
+mod mail;
 mod media;
 mod net;
 mod notif;
+mod pc;
 mod settings;
+mod store;
 mod system;
+mod tasks;
 mod theme;
 mod wall;
 mod we;
@@ -18,7 +24,7 @@ use std::time::Duration;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewWindow, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
@@ -70,6 +76,13 @@ fn startup_tab() -> Option<String> {
 fn grab_focus(win: WebviewWindow) {
     let _ = win.set_ignore_cursor_events(false);
     let _ = win.set_focus();
+}
+
+/// Taille de la fenetre (pixels CSS) pour le panneau agrandi, puis recentrage.
+#[tauri::command]
+fn win_resize(win: WebviewWindow, w: f64, h: f64) {
+    let _ = win.set_size(LogicalSize::new(w, h));
+    place(&win);
 }
 
 /// Place la fenetre en haut, au centre de l'ecran choisi dans les reglages
@@ -234,6 +247,17 @@ fn main() {
         let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("check.txt"), report);
         return;
     }
+    // `ilot.exe --check-imap <hote> <fichier>` : test de connexion IMAP
+    if let Some(i) = args.iter().position(|a| a == "--check-imap") {
+        let host = args.get(i + 1).map(String::as_str).unwrap_or("imap.gmail.com");
+        let _ = std::fs::write(args.get(i + 2).map(String::as_str).unwrap_or("imap-check.txt"), mail::check(host));
+        return;
+    }
+    // `ilot.exe --check-games <fichier>` : jeux detectes, sans interface
+    if let Some(i) = args.iter().position(|a| a == "--check-games") {
+        let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("games-check.txt"), games::report());
+        return;
+    }
     let hit = Arc::new(Mutex::new(Hit::default()));
     tauri::Builder::default()
         .plugin(
@@ -249,6 +273,10 @@ fn main() {
         .manage(system::Clips(Mutex::new(VecDeque::new())))
         .manage(apps::Apps(Mutex::new(Vec::new())))
         .manage(notif::Notifs(Mutex::new(Vec::new())))
+        .manage(games::Games(Mutex::new(Vec::new())))
+        .manage(tasks::Tasks::default())
+        .manage(discord::Discord::default())
+        .manage(mail::MailState(Mutex::new(Default::default())))
         .setup(move |app| {
             settings::init(app.handle());
             let win = app.get_webview_window("island").expect("fenetre island");
@@ -277,6 +305,9 @@ fn main() {
             theme::watch(h.clone());
             system::watch_keys(h.clone());
             wall::watch_rotation(h.clone());
+            mail::watch(h.clone());
+            discord::start(h.clone());
+            games::load(h.clone());
             apps::load(h);
 
             // Ctrl+Alt+Espace : lanceur d'applications
@@ -311,6 +342,7 @@ fn main() {
             set_hit,
             startup_tab,
             grab_focus,
+            win_resize,
             media::media_get,
             media::media_art,
             media::media_action,
@@ -358,6 +390,36 @@ fn main() {
             settings::settings_autostart,
             settings::settings_monitor,
             settings::settings_set,
+            audio::app_volume_get,
+            audio::app_volume_set,
+            games::games_get,
+            games::games_refresh,
+            games::game_launch,
+            games::game_folder,
+            games::app_folder,
+            games::folder_open,
+            games::pick_folder,
+            games::file_info,
+            games::file_open,
+            pc::power_get,
+            pc::power_set,
+            pc::procs_running,
+            tasks::tasks_get,
+            tasks::task_kill,
+            tasks::taskmgr_open,
+            discord::discord_get,
+            discord::discord_setup,
+            discord::discord_forget,
+            discord::discord_self,
+            discord::discord_user,
+            discord::discord_mic,
+            store::store_get,
+            store::store_set,
+            mail::mail_get,
+            mail::mail_refresh,
+            mail::mail_add,
+            mail::mail_remove,
+            mail::mail_read,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Ilot");
