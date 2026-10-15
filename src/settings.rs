@@ -1,5 +1,5 @@
 //! Reglages : lancement au demarrage, ecran de l'ilot, apparence, meteo,
-//! calendriers, fonds, notifications.
+//! calendriers, fonds, notifications, barre.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -43,6 +43,24 @@ pub struct Config {
     /// Notifications masquees (« tout effacer » : tout ce qui est <= cet id)
     pub notif_cleared: i64,
     pub notif_hidden: Vec<i64>,
+    /// Barre facon Waybar en haut de l'ecran
+    pub bar: bool,
+    /// Masque la barre des taches Windows (avec la barre)
+    pub hide_taskbar: bool,
+    /// Barre sans fond : chaque groupe devient un ilot detache
+    pub bar_islands: bool,
+    /// Fenetres ouvertes dans la barre
+    pub bar_tasks: bool,
+    /// Barre masquee, affichee quand la souris touche le haut de l'ecran
+    pub bar_autohide: bool,
+    /// Masquage automatique de la barre des taches avant que l'ilot ne le
+    /// force, pour le remettre ensuite (`None` : rien n'a ete change)
+    pub taskbar_autohide: Option<bool>,
+    /// La touche Windows seule ouvre le lanceur au lieu du menu Demarrer
+    pub win_key: bool,
+    /// Remappage de la touche Windows modifie depuis le demarrage de Windows
+    /// (un redemarrage est alors necessaire)
+    pub win_key_boot: Option<crate::winkey::BootRemap>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -68,6 +86,14 @@ impl Default for Config {
             osd: true,
             notif_cleared: 0,
             notif_hidden: Vec::new(),
+            bar: false,
+            hide_taskbar: true,
+            bar_islands: true,
+            bar_tasks: false,
+            bar_autohide: true,
+            taskbar_autohide: None,
+            win_key: false,
+            win_key_boot: None,
         }
     }
 }
@@ -206,6 +232,7 @@ pub fn settings_monitor(win: WebviewWindow, st: State<Settings>, id: Option<Stri
     };
     save(win.app_handle(), &cfg);
     crate::place(&win);
+    crate::bar::sync(win.app_handle());
 }
 
 /// Modifie la config, l'enregistre et previent l'interface (`settings`).
@@ -226,11 +253,11 @@ pub fn update(app: &AppHandle, f: impl FnOnce(&mut Config)) -> Config {
 /// Fusionne `patch` (un objet JSON partiel) dans la config.
 #[tauri::command]
 pub fn settings_set(app: AppHandle, patch: serde_json::Value) -> Config {
-    update(&app, |cfg| {
+    let cfg = update(&app, |cfg| {
         let mut v = serde_json::to_value(&*cfg).unwrap_or_default();
         if let (Some(obj), Some(p)) = (v.as_object_mut(), patch.as_object()) {
             for (k, val) in p {
-                if k != "monitor" {
+                if !matches!(k.as_str(), "monitor" | "taskbar_autohide" | "win_key_boot") {
                     obj.insert(k.clone(), val.clone());
                 }
             }
@@ -238,7 +265,17 @@ pub fn settings_set(app: AppHandle, patch: serde_json::Value) -> Config {
         if let Ok(new) = serde_json::from_value(v) {
             *cfg = new;
         }
-    })
+    });
+    if ["bar", "hide_taskbar", "bar_autohide"].iter().any(|k| patch.get(k).is_some()) {
+        if let Some(win) = app.get_webview_window("island") {
+            crate::place(&win);
+        }
+        crate::bar::sync(&app);
+    }
+    if patch.get("win_key").is_some() {
+        crate::winkey::set(&app, cfg.win_key);
+    }
+    cfg
 }
 
 pub fn init(app: &AppHandle) {

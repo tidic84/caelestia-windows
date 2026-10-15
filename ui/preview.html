@@ -29,7 +29,9 @@ const D={
  http_get:null,
 };
 D.settings_get={autostart:true,monitor:null,monitors:[{id:'\\\\.\\DISPLAY1',label:'Écran 1',width:2560,height:1440,primary:true},{id:'\\\\.\\DISPLAY2',label:'Écran 2',width:1920,height:1080,primary:false}],
- variant:'tonalspot',mode:'dark',win_accent:false,win_mode:false,city:{name:'Lyon',lat:45.75,lon:4.85},icals:['https://calendar.google.com/calendar/ical/abc/private-123/basic.ics'],rotate_min:30,notif_popups:true,dnd:false,osd:true,notif_cleared:0,notif_hidden:[]};
+ variant:'tonalspot',mode:'dark',win_accent:false,win_mode:false,city:{name:'Lyon',lat:45.75,lon:4.85},icals:['https://calendar.google.com/calendar/ical/abc/private-123/basic.ics'],rotate_min:30,notif_popups:true,dnd:false,osd:true,notif_cleared:0,notif_hidden:[],bar:P.get('bar')!=='0',hide_taskbar:true,bar_islands:!!P.get('islands'),bar_tasks:P.get('tasks')!=='0',bar_autohide:!!P.get('autohide'),win_key:false};
+D.tasks_get={desktops:4,desktop:1,active:2,windows:[{id:1,title:'Explorateur de fichiers',icon:'a'},{id:2,title:'bar.rs — Ilot — Visual Studio Code',icon:'b'},{id:3,title:'Spotify Premium',icon:'c'},{id:4,title:'Discord',icon:'d'}]};
+D.task_icon='';
 D.settings_autostart=true;
 D.wall_current={path:'C:\\w2.jpg',thumb:D.walls_get[2].thumb};
 D.walls_get.forEach((w,i)=>w.cur=i===2);
@@ -67,6 +69,7 @@ setTimeout(()=>{const a=P.get('act');if(!a)return;
     const html = await (await fetch('index.html')).text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
     document.body.prepend(doc.getElementById('island'));
+    document.body.prepend(doc.getElementById('bar'));
     if (P.get('light')) D.settings_get.mode = 'light';
     await import('./app.js');
     const q = P.get('q');
