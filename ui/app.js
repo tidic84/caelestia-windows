@@ -305,6 +305,7 @@ listen('activity', ({ payload: a }) => {
 // ================================================================ onglets
 let currentTab = 'home';
 const TABS = $$('#tabs button').map(b => b.dataset.tab);
+$$('#tabs button').forEach(b => { if (!b.title) b.title = b.querySelector('span:not(.ms)')?.textContent || ''; });
 
 function showTab(tab) {
   const dir = TABS.indexOf(tab) > TABS.indexOf(currentTab) ? 1 : -1;

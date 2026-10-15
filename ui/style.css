@@ -270,6 +270,10 @@ button.bar-pill:hover { background: var(--surface-c-high); }
 #tabs button.on { color: var(--on-primary); }
 #tabs .badge { position: absolute; top: 2px; right: 6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px; font: 600 10px/16px 'Rubik', sans-serif; font-style: normal; text-align: center; background: var(--error); color: var(--on-error); }
 #tabs button:not(.on):hover { color: var(--on-surface); }
+/* panneau normal : trop d'onglets pour tous les nommer, seul l'onglet actif
+   garde son nom (les autres l'ont en info-bulle) */
+#island:not(.big) #tabs button { padding: 8px 10px; }
+#island:not(.big) #tabs button:not(.on) span:not(.ms) { display: none; }
 .tab-ind { position: absolute; top: 4px; bottom: 4px; left: 0; width: 0; border-radius: 99px; background: var(--primary); transition: left .45s var(--spring), width .45s var(--spring); }
 
 #pages { position: relative; flex: 1; margin-top: 12px; }
@@ -669,7 +673,6 @@ label.set-row { cursor: pointer; }
 .sort-btn .ms { font-size: 17px; color: inherit; }
 
 /* ------------------------------------------------------- dossiers d'apps */
-[data-page="apps"] { position: relative; }
 .folder-bar { display: flex; gap: 6px; margin-bottom: 8px; flex: none; overflow-x: auto; padding-bottom: 2px; }
 .folder-bar::-webkit-scrollbar { height: 0; }
 .fchip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 9px; border-radius: 99px; background: var(--surface-c); color: var(--on-surface-variant); white-space: nowrap; flex: none; transition: background .2s, color .2s, border-radius .3s var(--spring), transform .2s var(--spring); }
