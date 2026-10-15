@@ -20,12 +20,13 @@ pour ouvrir le panneau. Les couleurs suivent votre fond d'écran (Material You).
 
 | Onglet | Contenu |
 |---|---|
+| **Barre** | Façon Waybar, l'îlot au centre : lanceur, bureaux virtuels (clic ou molette), fenêtres ouvertes, regroupées par appli (clic : activer / réduire ou fenêtre suivante, clic molette : fermer ; au survol, aperçu de chaque fenêtre pour choisir ou fermer), CPU / RAM, Wi-Fi, Bluetooth, volume (molette), batterie, notifications, date. Le haut de l'écran est réservé (les fenêtres maximisées s'arrêtent dessous) et la barre des tâches Windows peut être masquée. Options : îlots séparés (sans fond, chaque groupe flotte seul), fenêtres ouvertes affichées ou non, masquage automatique (la barre apparaît quand la souris touche le haut de l'écran) |
 | **Îlot replié** | Heure ; pochette qui tourne et égaliseur qui suit vraiment le son ; icônes caféine, ne pas déranger et minuteur en cours |
 | **Survol** | Titre, artiste, progression, lecture/pause ; sinon date et météo |
 | **Accueil** | Profil (avatar Windows, durée d'allumage), météo, horloge, calendrier avec vos agendas iCal (clic sur un jour : ses événements), lecteur avec visualiseur, CPU / RAM / disque / batterie, volume, verrouiller · veille · déconnexion · redémarrer · éteindre (second clic pour confirmer) |
 | **Média** | Lecteur complet avec avance dans le morceau et visualiseur audio. Fonctionne avec tout ce que Windows voit (Spotify, navigateurs…) |
 | **Contrôles** | Wi-Fi (réseaux, connexion avec mot de passe), Bluetooth, caféine (empêche la veille), ne pas déranger, mode sombre, minuteur / Pomodoro, luminosité, sortie audio, volume par application, centre de notifications |
-| **Apps** | Toutes les applis du menu Démarrer avec icônes, recherche, navigation clavier. Préfixes : `>` commandes (fond au hasard, variantes de couleurs, minuteur, Wi-Fi, session…), `=` calculatrice, `:` emoji, `?` recherche web. Un calcul tapé directement s'affiche aussi. **Ctrl+Alt+Espace** ouvre le lanceur. **Dossiers** (clic droit sur une appli, ou glisser une appli sur un dossier), fichiers et raccourcis déposés depuis l'Explorateur, applis masquées (clic droit sur « Toutes » pour les réafficher), tri par nom ou date d'ajout. **Launcher** de jeux : Steam, Epic Games, Ubisoft Connect et GOG avec jaquettes, plus les jeux ajoutés à la main |
+| **Apps** | Toutes les applis du menu Démarrer avec icônes, recherche, navigation clavier. Préfixes : `>` commandes (fond au hasard, variantes de couleurs, minuteur, Wi-Fi, session…), `=` calculatrice, `:` emoji, `?` recherche web. Un calcul tapé directement s'affiche aussi. **Ctrl+Alt+Espace** ouvre le lanceur, ainsi que la touche Windows seule si le réglage est activé (la touche est alors remappée au niveau du pilote clavier pour que Windows n'ouvre plus le menu Démarrer : droits administrateur et redémarrage requis ; les raccourcis Win+… restent ceux de Windows, Ctrl+Échap ouvre le menu Démarrer). **Dossiers** (clic droit sur une appli, ou glisser une appli sur un dossier), fichiers et raccourcis déposés depuis l'Explorateur, applis masquées (clic droit sur « Toutes » pour les réafficher), tri par nom ou date d'ajout. **Launcher** de jeux : Steam, Epic Games, Ubisoft Connect et GOG avec jaquettes, plus les jeux ajoutés à la main |
 | **Mail** | Comptes IMAP (Gmail, Yahoo, iCloud, Orange…) avec mot de passe d'application chiffré (DPAPI), boîte de réception de chaque compte, lecture du message ; nombre de non-lus sur l'onglet et dans la pilule |
 | **PC** | Discord : micro, sourdine, volume de chaque personne du salon et de son propre micro (RPC, avec une application Discord à soi ; sinon mélangeur Windows). Logiciels du PC (MSI Center, Armoury Crate, G HUB) et mode d'alimentation de Windows 11 |
 | **Tâches** | Gestionnaire des tâches : programmes regroupés avec CPU, mémoire, disque et connexions réseau (colonnes colorées selon la charge), tri, filtre, fin de tâche (processus Windows protégés) |
@@ -46,7 +47,7 @@ Autres comportements :
 - en haut à droite du panneau : **agrandir** (presque tout l'écran) et **verrouiller** (l'îlot reste ouvert quand la souris sort) ;
 - calendrier : une **note** par jour (clic sur un jour) ;
 - Média : **playlists** favorites (liens Spotify, Deezer, YouTube) ;
-- Réglages › Apparence : **fond de l'îlot** opaque, translucide ou fond d'écran flouté ;
+- Réglages › Apparence : **fond de l'îlot** (et de la barre) opaque, translucide ou fond d'écran flouté ;
 - hors de l'îlot, les clics passent aux fenêtres en dessous ;
 - l'îlot se cache quand un jeu ou une vidéo est en plein écran ;
 - une icône dans la zone de notification permet d'ouvrir les réglages, de recharger ou de quitter.
@@ -104,7 +105,7 @@ cd ui; python -m http.server 8765   # puis http://localhost:8765/preview.html?ta
 
 Onglets : `home`, `media`, `ctrl`, `apps`, `clips`, `walls`, `settings`. Autres paramètres :
 `peek=1` (état survolé), `act=osd|notif|bt|shot|caps` (activité), `q=>v` (texte du lanceur),
-`sheet=wifi|out|timer`, `day=1` (événements du jour), `light=1` (mode clair).
+`sheet=wifi|out|timer`, `day=1` (événements du jour), `light=1` (mode clair), `bar=0` (sans la barre).
 
 `ilot.exe --check-all rapport.txt` écrit un diagnostic des modules système (audio, réseau,
 notifications, visualiseur, HTTP) sans lancer l'interface.
@@ -115,6 +116,7 @@ notifications, visualiseur, HTTP) sans lancer l'interface.
   Un thread Rust suit le curseur et ne rend la fenêtre cliquable que lorsqu'il
   est au-dessus de la zone de l'îlot (signalée par l'interface).
 - **Média** : `GlobalSystemMediaTransportControls` (WinRT).
+- **Barre** : zone réservée via `SHAppBarMessage` (AppBar) ; bureaux virtuels lus dans le registre (`VirtualDesktopIDs`), changés par Ctrl+Win+←/→ faute d'API publique. La barre des tâches Windows est passée en masquage automatique puis cachée, et tout est rétabli en quittant l'îlot (si l'îlot plante, redémarrer l'Explorateur la fait revenir).
 - **Volume** : Core Audio (`IAudioEndpointVolume`).
 - **Apps** : dossier virtuel `shell:AppsFolder`, icônes via `IShellItemImageFactory`.
 - **Wallpaper Engine** : lecture de `config.json` et des `project.json`, application via sa ligne de commande.

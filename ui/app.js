@@ -23,7 +23,8 @@ const store = {
 // Réglages (remplacés par ceux du backend au démarrage)
 let cfg = {
   variant: 'tonalspot', mode: 'dark', win_accent: false, win_mode: false, island_bg: 'solid', city: null, icals: [],
-  rotate_min: 0, notif_popups: true, dnd: false, osd: true,
+  rotate_min: 0, notif_popups: true, dnd: false, osd: true, bar: false, hide_taskbar: true,
+  bar_islands: true, bar_tasks: false, bar_autohide: true, win_key: false,
 };
 async function setCfg(patch) {
   Object.assign(cfg, patch);
@@ -36,12 +37,19 @@ async function setCfg(patch) {
 // En replié, une « activité » (OSD, notification…) peut agrandir la pilule.
 const OPEN = { w: 740, h: 540 };
 const EAR = 22;
+const BAR_H = 30;
 let state = 'collapsed';
 let hovered = false;
 let pinned = false; // ouvert au clavier : ne se referme pas en sortant la souris
 let leaveTimer = null;
 let hasMedia = false;
 let fullscreen = false;
+let barPeek = false; // barre affichée (masquage automatique)
+let atTop = false;   // souris dans la bande du haut de l'écran
+let barTimer = null;
+const barAuto = () => !!(cfg.bar && cfg.bar_autohide);
+const barVisible = () => !!cfg.bar && !fullscreen && (!cfg.bar_autohide || barPeek);
+const barDocked = () => barVisible() && !cfg.bar_islands;
 let act = null;
 let actTimer = null;
 let weather = null;
@@ -56,27 +64,51 @@ function sizeFor(s) {
   return { w, h: 30 };
 }
 
+// avec la barre (pleine et affichée), les coins concaves ne poussent que
+// sous son bord
+const earFor = h => (barDocked() ? Math.max(0, Math.min(EAR, h - BAR_H)) : EAR);
+
 function applySize() {
   const { w, h } = sizeFor(state);
   island.style.width = w + 'px';
   island.style.height = h + 'px';
+  island.style.setProperty('--ear', earFor(h) + 'px');
   island.classList.toggle('act', !!act && state === 'collapsed');
   reportHit();
 }
 
 function reportHit() {
   const { w, h } = sizeFor(state);
-  const x = (innerWidth - w) / 2 - EAR;
-  // un peu de marge sous l'îlot replié pour l'attraper facilement
-  invoke('set_hit', { x, y: 0, w: w + EAR * 2, h: h + (state === 'collapsed' ? 6 : 2) });
+  const ear = earFor(h);
+  const x = (innerWidth - w) / 2 - ear;
+  // l'îlot d'abord (survol), puis la barre ; un peu de marge sous l'îlot
+  // replié pour l'attraper facilement
+  const rects = [{ x, y: 0, w: w + ear * 2, h: h + (state === 'collapsed' ? 6 : 2) }];
+  if (barVisible()) {
+    if (!cfg.bar_islands) rects.push({ x: 0, y: 0, w: innerWidth, h: BAR_H });
+    // îlots séparés : les clics passent entre eux
+    else for (const el of $$('.bar-side > *')) {
+      const r = el.getBoundingClientRect();
+      if (r.width) rects.push({ x: r.left - 2, y: 0, w: r.width + 4, h: BAR_H });
+    }
+    if (pvKey) {
+      const r = $('#task-preview').getBoundingClientRect();
+      rects.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+    }
+  }
+  // masquage auto : une bande au bord de l'écran affiche la barre, qui reste
+  // tant que la souris est dessus
+  const top = barAuto() && !fullscreen ? (barPeek ? BAR_H + 8 : 2) : 0;
+  invoke('set_hit', { rects, top });
 }
 
 function setState(s) {
   if (s === state) return;
+  if (state === 'open') invoke('release_focus');
   state = s;
   island.classList.remove('collapsed', 'peek', 'open');
   island.classList.add(s);
-  if (s !== 'open') { pinned = false; closeSheets(); }
+  if (s !== 'open') { pinned = false; closeSheets(); if (!atTop) hideBarLater(); }
   if (s !== 'collapsed' && act) endActivity(false);
   if (s === 'open') onOpen();
   applySize();
@@ -105,6 +137,7 @@ listen('hover', ({ payload }) => {
 listen('fullscreen', ({ payload }) => {
   fullscreen = payload;
   island.classList.toggle('hidden', payload);
+  refreshBar();
   if (payload) { setState('collapsed'); endActivity(); }
   updateViz();
 });
@@ -184,6 +217,18 @@ addEventListener('keydown', e => {
   if ($('.cal-card.day')) return $('.cal-card').classList.remove('day');
   close();
 });
+// Touche Windows remappée (F24) : quand l'îlot a le clavier, elle arrive ici
+// au lieu de passer par le hook ; seule, elle referme l'îlot
+let winTap = false;
+addEventListener('keydown', e => {
+  if (e.key === 'F24') { if (!e.repeat) winTap = true; e.preventDefault(); }
+  else winTap = false;
+}, true);
+addEventListener('keyup', e => {
+  if (e.key !== 'F24' || !winTap) return;
+  winTap = false;
+  if (state === 'open') close();
+}, true);
 addEventListener('resize', reportHit);
 
 // ============================================================== activités
@@ -224,6 +269,7 @@ function simpleActivity(icon, title, sub = '', extra = {}) {
 }
 
 listen('osd', ({ payload: o }) => {
+  if (o.kind === 'volume') showBarVolume(o.value, o.muted);
   if (o.kind === 'volume' && state === 'open') showVolume(o.value, o.muted);
   if (!cfg.osd) return;
   const v = o.muted ? 0 : o.value;
@@ -312,6 +358,7 @@ function onTab(tab) {
 const fmtDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 const fmtShort = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 const fmtHM = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const fmtBar = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 function tickClock() {
   const d = new Date();
   const hh = String(d.getHours()).padStart(2, '0');
@@ -321,6 +368,8 @@ function tickClock() {
   $('.big-clock .mm').textContent = mm;
   $('.big-date').textContent = fmtDate.format(d);
   $('.peek-date').textContent = fmtShort.format(d);
+  const day = fmtBar.format(d);
+  $('.bar-date').textContent = day[0].toUpperCase() + day.slice(1);
   if (d.getDate() !== calToday) { calToday = d.getDate(); renderCal(); }
 }
 setInterval(tickClock, 1000);
@@ -642,6 +691,7 @@ listen('sys', ({ payload: r }) => {
   bat.hidden = r.battery < 0;
   if (r.battery >= 0) gauge('bat', r.battery / 100, r.battery + (r.charging ? ' % ⚡' : ' %'));
   $('.uptime').textContent = 'Allumé depuis ' + fmtUptime(r.uptime);
+  barResources(r);
 });
 
 // ============================================================ utilisateur
@@ -747,7 +797,7 @@ function renderTiles() {
   tile('dark').querySelector('.ms').textContent = dark ? 'dark_mode' : 'light_mode';
   renderTimerTile();
 }
-listen('net', ({ payload }) => { net = payload; renderTiles(); });
+listen('net', ({ payload }) => { net = payload; renderTiles(); renderBarNet(); });
 listen('caffeine', ({ payload }) => { caffeine = payload; renderTiles(); updateIndicators(); });
 
 async function enterCtrl() {
@@ -1010,6 +1060,10 @@ function renderNotifs() {
   const badge = $('[data-tab="ctrl"] .badge');
   badge.hidden = !n;
   badge.textContent = n > 9 ? '9+' : n;
+  const bell = $('.bar-notif');
+  bell.classList.toggle('has', !!n && !cfg.dnd);
+  bell.querySelector('.ms').textContent = cfg.dnd ? 'do_not_disturb_on' : n ? 'notifications' : 'notifications_none';
+  bell.querySelector('b').textContent = n && !cfg.dnd ? (n > 9 ? '9+' : n) : '';
   if (!n) {
     box.innerHTML = `<div class="empty small"><span class="ms big">${cfg.dnd ? 'do_not_disturb_on' : 'notifications_none'}</span>${cfg.dnd ? 'Ne pas déranger est activé' : 'Aucune notification'}</div>`;
     return;
@@ -2729,6 +2783,15 @@ function renderSettings() {
   $('#set-win-mode').checked = cfg.win_mode;
   $('#set-notif').checked = cfg.notif_popups;
   $('#set-osd').checked = cfg.osd;
+  $('#set-win-key').checked = cfg.win_key;
+  renderWinKey();
+  $('#set-bar').checked = cfg.bar;
+  $('#set-hide-taskbar').checked = cfg.hide_taskbar;
+  $('#set-hide-taskbar').disabled = !cfg.bar;
+  for (const k of ['islands', 'tasks', 'autohide']) {
+    $(`#set-bar-${k}`).checked = cfg[`bar_${k}`];
+    $(`#set-bar-${k}`).disabled = !cfg.bar;
+  }
   $$('#set-rotate button').forEach(b => b.classList.toggle('on', Number(b.dataset.v) === cfg.rotate_min));
   $$('#set-island-bg button').forEach(b => b.classList.toggle('on', b.dataset.v === (cfg.island_bg || 'solid')));
   $('.city-cur').textContent = cfg.city ? cfg.city.name : 'Aucune ville choisie';
@@ -2760,6 +2823,46 @@ $('#set-win-accent').addEventListener('change', e => {
 $('#set-win-mode').addEventListener('change', e => setCfg({ win_mode: e.target.checked }));
 $('#set-notif').addEventListener('change', e => setCfg({ notif_popups: e.target.checked }));
 $('#set-osd').addEventListener('change', e => setCfg({ osd: e.target.checked }));
+// Touche Windows : remappée au niveau du pilote (invite administrateur), sinon
+// Windows ouvre quand même le menu Démarrer
+async function winKeyRemap(on) {
+  const sw = $('#set-win-key');
+  sw.disabled = true;
+  const ok = await invoke('winkey_remap', { on });
+  sw.disabled = false;
+  // couper reste possible si le remappage n'a pas pu être retiré
+  if (ok || !on) await setCfg({ win_key: on });
+  sw.checked = cfg.win_key;
+  renderWinKey();
+}
+async function renderWinKey() {
+  const st = await invoke('winkey_status');
+  const note = $('#win-key-note');
+  if (!st) return (note.hidden = true);
+  const btn = note.querySelector('button');
+  let text = '', action = null;
+  if (st.pending) text = 'Redémarrez Windows pour terminer (Redémarrer, pas Arrêter).';
+  else if (cfg.win_key && !st.remap) {
+    text = 'Windows peut encore ouvrir le menu Démarrer : la touche n\'est pas remappée.';
+    action = ['Remapper', true];
+  } else if (!cfg.win_key && st.remap) {
+    text = 'La touche Windows est encore remappée.';
+    action = ['Rétablir', false];
+  }
+  note.hidden = !text;
+  note.querySelector('small').textContent = text;
+  btn.hidden = !action;
+  if (action) {
+    btn.textContent = action[0];
+    btn.onclick = () => winKeyRemap(action[1]);
+  }
+}
+$('#set-win-key').addEventListener('change', e => winKeyRemap(e.target.checked));
+$('#set-bar').addEventListener('change', e => setCfg({ bar: e.target.checked }));
+$('#set-hide-taskbar').addEventListener('change', e => setCfg({ hide_taskbar: e.target.checked }));
+for (const k of ['islands', 'tasks', 'autohide']) {
+  $(`#set-bar-${k}`).addEventListener('change', e => setCfg({ [`bar_${k}`]: e.target.checked }));
+}
 $$('#set-rotate button').forEach(b => b.addEventListener('click', () => setCfg({ rotate_min: Number(b.dataset.v) })));
 $$('#set-island-bg button').forEach(b => b.addEventListener('click', () => setCfg({ island_bg: b.dataset.v })));
 
@@ -2769,7 +2872,7 @@ const WALL_BLEED = 30; // débord du calque flouté (évite les bords clairs du 
 async function applyIslandBg(src = currentThumb) {
   const mode = cfg.island_bg || 'solid';
   const a = ISLAND_ALPHA[mode] ?? 100;
-  island.style.setProperty('--island-bg', a === 100 ? 'var(--surface)' : `color-mix(in srgb, var(--surface) ${a}%, transparent)`);
+  document.documentElement.style.setProperty('--island-bg', a === 100 ? 'var(--surface)' : `color-mix(in srgb, var(--surface) ${a}%, transparent)`);
   const wall = mode === 'wall' && src;
   island.classList.toggle('wall-bg', !!wall);
   if (!wall) return;
@@ -2851,6 +2954,7 @@ $('#ical-url').addEventListener('focus', () => invoke('grab_focus'));
 // les réglages ont changé (ici ou par une commande)
 function onSettings() {
   applyTheme();
+  applyBar();
   applyIslandBg();
   updateIndicators();
   renderTiles();
@@ -2864,6 +2968,331 @@ listen('settings', ({ payload }) => {
   onSettings();
   if (icalsChanged) refreshEvents(true);
   if (cityChanged) refreshWeather();
+});
+
+// ================================================================= barre
+// Façon Waybar : à gauche le lanceur, les bureaux virtuels et les fenêtres
+// ouvertes ; à droite l'état du système. Chaque module ouvre l'onglet de
+// l'îlot qui va avec, et un second clic le referme.
+let barOn = null;
+let barWins = { windows: [], active: 0, desktops: 1, desktop: 0 };
+const taskIcons = {};
+let barVol = { level: 0, muted: false };
+function refreshBar() {
+  if (!barVisible()) hidePreview();
+  $('#bar').classList.toggle('hidden', !barVisible());
+  document.body.classList.toggle('with-bar', barDocked());
+  document.body.classList.toggle('bar-islands', !!cfg.bar_islands);
+  applySize();
+}
+function showBar(on) {
+  clearTimeout(barTimer);
+  if (on === barPeek) return;
+  barPeek = on;
+  refreshBar();
+}
+// la barre reste tant que le panneau de l'îlot est ouvert
+function hideBarLater() {
+  clearTimeout(barTimer);
+  if (barPeek) barTimer = setTimeout(() => { if (state !== 'open' && !atTop && !pvKey) showBar(false); }, 500);
+}
+listen('top-hover', ({ payload }) => {
+  atTop = payload;
+  if (payload) showBar(true);
+  else hideBarLater();
+});
+// îlots séparés : les zones cliquables suivent la taille des groupes
+const barResize = new ResizeObserver(() => { if (cfg.bar_islands) reportHit(); });
+['#bar', '.bar-l', '.bar-r'].forEach(q => barResize.observe($(q)));
+
+function applyBar() {
+  const on = !!cfg.bar;
+  $('.bar-taskbar').hidden = !(on && cfg.hide_taskbar);
+  if ($('.tasks').hidden === !!cfg.bar_tasks) {
+    $('.tasks').hidden = !cfg.bar_tasks;
+    renderBarWins(barWins);
+  }
+  if (!barAuto()) barPeek = false;
+  refreshBar();
+  if (on === barOn) return;
+  barOn = on;
+  $('#bar').hidden = !on;
+  if (!on) return;
+  invoke('bar_windows').then(renderBarWins);
+  invoke('net_get').then(n => { net = n; renderTiles(); renderBarNet(); });
+  invoke('volume_get').then(v => showBarVolume(v.level, v.muted));
+}
+
+function renderBarWins(t) {
+  barWins = t;
+  const ws = $('.ws');
+  if (ws.children.length !== t.desktops) {
+    ws.innerHTML = '';
+    for (let i = 0; i < t.desktops; i++) {
+      const b = document.createElement('button');
+      b.title = `Bureau ${i + 1}`;
+      b.addEventListener('click', () => invoke('desktop_go', { index: i }));
+      ws.append(b);
+    }
+  }
+  [...ws.children].forEach((b, i) => b.classList.toggle('on', i === t.desktop));
+
+  const box = $('.tasks');
+  box.innerHTML = '';
+  if (!cfg.bar_tasks) return hidePreview();
+  for (const g of taskGroups(t)) {
+    const active = g.wins.find(w => w.id === t.active);
+    const first = g.wins[0];
+    const el = document.createElement('button');
+    el.className = 'bar-task' + (active ? ' on' : '');
+    el.dataset.key = g.key;
+    el.innerHTML = taskIconHtml(g.key, first.title);
+    const label = document.createElement('span');
+    label.textContent = (active || first).title;
+    el.append(label);
+    if (g.wins.length > 1) {
+      const n = document.createElement('em');
+      n.textContent = g.wins.length;
+      el.append(n);
+    }
+    // plusieurs fenêtres : chaque clic passe à la suivante
+    el.addEventListener('click', () => {
+      const i = g.wins.findIndex(w => w.id === barWins.active);
+      const w = i >= 0 && g.wins.length > 1 ? g.wins[(i + 1) % g.wins.length] : first;
+      hidePreview();
+      invoke('task_activate', { id: w.id });
+    });
+    // clic molette : fermer, comme dans Waybar (fenêtre seule)
+    el.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });
+    el.addEventListener('auxclick', e => { if (e.button === 1 && g.wins.length === 1) invoke('task_close', { id: first.id }); });
+    box.append(el);
+    if (taskIcons[g.key] === undefined) loadTaskIcon(g.key, first.id);
+  }
+  // la fenêtre qui vient d'être activée est capturée : une fois réduite, son
+  // aperçu montrera encore son contenu
+  const ids = new Set(t.windows.map(w => w.id));
+  for (const id of Object.keys(thumbs)) if (!ids.has(Number(id))) delete thumbs[id];
+  if (t.active !== lastActive) {
+    lastActive = t.active;
+    const id = t.active;
+    if (id) setTimeout(() => { if (barWins.active === id) loadThumb(id); }, 800);
+  }
+  if (pvKey) renderPreview();
+}
+
+// fenêtres d'une même appli regroupées sous une seule icône
+function taskGroups(t) {
+  const groups = new Map();
+  for (const w of t.windows) {
+    if (!groups.has(w.icon)) groups.set(w.icon, []);
+    groups.get(w.icon).push(w);
+  }
+  return [...groups].map(([key, wins]) => ({ key, wins }));
+}
+function taskIconHtml(key, title) {
+  const icon = taskIcons[key];
+  return icon ? `<img src="${icon}" alt="">` : `<i class="ph">${esc(title.trim()[0] || '?')}</i>`;
+}
+
+// --- aperçu des fenêtres au survol d'une appli
+const PV_W = 220;
+const PV_H = 124;
+const thumbs = {}; // id de fenêtre -> dernière capture (gardée une fois réduite)
+const minimized = new Set();
+let lastActive = 0;
+let pvKey = null;  // appli dont l'aperçu est affiché
+let pvSig = '';
+let pvShowTimer = null;
+let pvHideTimer = null;
+let pvRefresh = null;
+
+function previewSoon(key) {
+  clearTimeout(pvHideTimer);
+  clearTimeout(pvShowTimer);
+  if (key === pvKey) return;
+  // déjà ouvert : on passe tout de suite à l'autre appli
+  pvShowTimer = setTimeout(() => showPreview(key), pvKey ? 0 : 350);
+}
+function previewLeave() {
+  clearTimeout(pvShowTimer);
+  clearTimeout(pvHideTimer);
+  pvHideTimer = setTimeout(hidePreview, 250);
+}
+function showPreview(key) {
+  pvKey = key;
+  pvSig = '';
+  renderPreview();
+  clearInterval(pvRefresh);
+  pvRefresh = setInterval(loadThumbs, 1500);
+}
+function hidePreview() {
+  clearTimeout(pvShowTimer);
+  clearTimeout(pvHideTimer);
+  clearInterval(pvRefresh);
+  if (!pvKey) return;
+  pvKey = null;
+  $('#task-preview').classList.add('out');
+  reportHit();
+  if (!atTop) hideBarLater();
+}
+function renderPreview() {
+  const g = taskGroups(barWins).find(g => g.key === pvKey);
+  const anchor = $(`.bar-task[data-key="${CSS.escape(pvKey)}"]`);
+  if (!g || !anchor || !barVisible()) return hidePreview();
+  const pv = $('#task-preview');
+  const sig = JSON.stringify([g.wins, barWins.active, !!taskIcons[g.key]]);
+  if (sig !== pvSig) {
+    pvSig = sig;
+    const box = pv.querySelector('.tp-cards');
+    box.innerHTML = '';
+    for (const w of g.wins) {
+      const card = document.createElement('div');
+      card.className = 'tp-card' + (w.id === barWins.active ? ' on' : '');
+      card.dataset.id = w.id;
+      card.innerHTML = `<div class="tp-head">${taskIconHtml(g.key, w.title)}<span></span>`
+        + `<button class="tp-x" title="Fermer"><span class="ms">close</span></button></div><div class="tp-shot"></div>`;
+      card.querySelector('.tp-head span').textContent = w.title;
+      setThumb(card, w.id);
+      card.addEventListener('click', e => {
+        hidePreview();
+        if (e.target.closest('.tp-x')) return invoke('task_close', { id: w.id });
+        if (w.id !== barWins.active) invoke('task_activate', { id: w.id });
+      });
+      card.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });
+      card.addEventListener('auxclick', e => { if (e.button === 1) invoke('task_close', { id: w.id }); });
+      box.append(card);
+    }
+    loadThumbs();
+  }
+  // sous l'appli survolée, sans sortir de l'écran
+  const a = anchor.getBoundingClientRect();
+  const left = Math.max(8, Math.min(innerWidth - pv.offsetWidth - 8, a.left + a.width / 2 - pv.offsetWidth / 2));
+  pv.style.left = left + 'px';
+  pv.classList.remove('out');
+  reportHit();
+}
+// réduite : dernière capture assombrie, ou à défaut l'icône de l'appli
+function setThumb(card, id) {
+  const shot = card.querySelector('.tp-shot');
+  const src = thumbs[id];
+  const min = minimized.has(id);
+  shot.classList.toggle('min', min);
+  if (src) {
+    const img = shot.querySelector('img.tp-img');
+    if (img) img.src = src;
+    else shot.innerHTML = `<img class="tp-img" src="${src}" alt=""><small>Réduite</small>`;
+  } else if (src === '' || min) {
+    const key = taskGroups(barWins).find(g => g.wins.some(w => w.id === id))?.key;
+    const title = barWins.windows.find(w => w.id === id)?.title || '';
+    shot.innerHTML = `<div class="tp-ph">${taskIconHtml(key, title)}</div><small>${min ? 'Réduite' : 'Aperçu indisponible'}</small>`;
+  }
+}
+function loadThumb(id) {
+  const dpr = devicePixelRatio || 1;
+  return invoke('task_thumb', { id, w: Math.round(PV_W * dpr), h: Math.round(PV_H * dpr) }).then(src => {
+    if (src === 'min') minimized.add(id);
+    else { minimized.delete(id); thumbs[id] = src; }
+    if (src === 'min' && thumbs[id] === undefined) thumbs[id] = '';
+  });
+}
+function loadThumbs() {
+  if (!pvKey) return;
+  for (const card of $$('#task-preview .tp-card')) {
+    const id = Number(card.dataset.id);
+    loadThumb(id).then(() => { if (card.isConnected) setThumb(card, id); });
+  }
+}
+$('.tasks').addEventListener('mouseover', e => {
+  const t = e.target.closest('.bar-task');
+  if (t) previewSoon(t.dataset.key);
+});
+$('.tasks').addEventListener('mouseleave', previewLeave);
+$('#task-preview').addEventListener('mouseenter', () => clearTimeout(pvHideTimer));
+$('#task-preview').addEventListener('mouseleave', previewLeave);
+const iconTries = {};
+function loadTaskIcon(key, id) {
+  taskIcons[key] = null; // en cours
+  invoke('task_icon', { key, id }).then(src => {
+    taskIcons[key] = src || '';
+    if (src) return renderBarWins(barWins);
+    // échec passager (démarrage de Windows, appli qui se lance) : on réessaie
+    const n = (iconTries[key] = (iconTries[key] || 0) + 1);
+    if (n <= 5) setTimeout(() => { delete taskIcons[key]; renderBarWins(barWins); }, 2000 * n);
+  });
+}
+listen('tasks', ({ payload }) => renderBarWins(payload));
+
+let wsWheel = 0;
+$('.ws').addEventListener('wheel', e => {
+  if (Date.now() - wsWheel < 350) return;
+  const i = Math.max(0, Math.min(barWins.desktops - 1, barWins.desktop + Math.sign(e.deltaY)));
+  if (i === barWins.desktop) return;
+  wsWheel = Date.now();
+  invoke('desktop_go', { index: i });
+}, { passive: true });
+
+function openFromBar(tab) {
+  if (state === 'open' && currentTab === tab) return setState('collapsed');
+  pinned = true;
+  open(tab);
+}
+$$('#bar [data-open]').forEach(b => b.addEventListener('click', () => openFromBar(b.dataset.open)));
+$('.bar-launch').addEventListener('click', () => {
+  openFromBar('apps');
+  if (state === 'open') { invoke('grab_focus'); setTimeout(() => $('#q').focus(), 60); }
+});
+
+function barResources(r) {
+  $('.bar-cpu').textContent = Math.round(r.cpu) + '%';
+  $('.bar-mem').textContent = Math.round((r.mem_used / r.mem_total) * 100) + '%';
+  $('.bar-res').classList.toggle('hot', r.cpu > 90);
+  const bat = $('.bar-bat');
+  bat.hidden = r.battery < 0;
+  if (r.battery >= 0) {
+    bat.querySelector('.ms').textContent = r.charging ? 'battery_charging_full' : r.battery <= 20 ? 'battery_std' : 'battery_full';
+    bat.querySelector('b').textContent = r.battery + '%';
+    bat.title = r.charging ? 'En charge' : 'Sur batterie';
+  }
+}
+
+function renderBarNet() {
+  const r = net.radios;
+  const wifi = $('.bar-wifi');
+  wifi.hidden = r.wifi === null;
+  wifi.classList.toggle('off', !r.wifi || !net.ssid);
+  wifi.title = r.wifi ? net.ssid || 'Wi-Fi : non connecté' : 'Wi-Fi désactivé';
+  const bt = $('.bar-bt');
+  bt.hidden = !r.bluetooth;
+  bt.querySelector('.ms').textContent = net.bt_devices.length ? 'bluetooth_connected' : 'bluetooth';
+  bt.title = net.bt_devices.length ? net.bt_devices.join(', ') : 'Bluetooth';
+}
+
+function showBarVolume(level, muted) {
+  barVol = { level, muted };
+  const v = Math.round(level * 100);
+  const b = $('.bar-vol');
+  b.classList.toggle('off', muted);
+  b.querySelector('.ms').textContent = muted || v === 0 ? 'volume_off' : v < 50 ? 'volume_down' : 'volume_up';
+  b.querySelector('b').textContent = muted ? '–' : v + '%';
+}
+$('.bar-vol').addEventListener('click', () => {
+  showBarVolume(barVol.level, !barVol.muted);
+  invoke('volume_set', { muted: barVol.muted });
+});
+$('.bar-vol').addEventListener('wheel', e => {
+  const level = Math.max(0, Math.min(1, Math.round((barVol.level - Math.sign(e.deltaY) * 0.05) * 100) / 100));
+  showBarVolume(level, false);
+  invoke('volume_set', { level, muted: false });
+}, { passive: true });
+
+// barre des tâches Windows affichée temporairement
+$('.bar-taskbar').addEventListener('click', e => {
+  invoke('taskbar_peek', { show: !e.currentTarget.classList.contains('on') });
+});
+listen('taskbar-peek', ({ payload }) => {
+  const b = $('.bar-taskbar');
+  b.classList.toggle('on', payload);
+  b.title = payload ? 'Masquer la barre des tâches Windows' : 'Afficher la barre des tâches Windows';
 });
 
 // ======================================================== Material You

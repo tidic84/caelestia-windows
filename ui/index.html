@@ -6,6 +6,34 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- barre façon Waybar : l'îlot en occupe le centre -->
+  <div id="bar" hidden>
+    <div class="bar-side bar-l">
+      <button class="bar-btn bar-launch" title="Applications (Ctrl+Alt+Espace ou touche Windows)"><span class="ms">apps</span></button>
+      <div class="ws" title="Bureaux virtuels"></div>
+      <div class="tasks"></div>
+    </div>
+    <div class="bar-side bar-r">
+      <button class="bar-pill bar-res" data-open="home" title="Processeur · mémoire">
+        <span class="ms">memory</span><b class="bar-cpu">–</b>
+        <span class="ms">developer_board</span><b class="bar-mem">–</b>
+      </button>
+      <div class="bar-pill bar-status">
+        <button class="bar-wifi" data-open="ctrl" hidden><span class="ms">wifi</span></button>
+        <button class="bar-bt" data-open="ctrl" hidden><span class="ms">bluetooth</span></button>
+        <button class="bar-vol" title="Clic : couper · molette : volume"><span class="ms">volume_up</span><b>–</b></button>
+        <button class="bar-bat" data-open="home" hidden><span class="ms">battery_full</span><b></b></button>
+      </div>
+      <button class="bar-pill bar-notif" data-open="ctrl" title="Notifications"><span class="ms">notifications_none</span><b></b></button>
+      <button class="bar-pill bar-date" data-open="home"></button>
+      <button class="bar-btn bar-taskbar" title="Afficher la barre des tâches Windows" hidden><span class="ms">desktop_windows</span></button>
+      <button class="bar-btn bar-power" data-open="home" title="Session"><span class="ms">power_settings_new</span></button>
+    </div>
+  </div>
+
+  <!-- aperçu des fenêtres d'une appli de la barre -->
+  <div id="task-preview" class="out"><div class="tp-cards"></div></div>
+
   <div id="island" class="collapsed">
   <div class="island-clip">
     <div class="island-wall"></div>
@@ -456,6 +484,20 @@
               <input type="checkbox" class="switch" id="set-autostart">
             </label>
             <div class="card set-block">
+              <label class="set-row">
+                <span class="ms set-icon">apps</span>
+                <span class="set-text">
+                  <b>Touche Windows</b>
+                  <small>Appuyée seule, elle ouvre les applications de l'îlot au lieu du menu Démarrer (Ctrl+Échap l'ouvre toujours). La touche est remappée : îlot fermé, elle ne fait plus rien</small>
+                </span>
+                <input type="checkbox" class="switch" id="set-win-key">
+              </label>
+              <div class="set-row sub" id="win-key-note" hidden>
+                <span class="set-text"><small></small></span>
+                <button class="text-btn" type="button" hidden></button>
+              </div>
+            </div>
+            <div class="card set-block">
               <div class="set-row">
                 <span class="ms set-icon">desktop_windows</span>
                 <span class="set-text">
@@ -464,6 +506,33 @@
                 </span>
               </div>
               <div class="mon-list"></div>
+            </div>
+
+            <div class="card set-block">
+              <label class="set-row">
+                <span class="ms set-icon">dashboard</span>
+                <span class="set-text">
+                  <b>Barre en haut de l'écran</b>
+                  <small>Façon Waybar : bureaux, fenêtres ouvertes et état du système autour de l'îlot</small>
+                </span>
+                <input type="checkbox" class="switch" id="set-bar">
+              </label>
+              <label class="set-row sub">
+                <span class="set-text"><b>Masquer la barre des tâches Windows</b><small>Elle revient quand l'îlot est quitté</small></span>
+                <input type="checkbox" class="switch" id="set-hide-taskbar">
+              </label>
+              <label class="set-row sub">
+                <span class="set-text"><b>Îlots séparés</b><small>Sans fond : chaque groupe flotte comme un petit îlot</small></span>
+                <input type="checkbox" class="switch" id="set-bar-islands">
+              </label>
+              <label class="set-row sub">
+                <span class="set-text"><b>Fenêtres ouvertes</b><small>Les applications ouvertes, à côté des bureaux</small></span>
+                <input type="checkbox" class="switch" id="set-bar-tasks">
+              </label>
+              <label class="set-row sub">
+                <span class="set-text"><b>Masquer automatiquement</b><small>La barre apparaît quand la souris touche le haut de l'écran</small></span>
+                <input type="checkbox" class="switch" id="set-bar-autohide">
+              </label>
             </div>
 
             <div class="card set-block">
