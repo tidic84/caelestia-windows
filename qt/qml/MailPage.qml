@@ -378,7 +378,7 @@ Item {
                             Txt {
                                 width: parent.width
                                 readonly property var a: acc.modelData
-                                text: a.error ? "⚠ " + a.error : a.host + " · " + a.unread + " non lu" + (a.unread > 1 ? "s" : "")
+                                text: a.error ? "⚠ " + a.error : (a.auth === "google" ? "Google" : a.host) + " · " + a.unread + " non lu" + (a.unread > 1 ? "s" : "")
                                 px: 11.5
                                 color: a.error ? Theme.error : Theme.inkVariant
                                 elide: Text.ElideRight
@@ -409,9 +409,160 @@ Item {
                 }
             }
         }
+        // connexion Google par le navigateur (src/google.rs)
+        Card {
+            id: gCard
+            y: accFlick.y + accFlick.height + 10
+            width: parent.width
+            height: gCol.height + 28
+            // saisie du client OAuth (Client ID + Secret)
+            property bool setup: false
+            property bool waiting: false
+            property string err: ""
+            function signIn() {
+                if (!page.inbox.google) {
+                    setup = true
+                    return
+                }
+                err = "Terminez la connexion dans le navigateur…"
+                waiting = true
+                Api.invoke("mail_google").then(ib => {
+                    Ilot.inbox = ib
+                    gCard.err = ""
+                    page.view = "list"
+                }).catch(e => { gCard.err = "⚠ " + String(e) }).then(() => { gCard.waiting = false }, () => { gCard.waiting = false })
+            }
+            function saveClient() {
+                if (!gid.text.trim() || !gsecret.text) {
+                    (gid.text.trim() ? gsecret : gid).input.forceActiveFocus()
+                    return
+                }
+                Api.invoke("mail_google_setup", { clientId: gid.text.trim(), secret: gsecret.text }).then(ib => {
+                    Ilot.inbox = ib
+                    gid.text = ""
+                    gsecret.text = ""
+                    gCard.setup = false
+                    gCard.err = ""
+                    gCard.signIn()
+                }).catch(e => { gCard.err = "⚠ " + String(e) })
+            }
+            Column {
+                id: gCol
+                x: 14
+                y: 14
+                width: parent.width - 28
+                spacing: 8
+                Item {
+                    width: parent.width
+                    height: 34
+                    Column {
+                        width: parent.width - gBtns.width - 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        Txt {
+                            text: "Compte Google"
+                            weight: Font.Bold
+                        }
+                        Txt {
+                            width: parent.width
+                            text: gCard.err || "Connexion par le navigateur, sans mot de passe d'application"
+                            px: 11.5
+                            color: gCard.err.startsWith("⚠") ? Theme.error : Theme.inkVariant
+                            elide: Text.ElideRight
+                        }
+                    }
+                    Row {
+                        id: gBtns
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 6
+                        TextBtn {
+                            visible: gCard.waiting || gCard.setup
+                            icon: "close"
+                            text: "Annuler"
+                            onClicked: {
+                                if (gCard.waiting)
+                                    Api.invoke("mail_google_cancel")
+                                gCard.setup = false
+                                gCard.err = ""
+                            }
+                        }
+                        TextBtn {
+                            visible: !gCard.setup
+                            primary: true
+                            icon: "link"
+                            text: "Se connecter"
+                            busy: gCard.waiting
+                            disabled: gCard.waiting
+                            onClicked: gCard.signIn()
+                        }
+                    }
+                }
+                Txt {
+                    visible: gCard.setup
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    textFormat: Text.StyledText
+                    px: 11.5
+                    lineHeight: 1.15
+                    color: Theme.inkVariant
+                    linkColor: Theme.primary
+                    text: "Google demande un client OAuth à vous (gratuit, une seule fois) :<br>"
+                        + "1. Dans la <a href=\"https://console.cloud.google.com/apis/library/gmail.googleapis.com\">console Google Cloud</a>, créez un projet et activez l'API Gmail.<br>"
+                        + "2. <a href=\"https://console.cloud.google.com/auth/audience\">Audience</a> : type <font color=\"" + Theme.ink + "\">Externe</font>, puis <font color=\"" + Theme.ink + "\">Publier l'application</font> (sinon l'accès expire après 7 jours).<br>"
+                        + "3. <a href=\"https://console.cloud.google.com/auth/clients\">Clients</a> › Créer › <font color=\"" + Theme.ink + "\">Application de bureau</font>, puis copiez l'ID client et le code secret."
+                    onLinkActivated: link => Api.invoke("open_url", { url: link })
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.NoButton
+                        cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    }
+                }
+                Field {
+                    id: gid
+                    visible: gCard.setup
+                    width: parent.width
+                    height: 38
+                    radius: 10
+                    pad: 10
+                    bg: Theme.surfaceHigh
+                    focusRing: true
+                    placeholder: "ID client (…apps.googleusercontent.com)"
+                    onFocused: Ilot.pinned = true
+                    onAccepted: gsecret.input.forceActiveFocus()
+                }
+                Item {
+                    visible: gCard.setup
+                    width: parent.width
+                    height: 38
+                    Field {
+                        id: gsecret
+                        width: parent.width - gSave.width - 10
+                        height: 38
+                        radius: 10
+                        pad: 10
+                        bg: Theme.surfaceHigh
+                        focusRing: true
+                        password: true
+                        placeholder: "Code secret du client"
+                        onFocused: Ilot.pinned = true
+                        onAccepted: gCard.saveClient()
+                    }
+                    TextBtn {
+                        id: gSave
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        primary: true
+                        icon: "link"
+                        text: "Continuer"
+                        onClicked: gCard.saveClient()
+                    }
+                }
+            }
+        }
         Card {
             id: form
-            y: accFlick.y + accFlick.height + 10
+            visible: !gCard.setup
+            y: gCard.y + gCard.height + 10
             width: parent.width
             height: formCol.height + 28
             property string err: ""

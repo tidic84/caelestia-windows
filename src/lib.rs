@@ -12,6 +12,7 @@ mod display;
 mod events;
 mod games;
 mod host;
+mod google;
 mod img;
 mod mail;
 mod media;
@@ -332,6 +333,10 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "mail_get" => json(mail::mail_get(app.state())),
         "mail_refresh" => json(mail::mail_refresh(app)),
         "mail_add" => mail::mail_add(app, a!("email"), a!("pass"), a!("host")).and_then(json),
+        "mail_google" => mail::mail_google(app).and_then(json),
+        "mail_google_cancel" => json(mail::mail_google_cancel()),
+        "mail_google_setup" => mail::mail_google_setup(app, a!("clientId"), a!("secret")).and_then(json),
+        "mail_google_forget" => json(mail::mail_google_forget(app)),
         "mail_remove" => json(mail::mail_remove(app, a!("email"))),
         "mail_read" => mail::mail_read(app, a!("account"), a!("uid")).and_then(json),
         _ => Err(format!("commande inconnue : {cmd}")),

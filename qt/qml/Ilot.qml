@@ -609,7 +609,7 @@ Item {
     }
 
     // ================================================== mail
-    property var inbox: ({ accounts: [], mails: [] })
+    property var inbox: ({ accounts: [], mails: [], google: false })
 
     // ========================================= presse-papiers, notes
     property var clips: []

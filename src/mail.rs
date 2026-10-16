@@ -3,6 +3,8 @@
 //!
 //! Les comptes sont dans %LOCALAPPDATA%\Ilot\mail.json ; les mots de passe y
 //! sont chiffres avec DPAPI (dechiffrables seulement par cette session Windows).
+//! Les comptes Google peuvent aussi se connecter par le navigateur (src/google.rs) :
+//! `pass` contient alors le jeton d'actualisation OAuth, chiffre de la meme facon.
 
 use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::Mutex;
@@ -28,14 +30,19 @@ struct Account {
     email: String,
     host: String,
     port: u16,
-    /// mot de passe chiffre DPAPI, en base64
+    /// mot de passe (ou jeton d'actualisation Google) chiffre DPAPI, en base64
     pass: String,
+    /// "google" : connexion OAuth par le navigateur ; vide : mot de passe
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    auth: String,
 }
 
 #[derive(Serialize, Clone)]
 pub struct AccountInfo {
     email: String,
     host: String,
+    /// "google" ou vide
+    auth: String,
     unread: u32,
     error: Option<String>,
 }
@@ -58,6 +65,8 @@ pub struct Mail {
 pub struct Inbox {
     accounts: Vec<AccountInfo>,
     mails: Vec<Mail>,
+    /// un client OAuth Google est configure (connexion par le navigateur possible)
+    google: bool,
 }
 
 pub struct MailState(pub Mutex<Inbox>);
@@ -160,7 +169,23 @@ fn enc_uri(s: &str) -> String {
 
 fn connect(acc: &Account) -> Result<Session, String> {
     let pass = unprotect(&acc.pass).ok_or("mot de passe illisible, rajoutez le compte")?;
+    if acc.auth == "google" {
+        let token = crate::google::access_token(&pass)?;
+        return login_oauth(&acc.host, acc.port, &acc.email, token);
+    }
     login(&acc.host, acc.port, &acc.email, &pass)
+}
+
+fn login_oauth(host: &str, port: u16, user: &str, token: String) -> Result<Session, String> {
+    let mut client = open(host, port)?;
+    client.read_greeting().map_err(|e| e.to_string())?;
+    let auth = crate::google::XOAuth2 { user: user.to_string(), token };
+    client.authenticate("XOAUTH2", &auth).map_err(|(e, _)| match e {
+        imap::error::Error::No(m) | imap::error::Error::Bad(m) => {
+            format!("acces refuse par Gmail ({}) : reconnectez le compte", m.trim())
+        }
+        e => e.to_string(),
+    })
 }
 
 /// Diagnostic `--check-imap <hote>` : connexion + accueil du serveur, sans identifiants.
@@ -286,7 +311,7 @@ fn refresh(app: &AppHandle) -> Inbox {
         .into_iter()
         .map(|h| h.join().unwrap_or_else(|_| Err("erreur interne".into())))
         .collect();
-    let mut inbox = Inbox::default();
+    let mut inbox = Inbox { google: crate::google::ready(), ..Default::default() };
     for (acc, r) in accounts.iter().zip(results) {
         let (unread, error) = match r {
             Ok((n, mails)) => {
@@ -295,7 +320,7 @@ fn refresh(app: &AppHandle) -> Inbox {
             }
             Err(e) => (0, Some(e)),
         };
-        inbox.accounts.push(AccountInfo { email: acc.email.clone(), host: acc.host.clone(), unread, error });
+        inbox.accounts.push(AccountInfo { email: acc.email.clone(), host: acc.host.clone(), auth: acc.auth.clone(), unread, error });
     }
     inbox.mails.sort_by(|a, b| b.date.cmp(&a.date));
     *app.state::<MailState>().0.lock().unwrap() = inbox.clone();
@@ -316,7 +341,9 @@ pub fn watch(app: AppHandle) {
 // ---------------------------------------------------------------- commandes
 
 pub fn mail_get(st: State<MailState>) -> Inbox {
-    st.0.lock().unwrap().clone()
+    let mut inbox = st.0.lock().unwrap().clone();
+    inbox.google = crate::google::ready();
+    inbox
 }
 
 pub fn mail_refresh(app: AppHandle) -> Inbox {
@@ -356,11 +383,46 @@ pub fn mail_add(app: AppHandle, email: String, pass: String, host: Option<String
     let enc = protect(&pass).ok_or("chiffrement du mot de passe impossible")?;
     let mut list = load_accounts();
     list.retain(|a| !a.email.eq_ignore_ascii_case(&email));
-    list.push(Account { email, host, port, pass: enc });
+    list.push(Account { email, host, port, pass: enc, auth: String::new() });
     if !save_accounts(&list) {
         return Err("impossible d'enregistrer le compte".into());
     }
     Ok(refresh(&app))
+}
+
+/// Connexion Google par le navigateur : attend la fin du consentement, puis
+/// enregistre le compte (remplace s'il existe deja).
+pub fn mail_google(app: AppHandle) -> Result<Inbox, String> {
+    let (email, token_refresh, token) = crate::google::sign_in()?;
+    let host = "imap.gmail.com".to_string();
+    let mut s = login_oauth(&host, 993, &email, token)?;
+    let _ = s.logout();
+    let enc = protect(&token_refresh).ok_or("chiffrement du jeton impossible")?;
+    let mut list = load_accounts();
+    list.retain(|a| !a.email.eq_ignore_ascii_case(&email));
+    list.push(Account { email, host, port: 993, pass: enc, auth: "google".into() });
+    if !save_accounts(&list) {
+        return Err("impossible d'enregistrer le compte".into());
+    }
+    Ok(refresh(&app))
+}
+
+pub fn mail_google_cancel() {
+    crate::google::cancel();
+}
+
+/// Enregistre le client OAuth Google (Client ID + Secret).
+pub fn mail_google_setup(app: AppHandle, client_id: String, secret: String) -> Result<Inbox, String> {
+    crate::google::setup(client_id, secret)?;
+    let mut inbox = app.state::<MailState>().0.lock().unwrap().clone();
+    inbox.google = true;
+    Ok(inbox)
+}
+
+/// Oublie le client OAuth Google (les comptes deja connectes cessent de fonctionner).
+pub fn mail_google_forget(app: AppHandle) -> Inbox {
+    crate::google::forget();
+    refresh(&app)
 }
 
 pub fn mail_remove(app: AppHandle, email: String) -> Inbox {
