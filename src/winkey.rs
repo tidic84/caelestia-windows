@@ -17,7 +17,7 @@ use std::sync::OnceLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use crate::host::{AppHandle};
 use windows::core::{w, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, ERROR_FILE_NOT_FOUND, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -407,13 +407,11 @@ pub struct Status {
     pending: bool,
 }
 
-#[tauri::command]
 pub fn winkey_status(app: AppHandle) -> Status {
     Status { remap: remap_configured(), pending: pending(&app) }
 }
 
 /// Installe ou retire le remappage (invite UAC). Faux si refuse ou en echec.
-#[tauri::command(async)]
 pub fn winkey_remap(app: AppHandle, on: bool) -> bool {
     let before = remap_configured();
     if before != on {

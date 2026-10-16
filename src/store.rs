@@ -31,12 +31,10 @@ pub fn write<T: serde::Serialize>(key: &str, value: &T) -> bool {
     std::fs::write(&tmp, s).is_ok() && std::fs::rename(&tmp, &p).is_ok()
 }
 
-#[tauri::command]
 pub fn store_get(key: String) -> Option<serde_json::Value> {
     read(&key)
 }
 
-#[tauri::command]
 pub fn store_set(key: String, value: serde_json::Value) -> bool {
     key != "mail" && write(&key, &value)
 }

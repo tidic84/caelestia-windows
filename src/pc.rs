@@ -23,7 +23,6 @@ fn powrprof(name: windows::core::PCSTR) -> Option<unsafe extern "system" fn() ->
     }
 }
 
-#[tauri::command(async)]
 pub fn power_get() -> String {
     let Some(f) = powrprof(s!("PowerGetEffectiveOverlayScheme")) else { return String::new() };
     let f: GetOverlay = unsafe { std::mem::transmute(f) };
@@ -34,7 +33,6 @@ pub fn power_get() -> String {
     MODES.iter().find(|(_, id)| *id == g).map(|(n, _)| n.to_string()).unwrap_or_default()
 }
 
-#[tauri::command(async)]
 pub fn power_set(mode: String) -> bool {
     let Some((_, g)) = MODES.iter().find(|(n, _)| *n == mode) else { return false };
     let Some(f) = powrprof(s!("PowerSetActiveOverlayScheme")) else { return false };
@@ -43,7 +41,6 @@ pub fn power_set(mode: String) -> bool {
 }
 
 /// Pour chaque nom d'executable (sans .exe), vrai s'il tourne.
-#[tauri::command(async)]
 pub fn procs_running(names: Vec<String>) -> Vec<bool> {
     let mut sys = System::new();
     sys.refresh_processes(ProcessesToUpdate::All, true);

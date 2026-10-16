@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use tauri::{AppHandle, Emitter};
+use crate::host::{AppHandle};
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{LPARAM, WPARAM};
 use windows::Win32::System::Registry::{
@@ -40,7 +40,6 @@ pub fn windows_light() -> bool {
     get_dword(PERSONALIZE, w!("AppsUseLightTheme")).unwrap_or(0) == 1
 }
 
-#[tauri::command]
 pub fn win_theme_get() -> bool {
     windows_light()
 }
@@ -69,7 +68,6 @@ fn abgr(rgb: u32) -> u32 {
 /// Applique a Windows le mode clair / sombre et / ou l'accent. `palette`
 /// contient 8 teintes `0xRRGGBB`, de la plus claire a la plus foncee ; la
 /// 4e est l'accent lui-meme (meme disposition que le registre).
-#[tauri::command(async)]
 pub fn win_theme_apply(light: Option<bool>, palette: Option<Vec<u32>>) {
     if let Some(l) = light {
         if windows_light() != l {

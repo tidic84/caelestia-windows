@@ -9,7 +9,7 @@ use std::time::{Duration, SystemTime};
 
 use serde::Serialize;
 use sysinfo::{ProcessesToUpdate, System};
-use tauri::{AppHandle, Emitter};
+use crate::host::{AppHandle};
 use windows::core::w;
 use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
 
@@ -173,7 +173,6 @@ pub struct WeState {
     pub current: String,
 }
 
-#[tauri::command(async)]
 pub fn we_state() -> WeState {
     match install_dir() {
         Some(i) => WeState {
@@ -185,7 +184,6 @@ pub fn we_state() -> WeState {
     }
 }
 
-#[tauri::command(async)]
 pub fn we_walls() -> Vec<WeWall> {
     let Some(install) = install_dir() else { return Vec::new() };
     let mut list: Vec<WeWall> = project_dirs(&install).iter().filter_map(|d| project(d)).collect();
@@ -193,7 +191,6 @@ pub fn we_walls() -> Vec<WeWall> {
     list
 }
 
-#[tauri::command(async)]
 pub fn we_set(path: String) -> bool {
     let Some(install) = install_dir() else { return false };
     // l'executable choisi dans les reglages de WE (32 bits par defaut)

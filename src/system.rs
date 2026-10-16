@@ -8,7 +8,7 @@ use std::sync::Mutex;
 
 use serde::Serialize;
 use sysinfo::{Disks, System};
-use tauri::{AppHandle, Emitter, Manager, State};
+use crate::host::{AppHandle, State};
 use windows::core::{HSTRING, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, LocalFree, HANDLE, HLOCAL};
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
@@ -46,7 +46,6 @@ pub struct Volume {
     muted: bool,
 }
 
-#[tauri::command(async)]
 pub fn volume_get() -> Volume {
     endpoint()
         .and_then(|ep| unsafe {
@@ -58,7 +57,6 @@ pub fn volume_get() -> Volume {
         .unwrap_or(Volume { level: 0.0, muted: false })
 }
 
-#[tauri::command(async)]
 pub fn volume_set(level: Option<f32>, muted: Option<bool>) {
     if let Ok(ep) = endpoint() {
         unsafe {
@@ -236,12 +234,10 @@ pub fn watch_clipboard(app: AppHandle) {
     });
 }
 
-#[tauri::command]
 pub fn clips_get(st: State<Clips>) -> Vec<ClipView> {
     clips_view(&st.0.lock().unwrap())
 }
 
-#[tauri::command(async)]
 pub fn clip_copy(st: State<'_, Clips>, id: u64) -> bool {
     let Some(c) = st.0.lock().unwrap().iter().find(|c| c.id == id).cloned() else { return false };
     let Ok(mut cb) = arboard::Clipboard::new() else { return false };
@@ -254,12 +250,10 @@ pub fn clip_copy(st: State<'_, Clips>, id: u64) -> bool {
     }
 }
 
-#[tauri::command]
 pub fn clip_text(text: String) -> bool {
     arboard::Clipboard::new().and_then(|mut c| c.set_text(text)).is_ok()
 }
 
-#[tauri::command]
 pub fn clips_clear(app: AppHandle, st: State<Clips>) {
     st.0.lock().unwrap().clear();
     let _ = app.emit("clips", Vec::<ClipView>::new());
@@ -271,7 +265,6 @@ static CAFFEINE: Mutex<Option<std::sync::mpsc::Sender<()>>> = Mutex::new(None);
 
 /// Empeche la mise en veille (et l'extinction de l'ecran) tant que c'est
 /// actif. L'etat d'execution est lie au thread : un thread le garde.
-#[tauri::command]
 pub fn caffeine_set(app: AppHandle, on: bool) -> bool {
     let mut cur = CAFFEINE.lock().unwrap();
     if on && cur.is_none() {
@@ -292,7 +285,6 @@ pub fn caffeine_set(app: AppHandle, on: bool) -> bool {
     state
 }
 
-#[tauri::command]
 pub fn caffeine_get() -> bool {
     CAFFEINE.lock().unwrap().is_some()
 }
@@ -338,7 +330,6 @@ fn reg_string(root: HKEY, key: &str, name: &str) -> Option<String> {
     Some(String::from_utf16_lossy(&buf[..n]))
 }
 
-#[tauri::command(async)]
 pub fn user_info() -> User {
     let mut buf = [0u16; 256];
     let mut len = buf.len() as u32;
@@ -380,7 +371,6 @@ pub fn watch_keys(app: AppHandle) {
 
 /// Ouvre une adresse dans le navigateur par defaut, ou un lien d'appli
 /// musicale (playlists favorites : spotify:, deezer://).
-#[tauri::command(async)]
 pub fn open_url(url: String) {
     const OK: &[&str] = &["https://", "http://", "spotify:", "deezer://"];
     if OK.iter().any(|p| url.starts_with(p)) {
@@ -389,7 +379,6 @@ pub fn open_url(url: String) {
 }
 
 /// GET HTTPS (meteo, calendriers iCal).
-#[tauri::command(async)]
 pub fn http_get(url: String) -> Result<String, String> {
     let url = url.replacen("webcal://", "https://", 1);
     if !url.starts_with("https://") {
@@ -406,7 +395,6 @@ pub fn http_get(url: String) -> Result<String, String> {
 
 // ------------------------------------------------------------------ session
 
-#[tauri::command(async)]
 pub fn session_action(action: String) {
     let shutdown = |args: &[&str]| {
         let _ = Command::new("shutdown")

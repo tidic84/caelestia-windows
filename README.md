@@ -80,57 +80,65 @@ il est détecté automatiquement (toutes les bibliothèques Steam sont parcourue
 
 ## Installation
 
-Pas encore de version publiée : il faut compiler (voir plus bas), puis lancer
-`target\release\ilot.exe`.
+Pas encore de version publiée : il faut compiler (voir plus bas). `install.ps1`
+compile, copie l'îlot dans `%LOCALAPPDATA%\Programs\Ilot` et l'ajoute au
+démarrage.
 
 ## Compiler
 
-Prérequis : Windows 10/11 avec WebView2 (déjà présent sur Windows 11), et
-[Rust](https://rustup.rs). Pas de Node ni de npm : l'interface est du HTML/CSS/JS
-statique dans `ui/`.
+Prérequis :
+- [Rust](https://rustup.rs) (1.89 ou plus) ;
+- Visual Studio Build Tools 2022 (MSVC, CMake, Ninja) ;
+- Qt 6.9 pour MSVC 2022, avec le module Qt Shader Tools (par exemple avec
+  `aqtinstall` : `aqt install-qt windows desktop 6.9.3 win64_msvc2022_64 -m qtshadertools`).
 
-```powershell
-cargo build --release
+```bat
+set QTDIR=C:\Qt\6.9.3\msvc2022_64
+qt\build.cmd
 ```
 
-Le projet compile avec Rust 1.89 : `.cargo/config.toml` demande à Cargo de
-choisir des versions de dépendances compatibles avec la toolchain installée.
+Le script compile le cœur Rust (`cargo build --release`), puis l'interface
+(CMake), et copie les DLL de Qt : `qt\build\ilot.exe` se lance tel quel.
 
-Pour travailler l'interface sans lancer l'application, servez le dossier `ui/` et
-ouvrez `preview.html`, qui simule le backend avec des données factices :
+`.cargo/config.toml` demande à Cargo de choisir des versions de dépendances
+compatibles avec la toolchain installée.
 
-```powershell
-cd ui; python -m http.server 8765   # puis http://localhost:8765/preview.html?tab=home
-```
-
-Onglets : `home`, `media`, `ctrl`, `apps`, `clips`, `walls`, `settings`. Autres paramètres :
-`peek=1` (état survolé), `act=osd|notif|bt|shot|caps` (activité), `q=>v` (texte du lanceur),
-`sheet=wifi|out|timer`, `day=1` (événements du jour), `light=1` (mode clair), `bar=0` (sans la barre).
+Options utiles pour travailler l'interface :
+- `ilot.exe --open <onglet>` ouvre le panneau au démarrage (`home`, `media`,
+  `ctrl`, `apps`, `mail`, `pc`, `tasks`, `clips`, `walls`, `settings`) ;
+- `ILOT_QT_LOG=<fichier>` écrit les messages de Qt et du QML dans un fichier ;
+- `ILOT_QT_SHOT=<fichier.png>` capture la fenêtre de l'îlot après
+  `ILOT_QT_SHOT_DELAY` ms (4000 par défaut), puis quitte si `ILOT_QT_SHOT_QUIT` est défini.
 
 `ilot.exe --check-all rapport.txt` écrit un diagnostic des modules système (audio, réseau,
 notifications, visualiseur, HTTP) sans lancer l'interface.
 
 ## Comment ça marche
 
-- **Tauri 2** : une fenêtre transparente, toujours au premier plan, de taille fixe.
-  Un thread Rust suit le curseur et ne rend la fenêtre cliquable que lorsqu'il
-  est au-dessus de la zone de l'îlot (signalée par l'interface).
-- **Média** : `GlobalSystemMediaTransportControls` (WinRT).
-- **Barre** : zone réservée via `SHAppBarMessage` (AppBar) ; bureaux virtuels lus dans le registre (`VirtualDesktopIDs`), changés par Ctrl+Win+←/→ faute d'API publique. Sur les autres écrans, une fenêtre `bar-*` par écran (`ui/bar.html`, `src/screens.rs`) reprend le thème de l'îlot via le `localStorage`. La barre des tâches Windows (principale et secondaires) est passée en masquage automatique puis cachée, et tout est rétabli en quittant l'îlot (si l'îlot plante, redémarrer l'Explorateur la fait revenir).
+- **Deux parties** : le cœur en Rust (`src/`, compilé en `ilot_core.dll`) parle
+  à Windows ; l'interface est en Qt Quick / QML (`qt/`). L'interface appelle les
+  commandes du cœur (`ilot_invoke`, sur un thread à part) et reçoit ses
+  événements ; les images (icônes, pochettes, fonds) passent par
+  `image://ilot/…` sans copie en base64.
+- **Fenêtre** : transparente, toujours au premier plan. Un masque de fenêtre
+  limite la souris aux zones de l'îlot et de la barre : ailleurs, les clics
+  passent aux fenêtres dessous.
+- **Média** : `GlobalSystemMediaTransportControls` (WinRT), suivi par événements.
+- **Barre** : zone réservée via `SHAppBarMessage` (AppBar) ; bureaux virtuels lus dans le registre (`VirtualDesktopIDs`), changés par Ctrl+Win+←/→ faute d'API publique. Sur les autres écrans, une fenêtre par écran (`qt/qml/Bar.qml`) partage l'état et le thème de l'îlot. La barre des tâches Windows (principale et secondaires) est passée en masquage automatique puis cachée, et tout est rétabli en quittant l'îlot (si l'îlot plante, redémarrer l'Explorateur la fait revenir).
 - **Volume** : Core Audio (`IAudioEndpointVolume`).
 - **Apps** : dossier virtuel `shell:AppsFolder`, icônes via `IShellItemImageFactory`.
 - **Wallpaper Engine** : lecture de `config.json` et des `project.json`, application via sa ligne de commande.
 - **Fonds** : `IDesktopWallpaper`, miniatures mises en cache dans `%LOCALAPPDATA%\Ilot\thumbs`.
 - **Couleurs** : [material-color-utilities](https://github.com/material-foundation/material-color-utilities),
-  schéma *Tonal Spot* sombre ; les couleurs CSS sont des propriétés enregistrées
-  (`@property`), donc la palette s'anime lors d'un changement.
+  schéma *Tonal Spot* sombre par défaut, calculé à partir du fond d'écran ; la
+  palette s'anime lors d'un changement.
 
 ## Composants tiers
 
-Inclus dans `ui/vendor/` :
-- material-color-utilities — Apache 2.0, © Google
-- Material Symbols Rounded (sous-ensemble) — Apache 2.0, © Google
-- Rubik — SIL Open Font License 1.1
+- Qt 6 (Qt Quick, Qt Quick Shapes, Qt Quick Effects) — LGPL v3, © The Qt Company
+- material-color-utilities (`qt/qml/mcu.mjs`) — Apache 2.0, © Google
+- Material Symbols Rounded (sous-ensemble, `qt/fonts`) — Apache 2.0, © Google
+- Rubik (`qt/fonts`) — SIL Open Font License 1.1
 
 ## Licence
 

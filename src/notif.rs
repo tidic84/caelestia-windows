@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use crate::host::{AppHandle, State};
 
 /// Ecart entre l'epoque FILETIME (1601) et l'epoque Unix, en 100 ns.
 const EPOCH_DIFF: i64 = 116_444_736_000_000_000;
@@ -183,14 +183,12 @@ pub fn watch(app: AppHandle) {
     });
 }
 
-#[tauri::command]
 pub fn notifs_get(st: State<Notifs>) -> Vec<Notif> {
     st.0.lock().unwrap().clone()
 }
 
 /// Masque une notification (ou toutes avec `id = None`) dans l'ilot. La
 /// base de Windows n'est jamais modifiee.
-#[tauri::command]
 pub fn notifs_dismiss(app: AppHandle, id: Option<i64>) {
     let list = {
         let st = app.state::<Notifs>();
@@ -211,7 +209,6 @@ pub fn notifs_dismiss(app: AppHandle, id: Option<i64>) {
     let _ = app.emit("notifs", &list);
 }
 
-#[tauri::command(async)]
 pub fn notif_open(app_id: String) {
     use std::os::windows::process::CommandExt;
     let _ = std::process::Command::new("explorer.exe")

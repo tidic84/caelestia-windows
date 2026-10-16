@@ -10,7 +10,7 @@ use std::time::Instant;
 
 use serde::Serialize;
 use sysinfo::{Networks, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
-use tauri::State;
+use crate::host::State;
 use windows::core::HSTRING;
 use windows::Win32::NetworkManagement::IpHelper::{GetExtendedTcpTable, TCP_TABLE_OWNER_PID_ALL};
 use windows::Win32::Networking::WinSock::{AF_INET, AF_INET6};
@@ -115,7 +115,6 @@ pub(crate) fn icons_for(paths: Vec<PathBuf>) -> Vec<(PathBuf, String)> {
     .unwrap_or_default()
 }
 
-#[tauri::command(async)]
 pub fn tasks_get(st: State<Tasks>) -> TasksReport {
     let mut guard = st.sys.lock().unwrap();
     let sys = guard.get_or_insert_with(System::new);
@@ -189,7 +188,6 @@ pub fn tasks_get(st: State<Tasks>) -> TasksReport {
 }
 
 /// Fin de tache pour tous les processus de ce nom ; renvoie combien ont ete arretes.
-#[tauri::command(async)]
 pub fn task_kill(st: State<Tasks>, name: String) -> usize {
     let key = name.to_lowercase();
     if PROTECTED.contains(&key.as_str()) {
@@ -206,7 +204,6 @@ pub fn task_kill(st: State<Tasks>, name: String) -> usize {
 }
 
 /// Ouvre le vrai Gestionnaire des taches de Windows.
-#[tauri::command]
 pub fn taskmgr_open() {
     let _ = Command::new("cmd").args(["/c", "start", "", "taskmgr.exe"]).creation_flags(CREATE_NO_WINDOW).spawn();
 }

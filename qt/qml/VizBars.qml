@@ -1,18 +1,26 @@
 import QtQuick
 
-// Barres du visualiseur (24 bandes)
-Row {
-    id: bars
-    readonly property real gap: width / 24 * 0.28
-    spacing: gap
+// Visualiseur : 24 barres arrondies en haut (paintBars d'app.js)
+Item {
+    id: v
+    // ne suit le son que s'il se voit
+    property bool active: true
+    readonly property int n: 24
+    readonly property real gap: width / n * 0.28
+    readonly property real bw: width / n - gap
+
     Repeater {
-        model: 24
+        model: v.n
         Rectangle {
             required property int index
-            width: (bars.width - 23 * bars.gap) / 24
-            height: Math.max(2, bars.height * (viz.live ? viz.bands[index] || 0 : 0))
-            anchors.bottom: parent.bottom
-            radius: Math.min(width / 2, 3)
+            readonly property real level: v.active ? (Ilot.shown[index] || 0) : 0
+            x: index * (v.bw + v.gap) + v.gap / 2
+            width: v.bw
+            height: Math.max(v.bw * 0.6, level * v.height)
+            y: v.height - height
+            visible: v.active && Ilot.live
+            topLeftRadius: Math.min(v.bw / 2, height / 2)
+            topRightRadius: topLeftRadius
             color: Theme.primary
         }
     }

@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, Manager, State};
+use crate::host::{AppHandle, State};
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::System::Pipes::PeekNamedPipe;
 
@@ -427,13 +427,11 @@ pub fn start(app: AppHandle) {
 
 // --------------------------------------------------------------- commandes
 
-#[tauri::command]
 pub fn discord_get(st: State<Discord>) -> DiscordState {
     st.state.lock().unwrap().clone()
 }
 
 /// Enregistre l'application Discord (Client ID + Secret).
-#[tauri::command]
 pub fn discord_setup(st: State<Discord>, client_id: String, secret: String) -> Result<(), String> {
     let client_id = client_id.trim().to_string();
     let secret = secret.trim().to_string();
@@ -449,14 +447,12 @@ pub fn discord_setup(st: State<Discord>, client_id: String, secret: String) -> R
     Ok(())
 }
 
-#[tauri::command]
 pub fn discord_forget(st: State<Discord>) {
     let _ = std::fs::remove_file(crate::store::data_dir().join("discord.json"));
     st.queue.lock().unwrap().push_back(("reset".into(), Value::Null));
 }
 
 /// Son micro / casque (dans Discord).
-#[tauri::command]
 pub fn discord_self(st: State<Discord>, mute: Option<bool>, deaf: Option<bool>) {
     let mut args = json!({});
     if let Some(m) = mute {
@@ -470,7 +466,6 @@ pub fn discord_self(st: State<Discord>, mute: Option<bool>, deaf: Option<bool>) 
 
 /// Volume du micro dans Discord (0-100) : Discord ignore le volume
 /// « utilisateur » applique a soi-meme, d'ou ce reglage pour sa propre ligne.
-#[tauri::command]
 pub fn discord_mic(st: State<Discord>, volume: f64) {
     let v = volume.clamp(0.0, 100.0);
     st.state.lock().unwrap().mic_volume = v;
@@ -478,7 +473,6 @@ pub fn discord_mic(st: State<Discord>, volume: f64) {
 }
 
 /// Volume (0-200) ou sourdine locale d'une personne.
-#[tauri::command]
 pub fn discord_user(st: State<Discord>, user_id: String, volume: Option<f64>, mute: Option<bool>) {
     {
         let mut s = st.state.lock().unwrap();

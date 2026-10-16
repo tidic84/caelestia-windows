@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
+use crate::host::{AppHandle, State};
 use windows::core::{w, PCWSTR};
 use windows::Win32::System::Registry::{
     RegDeleteKeyValueW, RegGetValueW, RegSetKeyValueW, HKEY_CURRENT_USER, REG_SZ, RRF_RT_REG_SZ,
@@ -168,19 +168,15 @@ fn label(name: &str, i: usize) -> String {
 }
 
 /// Ecran choisi s'il est branche, sinon l'ecran principal.
-pub fn target_monitor(win: &WebviewWindow) -> Option<tauri::Monitor> {
-    let wanted = win.state::<Settings>().0.lock().unwrap().monitor.clone();
+pub fn target_screen(app: &AppHandle) -> Option<crate::Screen> {
+    let wanted = app.state::<Settings>().0.lock().unwrap().monitor.clone();
+    let list = crate::screens();
     if let Some(name) = wanted {
-        let found = win
-            .available_monitors()
-            .ok()?
-            .into_iter()
-            .find(|m| m.name().is_some_and(|n| *n == name));
-        if found.is_some() {
-            return found;
+        if let Some(s) = list.iter().find(|s| s.name == name) {
+            return Some(s.clone());
         }
     }
-    win.primary_monitor().ok().flatten()
+    list.into_iter().find(|s| s.primary)
 }
 
 // -------------------------------------------------------------- commandes
@@ -193,23 +189,16 @@ pub struct SettingsView {
     cfg: Config,
 }
 
-#[tauri::command]
-pub fn settings_get(win: WebviewWindow, st: State<Settings>) -> SettingsView {
-    let primary = win.primary_monitor().ok().flatten().and_then(|m| m.name().cloned());
-    let mut monitors: Vec<Monitor> = win
-        .available_monitors()
-        .unwrap_or_default()
-        .iter()
+pub fn settings_get(st: State<Settings>) -> SettingsView {
+    let mut monitors: Vec<Monitor> = crate::screens()
+        .into_iter()
         .enumerate()
-        .map(|(i, m)| {
-            let id = m.name().cloned().unwrap_or_default();
-            Monitor {
-                label: label(&id, i),
-                width: m.size().width,
-                height: m.size().height,
-                primary: primary.as_ref() == Some(&id),
-                id,
-            }
+        .map(|(i, m)| Monitor {
+            label: label(&m.name, i),
+            width: m.width as u32,
+            height: m.height as u32,
+            primary: m.primary,
+            id: m.name,
         })
         .collect();
     monitors.sort_by(|a, b| a.label.cmp(&b.label));
@@ -220,22 +209,21 @@ pub fn settings_get(win: WebviewWindow, st: State<Settings>) -> SettingsView {
     }
 }
 
-#[tauri::command]
 pub fn settings_autostart(on: bool) -> bool {
     set_autostart(on);
     autostart_on()
 }
 
-#[tauri::command]
-pub fn settings_monitor(win: WebviewWindow, st: State<Settings>, id: Option<String>) {
+pub fn settings_monitor(app: AppHandle, st: State<Settings>, id: Option<String>) {
     let cfg = {
         let mut cfg = st.0.lock().unwrap();
         cfg.monitor = id;
         cfg.clone()
     };
-    save(win.app_handle(), &cfg);
-    crate::place(&win);
-    crate::bar::sync(win.app_handle());
+    save(&app, &cfg);
+    // l'interface replace ses fenetres
+    let _ = app.emit("@place", ());
+    crate::bar::sync(&app);
 }
 
 /// Modifie la config, l'enregistre et previent l'interface (`settings`).
@@ -254,7 +242,6 @@ pub fn update(app: &AppHandle, f: impl FnOnce(&mut Config)) -> Config {
 }
 
 /// Fusionne `patch` (un objet JSON partiel) dans la config.
-#[tauri::command]
 pub fn settings_set(app: AppHandle, patch: serde_json::Value) -> Config {
     let cfg = update(&app, |cfg| {
         let mut v = serde_json::to_value(&*cfg).unwrap_or_default();
@@ -270,9 +257,7 @@ pub fn settings_set(app: AppHandle, patch: serde_json::Value) -> Config {
         }
     });
     if ["bar", "hide_taskbar", "bar_autohide"].iter().any(|k| patch.get(k).is_some()) {
-        if let Some(win) = app.get_webview_window("island") {
-            crate::place(&win);
-        }
+        let _ = app.emit("@place", ());
         crate::bar::sync(&app);
     }
     if patch.get("win_key").is_some() {

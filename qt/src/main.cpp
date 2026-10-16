@@ -1,61 +1,71 @@
-// Prototype de l'ilot en Qt Quick / QML : meme fenetre transparente en haut
-// de l'ecran, pilule, panneau (Accueil, Media), lecteur GSMTC, jauges et
-// visualiseur, pour comparer la consommation avec la version Tauri.
+#include "backend.h"
+#include "core.h"
+#include "shell.h"
 
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFontDatabase>
 #include <QGuiApplication>
-#include <QQmlApplicationEngine>
-#include <QQmlContext>
+#include <QQmlEngine>
 #include <QQuickWindow>
-#include <QTimer>
 
-#include "island.h"
-#include "media.h"
-#include "sysmon.h"
-#include "viz.h"
+#include <windows.h>
 
-// `ILOT_QT_LOG=<fichier>` : messages Qt et QML dans un fichier (l'appli n'a
-// pas de console)
-static void logToFile(QtMsgType, const QMessageLogContext &, const QString &msg)
+// ILOT_QT_LOG=<fichier> : messages Qt / QML (l'appli n'a pas de console)
+static QFile *s_log = nullptr;
+static void toFile(QtMsgType, const QMessageLogContext &, const QString &msg)
 {
-    static FILE *f = _wfopen(qEnvironmentVariable("ILOT_QT_LOG").toStdWString().c_str(), L"a");
-    if (f && !msg.startsWith(QLatin1String("DirectWrite"))) {
-        fprintf(f, "%s\n", msg.toUtf8().constData());
-        fflush(f);
-    }
+    if (!s_log)
+        return;
+    s_log->write((QDateTime::currentDateTime().toString("hh:mm:ss.zzz ") + msg + "\n").toUtf8());
+    s_log->flush();
 }
 
 int main(int argc, char *argv[])
 {
-    if (qEnvironmentVariableIsSet("ILOT_QT_LOG"))
-        qInstallMessageHandler(logToFile);
+    // diagnostics en ligne de commande (`--check-all`...), sans interface
+    int code = ilot_cli();
+    if (code >= 0)
+        return code;
+
+    // « Recharger » : l'ancien processus doit d'abord avoir quitte
+    for (int i = 1; i + 1 < argc; ++i) {
+        if (!strcmp(argv[i], "--restart-of")) {
+            if (HANDLE p = OpenProcess(SYNCHRONIZE, FALSE, DWORD(atoi(argv[i + 1])))) {
+                WaitForSingleObject(p, 10000);
+                CloseHandle(p);
+            }
+        }
+    }
+    // une seule instance : deux hooks clavier se disputeraient la touche
+    // Windows (l'un verrait l'appui, l'autre le relachement)
+    HANDLE single = CreateMutexW(nullptr, TRUE, L"Local\\io.github.tidic84.ilot");
+    if (GetLastError() == ERROR_ALREADY_EXISTS)
+        return 0;
+
+    QString logFile = qEnvironmentVariable("ILOT_QT_LOG");
+    if (!logFile.isEmpty()) {
+        s_log = new QFile(logFile);
+        if (s_log->open(QIODevice::WriteOnly | QIODevice::Truncate))
+            qInstallMessageHandler(toFile);
+    }
+
     QGuiApplication app(argc, argv);
-    app.setApplicationName(QStringLiteral("Ilot (Qt)"));
-    // les mises en page se font en pixels logiques, comme en CSS
-    QQuickWindow::setDefaultAlphaBuffer(true);
+    app.setQuitOnLastWindowClosed(false);
+    app.setApplicationName(QStringLiteral("Ilot"));
 
-    Island island;
-    Media media;
-    SysMon sys;
-    Viz viz(app.arguments().contains(QStringLiteral("--sim-viz")));
+    // Rubik (texte) et Material Symbols Rounded (icones), comme l'interface web
+    for (const QString &f : QDir(QStringLiteral(":/fonts")).entryList({QStringLiteral("*.ttf")}))
+        QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/") + f);
 
-    QQmlApplicationEngine engine;
-    engine.addImageProvider(QStringLiteral("art"), new ArtProvider(&media));
-    QQmlContext *ctx = engine.rootContext();
-    ctx->setContextProperty(QStringLiteral("island"), &island);
-    ctx->setContextProperty(QStringLiteral("media"), &media);
-    ctx->setContextProperty(QStringLiteral("sys"), &sys);
-    ctx->setContextProperty(QStringLiteral("viz"), &viz);
-    ctx->setContextProperty(QStringLiteral("startOpen"), app.arguments().contains(QStringLiteral("--open")));
-    QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
-                     Qt::QueuedConnection);
-    engine.loadFromModule("Ilot", "Main");
-    if (engine.rootObjects().isEmpty())
+    Backend backend;
+    qmlRegisterSingletonInstance("IlotCore", 1, 0, "Backend", &backend);
+
+    Shell shell;
+    if (!shell.start())
         return 1;
-    auto *win = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
-    island.attach(win);
-    // `ILOT_QT_SHOT=<fichier.png>` : capture de la fenetre apres 4 s (une
-    // capture d'ecran GDI ne voit pas les fenetres DirectComposition a jour)
-    if (qEnvironmentVariableIsSet("ILOT_QT_SHOT"))
-        QTimer::singleShot(4000, win, [win] { win->grabWindow().save(qEnvironmentVariable("ILOT_QT_SHOT")); });
-    return app.exec();
+    int r = app.exec();
+    CloseHandle(single);
+    return r;
 }

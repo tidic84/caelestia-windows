@@ -54,8 +54,8 @@ pub static WINDOWS: Wake = Wake::new();
 
 unsafe extern "system" fn on_event(
     _hook: HWINEVENTHOOK,
-    _event: u32,
-    _hwnd: HWND,
+    event: u32,
+    hwnd: HWND,
     object: i32,
     child: i32,
     _thread: u32,
@@ -63,6 +63,9 @@ unsafe extern "system" fn on_event(
 ) {
     // la fenetre elle-meme, pas un de ses elements (curseur texte, barre de defilement...)
     if object == OBJID_WINDOW.0 && child == CHILDID_SELF as i32 {
+        if event == EVENT_SYSTEM_FOREGROUND {
+            crate::note_foreground(hwnd);
+        }
         WINDOWS.notify();
     }
 }

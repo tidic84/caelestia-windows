@@ -1,14 +1,11 @@
-//! Images servies a l'interface par le protocole `ilot` (icones, pochettes,
-//! fonds, apercus) au lieu de data URL : une data URL en base64 reste en
-//! memoire dans le tas JS, dans le DOM et dans chaque message IPC, alors
-//! qu'une URL laisse WebView2 decoder et mettre en cache l'image une fois.
+//! Images servies a l'interface par `image://ilot/<cle>.<ext>` (icones,
+//! pochettes, fonds, apercus) : les evenements ne portent qu'une URL, et Qt
+//! decode et met en cache l'image une fois (voir `ilot_image`).
 
 use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::Mutex;
-
-use tauri::http::{Response, StatusCode};
 
 enum Src {
     Bytes(Vec<u8>),
@@ -33,9 +30,9 @@ fn key<T: Hash + ?Sized>(v: &T) -> u64 {
     h.finish()
 }
 
-/// WebView2 sert les protocoles personnalises sous `http://<nom>.localhost`
+/// URL lue par le fournisseur d'images de Qt (qt/src/backend.cpp)
 fn url_of(k: u64, mime: &str) -> String {
-    format!("http://ilot.localhost/{k:016x}.{}", ext_of(mime))
+    format!("image://ilot/{k:016x}.{}", ext_of(mime))
 }
 
 /// Garde l'image et renvoie son URL (meme contenu : meme URL).
@@ -107,18 +104,9 @@ pub fn bytes(url: &str) -> Option<Vec<u8>> {
     find(u64::from_str_radix(name.split('.').next()?, 16).ok()?).map(|f| f.1)
 }
 
-/// Reponse du protocole `ilot` : `/<cle>.<ext>`
-pub fn serve(path: &str) -> Response<Vec<u8>> {
-    let name = path.trim_start_matches('/');
+/// Contenu d'une image d'apres son identifiant : `<cle>.<ext>`
+pub fn lookup(id: &str) -> Option<Vec<u8>> {
+    let name = id.rsplit('/').next()?;
     let hex = name.split('.').next().unwrap_or(name);
-    match u64::from_str_radix(hex, 16).ok().and_then(find) {
-        Some((mime, body)) => Response::builder()
-            .header("Content-Type", mime)
-            .header("Cache-Control", "max-age=31536000, immutable")
-            // les pochettes et fonds servent a calculer le theme (canvas)
-            .header("Access-Control-Allow-Origin", "*")
-            .body(body)
-            .unwrap(),
-        None => Response::builder().status(StatusCode::NOT_FOUND).body(Vec::new()).unwrap(),
-    }
+    find(u64::from_str_radix(hex, 16).ok()?).map(|f| f.1)
 }

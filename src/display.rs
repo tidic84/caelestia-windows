@@ -5,7 +5,7 @@ use std::mem::ManuallyDrop;
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, WebviewWindow};
+use crate::host::{AppHandle, WebviewWindow};
 use windows::core::{w, BSTR};
 use windows::Win32::Devices::Display::{
     DestroyPhysicalMonitors, GetMonitorBrightness, GetNumberOfPhysicalMonitorsFromHMONITOR,
@@ -160,7 +160,6 @@ pub struct Brightness {
     source: &'static str,
 }
 
-#[tauri::command(async)]
 pub fn brightness_get(win: WebviewWindow) -> Option<Brightness> {
     crate::com_init_mta();
     if let Some(v) = wmi().ok().and_then(|s| wmi_get(&s)) {
@@ -169,7 +168,6 @@ pub fn brightness_get(win: WebviewWindow) -> Option<Brightness> {
     ddc_get(&win).map(|level| Brightness { level, source: "ddc" })
 }
 
-#[tauri::command(async)]
 pub fn brightness_set(win: WebviewWindow, level: f32) -> bool {
     crate::com_init_mta();
     let level = level.clamp(0.0, 1.0);

@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State};
+use crate::host::{AppHandle, State};
 use windows::Win32::Foundation::{LocalFree, HLOCAL};
 use windows::Win32::Security::Cryptography::{
     CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
@@ -315,18 +315,15 @@ pub fn watch(app: AppHandle) {
 
 // ---------------------------------------------------------------- commandes
 
-#[tauri::command]
 pub fn mail_get(st: State<MailState>) -> Inbox {
     st.0.lock().unwrap().clone()
 }
 
-#[tauri::command(async)]
 pub fn mail_refresh(app: AppHandle) -> Inbox {
     refresh(&app)
 }
 
 /// Teste la connexion puis enregistre le compte (remplace s'il existe deja).
-#[tauri::command(async)]
 pub fn mail_add(app: AppHandle, email: String, pass: String, host: Option<String>) -> Result<Inbox, String> {
     let email = email.trim().to_string();
     // Google affiche les mots de passe d'application par groupes de 4 avec des espaces
@@ -366,7 +363,6 @@ pub fn mail_add(app: AppHandle, email: String, pass: String, host: Option<String
     Ok(refresh(&app))
 }
 
-#[tauri::command(async)]
 pub fn mail_remove(app: AppHandle, email: String) -> Inbox {
     let mut list = load_accounts();
     list.retain(|a| a.email != email);
@@ -388,7 +384,6 @@ fn find_part<'a>(m: &'a mailparse::ParsedMail<'a>, mime: &str) -> Option<&'a mai
 }
 
 /// Contenu d'un message ; le lire le marque comme lu sur le serveur.
-#[tauri::command(async)]
 pub fn mail_read(app: AppHandle, account: String, uid: u32) -> Result<Body, String> {
     let acc = load_accounts().into_iter().find(|a| a.email == account).ok_or("compte inconnu")?;
     let mut s = connect(&acc)?;

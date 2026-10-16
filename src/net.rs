@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use crate::host::{AppHandle};
 use windows::core::{GUID, HSTRING, PCWSTR};
 use windows::Devices::Bluetooth::{BluetoothConnectionStatus, BluetoothDevice, BluetoothLEDevice};
 use windows::Devices::Enumeration::DeviceInformation;
@@ -34,13 +34,11 @@ pub struct Radios {
     bluetooth: Option<bool>,
 }
 
-#[tauri::command(async)]
 pub fn radios_get() -> Radios {
     let on = |k| radio(k).and_then(|r| r.State().ok()).map(|s| s == RadioState::On);
     Radios { wifi: on(RadioKind::WiFi), bluetooth: on(RadioKind::Bluetooth) }
 }
 
-#[tauri::command(async)]
 pub fn radio_set(kind: String, on: bool) -> bool {
     let k = if kind == "wifi" { RadioKind::WiFi } else { RadioKind::Bluetooth };
     let Some(r) = radio(k) else { return false };
@@ -122,7 +120,6 @@ pub struct Network {
     known: bool,
 }
 
-#[tauri::command(async)]
 pub fn wifi_list(scan: bool) -> Vec<Network> {
     let Some(w) = Wlan::open() else { return Vec::new() };
     if scan {
@@ -162,7 +159,6 @@ fn xml_escape(s: &str) -> String {
 
 /// Se connecte a `ssid`. Pour un reseau inconnu, cree le profil (avec le
 /// mot de passe s'il est protege). Renvoie un message d'erreur, ou rien.
-#[tauri::command(async)]
 pub fn wifi_connect(ssid_name: String, password: Option<String>) -> Result<(), String> {
     let w = Wlan::open().ok_or("Pas de carte Wi-Fi")?;
     let nets = w.networks();
@@ -223,7 +219,6 @@ pub fn wifi_connect(ssid_name: String, password: Option<String>) -> Result<(), S
     }
 }
 
-#[tauri::command(async)]
 pub fn wifi_disconnect() {
     if let Some(w) = Wlan::open() {
         unsafe { WlanDisconnect(w.h, &w.guid, None) };
@@ -298,7 +293,6 @@ pub fn watch(app: AppHandle) {
     });
 }
 
-#[tauri::command(async)]
 pub fn net_get() -> NetState {
     crate::com_init_mta();
     let radios = radios_get();

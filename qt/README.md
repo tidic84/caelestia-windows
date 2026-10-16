@@ -1,56 +1,42 @@
-# Prototype Qt Quick / QML de l'îlot
+# Interface Qt Quick / QML de l'îlot
 
-Ce prototype sert à **mesurer** ce que coûterait l'îlot réécrit en Qt 6 / QML,
-face à la version Tauri + WebView2. Ce n'est pas un remplaçant : il ne
-reprend qu'une partie de l'interface.
+L'îlot complet : pilule (repliée, survol, activités), panneau et ses dix
+onglets, barre façon Waybar sur l'écran de l'îlot et sur les autres écrans,
+info-bulles, icône de la zone de notification, Ctrl+Alt+Espace. Tout ce qui
+parle à Windows reste dans le cœur Rust (`../src`, `ilot_core.dll`).
 
-## Ce qu'il reprend
+## Organisation
 
-- Fenêtre transparente, sans bordure, toujours au-dessus, en haut de l'écran
-  principal. Seule la zone de l'îlot reçoit la souris : un masque de fenêtre
-  remplace le suivi du curseur toutes les 25 ms (`track_cursor`).
-- Masquage quand une appli passe en plein écran (même règle que
-  `fullscreen_foreground`).
-- La pilule repliée (heure, pochette qui tourne, égaliseur), son survol
-  (titre, artiste, progression) et ses coins concaves.
-- Le panneau déplié :
-  - onglet **Accueil** : horloge, calendrier, jauges CPU / RAM / C:, lecteur
-    avec disque qui tourne et visualiseur ;
-  - onglet **Média** : pochette floutée en fond (`MultiEffect`), grande
-    pochette, progression, visualiseur.
-- Les backends :
-  - lecteur GSMTC en C++/WinRT, piloté par événements comme `media.rs` ;
-  - CPU, RAM et disque relevés toutes les 2 s ;
-  - visualiseur en capture WASAPI loopback (FFT, 24 bandes, ~30 trames/s), le
-    même calcul que `audio.rs`.
+- `src/` (C++)
+  - `core.h` : fonctions du cœur Rust (`ilot_invoke`, `ilot_start`...) ;
+  - `backend.*` : commandes sur un thread à part, événements, images
+    `image://ilot/...`, pixels pour la couleur du thème ;
+  - `winctl.*` (type QML `WinCtl`) : zones cliquables (masque de la fenêtre),
+    bande du haut de l'écran, plein écran, clavier ;
+  - `shell.*` : fenêtres (îlot, barres des autres écrans), placement,
+    réservation du haut de l'écran, zone de notification, raccourci.
+- `qml/`
+  - singletons : `Theme` (palette Material You, polices, courbes), `Api`
+    (`invoke` et `listen`, comme Tauri), `Ilot` (état et logique communs,
+    ce que faisait `app.js`) ;
+  - fenêtres : `Main` (îlot), `Bar` (autres écrans), `TipWindow` ;
+  - îlot : `Island`, `Pill`, `Panel` et une page par onglet (`HomePage`,
+    `MediaPage`, `CtrlPage`, `AppsPage`, `MailPage`, `PcPage`, `TasksPage`,
+    `ClipsPage`, `WallsPage`, `SettingsPage`) ;
+  - modules JavaScript repris de l'interface web : `mcu.mjs`
+    (material-color-utilities), `calc.mjs`, `emoji.mjs`, `ical.mjs`.
+- `shaders/round.frag` : images aux coins arrondis, sans calque.
+- `fonts/` : Rubik (graisses 300 à 700) et Material Symbols Rounded, les
+  mêmes polices que l'interface web, converties de WOFF2 en TTF (fontTools :
+  instances statiques des polices variables ; sous-ensembles latin et
+  latin étendu de Rubik fusionnés).
 
-Le reste n'y est pas : lanceur, barre, notifications, presse-papiers, fonds,
-Material You, réglages, mail, etc.
+## Différences avec l'interface web
 
-## Compiler
+- Le corps d'un mail est affiché en texte riche Qt : pas d'images distantes ni
+  de mise en page CSS avancée.
+- La couleur source du thème est calculée sur la miniature du fond réduite à
+  128 px (la quantification en JavaScript est bien plus lente que dans un
+  navigateur) : la teinte est la même, la nuance peut légèrement varier.
 
-Il faut Qt 6.5 ou plus (testé avec 6.9.3 `msvc2022_64`, installé avec
-`aqtinstall`) et Visual Studio Build Tools 2022, qui fournit MSVC, CMake et
-Ninja.
-
-```bat
-set QTDIR=C:\Qt\6.9.3\msvc2022_64
-qt\build.cmd
-```
-
-Le script lance `windeployqt`, si bien que `qt\build` contient un exécutable
-autonome avec ses DLL Qt.
-
-## Options
-
-| Option / variable | Effet |
-|---|---|
-| `--open` | ouvre le panneau au démarrage |
-| `--sim-viz` | visualiseur alimenté par des bandes aléatoires à 30 i/s au lieu du son (mesures sans musique) |
-| `ILOT_QT_LOG=<fichier>` | messages Qt / QML dans un fichier (l'appli n'a pas de console) |
-| `ILOT_QT_SHOT=<fichier.png>` | capture de la fenêtre après 4 s (une capture d'écran GDI ne voit pas cette fenêtre à jour) |
-
-## Mesures
-
-Les résultats comparés aux deux versions Tauri sont dans
-`docs/perf-ilot.md`, sur la branche `perf-ilot`.
+Compilation : voir le README à la racine.

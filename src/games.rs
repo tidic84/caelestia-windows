@@ -8,7 +8,7 @@ use std::process::Command;
 use std::sync::Mutex;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use crate::host::{AppHandle, State};
 use windows::core::{Interface, GUID, HSTRING};
 use windows::Win32::System::Com::{
     CoCreateInstance, CoTaskMemFree, IPersistFile, CLSCTX_INPROC_SERVER, STGM_READ,
@@ -339,17 +339,14 @@ pub fn load(app: AppHandle) {
     });
 }
 
-#[tauri::command]
 pub fn games_get(st: State<Games>) -> Vec<Game> {
     st.0.lock().unwrap().clone()
 }
 
-#[tauri::command]
 pub fn games_refresh(app: AppHandle) {
     load(app);
 }
 
-#[tauri::command(async)]
 pub fn game_launch(st: State<Games>, id: String) -> bool {
     let Some(g) = st.0.lock().unwrap().iter().find(|g| g.id == id).cloned() else {
         return false;
@@ -362,7 +359,6 @@ pub fn game_launch(st: State<Games>, id: String) -> bool {
     r.is_ok()
 }
 
-#[tauri::command(async)]
 pub fn game_folder(st: State<Games>, id: String) -> bool {
     let dir = st.0.lock().unwrap().iter().find(|g| g.id == id).map(|g| g.dir.clone());
     dir.is_some_and(|d| open_dir(&d))
@@ -469,7 +465,6 @@ fn locate(st: &Games, id: &str, name: &str) -> bool {
     false
 }
 
-#[tauri::command(async)]
 pub fn app_folder(app: AppHandle, id: String, name: String) -> bool {
     // thread dedie en STA pour les objets COM du shell
     std::thread::spawn(move || {
@@ -483,7 +478,6 @@ pub fn app_folder(app: AppHandle, id: String, name: String) -> bool {
 // ------------------------------------------- dossiers d'apps : emplacement reel
 
 /// Ouvre un dossier dans l'Explorateur.
-#[tauri::command(async)]
 pub fn folder_open(path: String) -> bool {
     open_dir(Path::new(&path))
 }
@@ -497,7 +491,6 @@ pub struct FileInfo {
 }
 
 /// Nom et icone d'un fichier ou dossier depose dans l'ilot (None s'il n'existe plus).
-#[tauri::command(async)]
 pub fn file_info(path: String) -> Option<FileInfo> {
     let p = PathBuf::from(&path);
     if !p.exists() {
@@ -519,13 +512,11 @@ pub fn file_info(path: String) -> Option<FileInfo> {
 }
 
 /// Ouvre un fichier (programme, raccourci, document) ou un dossier.
-#[tauri::command(async)]
 pub fn file_open(path: String) -> bool {
     Path::new(&path).exists() && Command::new("explorer.exe").arg(&path).spawn().is_ok()
 }
 
 /// Boite « Choisir un dossier » de Windows ; renvoie le chemin choisi.
-#[tauri::command(async)]
 pub fn pick_folder(app: AppHandle, title: Option<String>) -> Option<String> {
     use windows::Win32::UI::Shell::{FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH};
     let owner = app.get_webview_window("island").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize);

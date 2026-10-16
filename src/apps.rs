@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use crate::host::{AppHandle, State};
 use windows::core::Interface;
 use windows::Win32::Foundation::{PROPERTYKEY, SIZE};
 use windows::Win32::UI::Shell::IShellItem2;
@@ -255,17 +255,14 @@ pub fn load(app: AppHandle) {
     });
 }
 
-#[tauri::command]
 pub fn apps_get(st: State<Apps>) -> Vec<App> {
     st.0.lock().unwrap().clone()
 }
 
-#[tauri::command]
 pub fn apps_refresh(app: AppHandle) {
     load(app);
 }
 
-#[tauri::command(async)]
 pub fn app_launch(id: String) {
     let _ = Command::new("explorer.exe")
         .arg(format!("shell:AppsFolder\\{id}"))

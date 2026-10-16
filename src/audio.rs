@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use crate::host::{AppHandle};
 use windows::core::{Interface, PCWSTR};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 use windows::Win32::Media::Audio::{
@@ -106,7 +106,6 @@ pub struct Device {
     default: bool,
 }
 
-#[tauri::command(async)]
 pub fn audio_devices() -> Vec<Device> {
     crate::com_init_mta();
     let mut out = Vec::new();
@@ -163,7 +162,6 @@ mod policy {
     }
 }
 
-#[tauri::command(async)]
 pub fn audio_set_default(id: String) -> bool {
     crate::com_init_mta();
     let wide: Vec<u16> = id.encode_utf16().chain([0]).collect();
@@ -203,7 +201,6 @@ fn sessions() -> windows::core::Result<Vec<(u32, bool, ISimpleAudioVolume)>> {
     Ok(out)
 }
 
-#[tauri::command(async)]
 pub fn mixer_get() -> Vec<AppVolume> {
     // les icones passent par le shell : thread STA dedie
     std::thread::spawn(|| {
@@ -248,7 +245,6 @@ pub fn mixer_get() -> Vec<AppVolume> {
     .unwrap_or_default()
 }
 
-#[tauri::command(async)]
 pub fn mixer_set(pids: Vec<u32>, level: Option<f32>, muted: Option<bool>) {
     crate::com_init_mta();
     let Ok(list) = sessions() else { return };
@@ -327,7 +323,6 @@ const RANGE_DB: f32 = 42.0;
 
 /// Active ou coupe la capture (l'interface ne la demande que lorsqu'elle
 /// affiche le visualiseur et que de la musique joue).
-#[tauri::command]
 pub fn viz_set(app: AppHandle, on: bool) {
     VIZ_ON.store(on, Ordering::SeqCst);
     if on && !VIZ_RUNNING.swap(true, Ordering::SeqCst) {
@@ -614,7 +609,6 @@ pub struct NamedVolume {
 }
 
 /// Volume d'une appli designee par son nom (None si elle n'a pas de session audio).
-#[tauri::command(async)]
 pub fn app_volume_get(app: String, mic: Option<bool>) -> Option<NamedVolume> {
     let s = named_sessions(&app, mic.unwrap_or(false));
     let first = s.first()?;
@@ -626,7 +620,6 @@ pub fn app_volume_get(app: String, mic: Option<bool>) -> Option<NamedVolume> {
     }
 }
 
-#[tauri::command(async)]
 pub fn app_volume_set(app: String, mic: Option<bool>, level: Option<f32>, muted: Option<bool>) -> bool {
     let s = named_sessions(&app, mic.unwrap_or(false));
     unsafe {

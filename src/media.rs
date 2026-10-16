@@ -5,7 +5,7 @@ use std::sync::{mpsc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use crate::host::{AppHandle};
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession as Session,
     GlobalSystemMediaTransportControlsSessionManager as Manager,
@@ -206,19 +206,16 @@ pub fn watch(app: AppHandle) {
     });
 }
 
-#[tauri::command(async)]
 pub fn media_get() -> MediaInfo {
     crate::com_init_mta();
     session().and_then(|s| read(&s)).unwrap_or_default()
 }
 
-#[tauri::command(async)]
 pub fn media_art() -> String {
     crate::com_init_mta();
     session().and_then(|s| art(&s)).unwrap_or_default()
 }
 
-#[tauri::command(async)]
 pub fn media_action(action: String, value: Option<f64>) {
     crate::com_init_mta();
     let Ok(s) = session() else { return };

@@ -1,0 +1,2 @@
+// icone de l'executable et de la zone de notification (LoadIcon(..., 1))
+1 ICON "../icons/icon.ico"

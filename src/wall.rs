@@ -108,7 +108,6 @@ fn current_path() -> String {
     String::from_utf16_lossy(&buf[..n])
 }
 
-#[tauri::command(async)]
 pub fn walls_get() -> Vec<Wall> {
     let mut files = Vec::new();
     // le fond actuel d'abord, puis le dossier perso, puis ceux de Windows
@@ -133,7 +132,6 @@ pub fn walls_get() -> Vec<Wall> {
         .collect()
 }
 
-#[tauri::command(async)]
 pub fn wall_current() -> Option<Wall> {
     // si Wallpaper Engine tourne, c'est son fond qui est visible
     if let Some((path, thumb)) = crate::we::active() {
@@ -151,7 +149,6 @@ pub fn wall_current() -> Option<Wall> {
     })
 }
 
-#[tauri::command(async)]
 pub fn wall_set(path: String) -> bool {
     // IDesktopWallpaper (comme l'appli Parametres) : Windows fait un fondu.
     // Thread dedie : les threads du runtime async sont deja en MTA.
@@ -179,7 +176,6 @@ pub fn wall_set(path: String) -> bool {
     }
 }
 
-#[tauri::command(async)]
 pub fn walls_open_folder() {
     let _ = std::process::Command::new("explorer.exe").arg(user_dir()).spawn();
 }
@@ -201,9 +197,7 @@ fn random(n: usize) -> usize {
 
 /// Passe a un autre fond, au hasard, dans la source visible (Wallpaper
 /// Engine s'il tourne, sinon Windows).
-#[tauri::command(async)]
-pub fn wall_random(app: tauri::AppHandle) -> bool {
-    use tauri::Emitter;
+pub fn wall_random(app: crate::host::AppHandle) -> bool {
     let ok = if crate::we::install_dir().is_some() && crate::we::running() {
         let cur = crate::we::we_state().current;
         let list: Vec<String> = crate::we::we_walls()
@@ -225,8 +219,7 @@ pub fn wall_random(app: tauri::AppHandle) -> bool {
 }
 
 /// Change de fond toutes les `rotate_min` minutes (0 = jamais).
-pub fn watch_rotation(app: tauri::AppHandle) {
-    use tauri::Manager;
+pub fn watch_rotation(app: crate::host::AppHandle) {
     std::thread::spawn(move || {
         let mut elapsed = 0u32;
         loop {

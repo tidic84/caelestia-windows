@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
+use crate::host::{AppHandle, WebviewWindow};
 use windows::core::{w, BOOL, GUID, HSTRING, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, PROPERTYKEY, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS};
@@ -43,9 +43,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use crate::settings::Settings;
-
-/// Hauteur de la barre, en pixels CSS (la meme que l'ilot replie).
-pub const BAR_H: f64 = 30.0;
 
 #[derive(Serialize, Clone, PartialEq)]
 pub struct Task {
@@ -83,11 +80,6 @@ fn hwnd(id: isize) -> HWND {
 
 pub fn enabled(app: &AppHandle) -> bool {
     app.state::<Settings>().0.lock().unwrap().bar
-}
-
-/// Barre masquee automatiquement : le haut de l'ecran n'est pas reserve.
-pub fn autohide(app: &AppHandle) -> bool {
-    app.state::<Settings>().0.lock().unwrap().bar_autohide
 }
 
 // ------------------------------------------------------------- fenetres
@@ -265,7 +257,6 @@ fn resolve_icon(key: &str, id: isize) -> String {
     icon
 }
 
-#[tauri::command(async)]
 pub fn task_icon(key: String, id: Option<isize>) -> String {
     if let Some(v) = ICONS.lock().unwrap().as_ref().and_then(|m| m.get(&key)) {
         return v.clone();
@@ -281,7 +272,6 @@ pub fn task_icon(key: String, id: Option<isize>) -> String {
 
 /// Clic sur une fenetre de la barre : la met au premier plan, ou la reduit si
 /// elle y est deja (comme la barre des taches).
-#[tauri::command]
 pub fn task_activate(id: isize) {
     let h = hwnd(id);
     unsafe {
@@ -304,7 +294,6 @@ pub fn task_activate(id: isize) {
 /// Capture d'une fenetre pour l'apercu de la barre, en JPEG (data URL)
 /// tenant dans `w` x `h` pixels. `min` si elle est reduite, vide si elle
 /// refuse la capture (fenetre d'un processus administrateur...).
-#[tauri::command(async)]
 pub fn task_thumb(id: isize, w: u32, h: u32) -> String {
     if unsafe { IsIconic(hwnd(id)) }.as_bool() {
         return "min".into();
@@ -374,7 +363,6 @@ fn capture(h: HWND) -> Option<image::RgbaImage> {
     }
 }
 
-#[tauri::command]
 pub fn task_close(id: isize) {
     unsafe {
         let _ = PostMessageW(Some(hwnd(id)), WM_CLOSE, WPARAM(0), LPARAM(0));
@@ -441,7 +429,6 @@ fn send(keys: &[INPUT]) {
 }
 
 /// Va au bureau `index` avec Ctrl+Win+Gauche/Droite (seul moyen public).
-#[tauri::command(async)]
 pub fn desktop_go(index: usize) {
     let (n, cur) = desktops();
     let target = index.min(n - 1);
@@ -460,6 +447,12 @@ pub fn desktop_go(index: usize) {
 }
 
 // ------------------------------------------------- reservation de l'ecran
+
+/// `reserve` pour l'interface : `[gauche, haut, droite, bas]` en pixels
+/// physiques, ou rien pour liberer.
+pub fn reserve_rect(win: &WebviewWindow, rect: Option<[i32; 4]>) {
+    reserve(win, rect.map(|r| RECT { left: r[0], top: r[1], right: r[2], bottom: r[3] }));
+}
 
 /// Reserve le haut de l'ecran (`Some`) ou le libere (`None`) : les fenetres
 /// maximisees s'arretent alors sous la barre.
@@ -590,7 +583,6 @@ pub fn sync(app: &AppHandle) {
 }
 
 /// Affiche / remasque la barre des taches Windows (bouton de la barre).
-#[tauri::command]
 pub fn taskbar_peek(app: AppHandle, show: bool) {
     PEEK.store(show, Ordering::Relaxed);
     sync(&app);
@@ -684,7 +676,6 @@ pub fn check_icons() -> String {
         .join("\n")
 }
 
-#[tauri::command]
 pub fn bar_windows(win: WebviewWindow) -> Tasks {
     crate::com_init_sta();
     let own = win.hwnd().unwrap_or_default();
