@@ -136,6 +136,8 @@ listen('hover', ({ payload }) => {
     leaveTimer = setTimeout(() => setState('collapsed'), 450);
   }
 });
+// fenetre masquee : animations en pause (voir body.idle dans style.css)
+document.addEventListener('visibilitychange', () => document.body.classList.toggle('idle', document.hidden));
 listen('fullscreen', ({ payload }) => {
   fullscreen = payload;
   island.classList.toggle('hidden', payload);
@@ -360,7 +362,7 @@ function onTab(tab) {
   if (tab === 'apps') renderApps();
   if (tab === 'settings') loadSettings();
   if (tab === 'ctrl') enterCtrl();
-  if (tab === 'home') refreshEvents();
+  if (tab === 'home') { refreshEvents(); if (sysLast) renderSys(sysLast); }
   // onglets PC et Tâches : rafraîchis tant qu'ils sont affichés
   clearInterval(pcTimer);
   if (tab === 'pc') { refreshPc(); pcTimer = setInterval(() => state === 'open' && currentTab === 'pc' ? refreshPc() : clearInterval(pcTimer), 3000); }
@@ -373,10 +375,14 @@ const fmtDate = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeri
 const fmtShort = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 const fmtHM = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const fmtBar = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+// l'horloge n'affiche que les minutes : le DOM n'est touche qu'a leur changement
+let clockKey = '';
 function tickClock() {
   const d = new Date();
   const hh = String(d.getHours()).padStart(2, '0');
   const mm = String(d.getMinutes()).padStart(2, '0');
+  if (hh + mm + d.getDate() === clockKey) return;
+  clockKey = hh + mm + d.getDate();
   $('.mini-clock').textContent = $('.peek-clock').textContent = `${hh}:${mm}`;
   $('.big-clock .hh').textContent = hh;
   $('.big-clock .mm').textContent = mm;
@@ -524,7 +530,7 @@ let seeking = false;
 function updateProgress() {
   const p = position();
   const pct = media.duration ? (p / media.duration) * 100 : 0;
-  $('.peek-bar div').style.width = pct + '%';
+  $('.peek-bar div').style.transform = `scaleX(${pct / 100})`;
   if (!seeking) {
     const seek = $('#seek');
     seek.value = pct * 10;
@@ -533,7 +539,8 @@ function updateProgress() {
   }
   $('.t-dur').textContent = fmtTime(media.duration || 0);
 }
-setInterval(() => media.playing && updateProgress(), 500);
+// la progression ne se voit pas dans la pilule repliée
+setInterval(() => media.playing && state !== 'collapsed' && updateProgress(), 500);
 
 function applyArt(src) {
   $$('.mini-art, .peek-art, .disc-art, .mp-art img').forEach(i => {
@@ -604,7 +611,7 @@ function fadeViz() {
       vizFade = null;
       island.classList.remove('live');
       $$('.viz').forEach(c => c.getContext('2d').clearRect(0, 0, c.width, c.height));
-      $$('.eq i').forEach(el => (el.style.height = ''));
+      $$('.eq i').forEach(el => (el.style.transform = ''));
     }
   }, 33);
 }
@@ -622,7 +629,7 @@ function drawViz(target) {
   $$('.eq i').forEach((el, k) => {
     const g = shown.slice(k * 8, k * 8 + 8);
     const v = g.reduce((a, b) => a + b, 0) / g.length;
-    el.style.height = 3 + v * 9 + 'px';
+    el.style.transform = `scaleY(${(3 + v * 9) / 12})`;
   });
   if (state === 'open') {
     const c = currentTab === 'media' ? $('.viz-media') : currentTab === 'home' ? $('.viz-home') : null;
@@ -697,7 +704,14 @@ function fmtUptime(s) {
   if (h) return `${h} h ${String(m).padStart(2, '0')}`;
   return `${m} min`;
 }
+let sysLast = null;
 listen('sys', ({ payload: r }) => {
+  sysLast = r;
+  // jauges du panneau : mises à jour seulement quand elles sont affichées
+  if (state === 'open' && currentTab === 'home') renderSys(r);
+  barResources(r);
+});
+function renderSys(r) {
   gauge('cpu', r.cpu / 100, Math.round(r.cpu) + ' %');
   gauge('mem', r.mem_used / r.mem_total, `${gb(r.mem_used)} / ${gb(r.mem_total)} Go`);
   if (r.disk_total) gauge('disk', r.disk_used / r.disk_total, `${gb(r.disk_used)} / ${gb(r.disk_total)} Go`);
@@ -705,8 +719,7 @@ listen('sys', ({ payload: r }) => {
   bat.hidden = r.battery < 0;
   if (r.battery >= 0) gauge('bat', r.battery / 100, r.battery + (r.charging ? ' % ⚡' : ' %'));
   $('.uptime').textContent = 'Allumé depuis ' + fmtUptime(r.uptime);
-  barResources(r);
-});
+}
 
 // ============================================================ utilisateur
 invoke('user_info').then(u => {
@@ -3365,6 +3378,7 @@ function syncWindows(scheme, dark) {
 async function themeFrom(src) {
   try {
     const img = new Image();
+    img.crossOrigin = 'anonymous'; // image du protocole ilot, lue par un canvas
     img.src = src;
     await img.decode();
     sourceArgb = await sourceColorFromImage(img);

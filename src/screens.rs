@@ -3,7 +3,7 @@
 //! l'ilot. Ses boutons ouvrent l'ilot, sur son ecran a lui.
 
 use std::collections::HashMap;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use windows::Win32::Foundation::{POINT, RECT};
@@ -120,29 +120,44 @@ struct Track {
 /// Suit les ecrans et le curseur pour les barres des autres ecrans, comme
 /// `track_cursor` pour l'ilot : passage des clics hors des zones declarees,
 /// bande du haut (`bar-top`) et plein ecran (`bar-fullscreen`). Les
-/// evenements portent le label de la barre visee.
+/// evenements portent le label de la barre visee. Les barres ne sont
+/// recreees / replacees que quand les ecrans changent (ou toutes les 3 s
+/// pour les reglages), et sans barre la boucle ralentit.
 pub fn watch(app: AppHandle, hit: HitMap) {
     std::thread::spawn(move || {
         let mut tracks: HashMap<String, Track> = HashMap::new();
-        let mut tick = 0u32;
+        let mut screens = None;
+        let mut next_sync = Instant::now();
+        let mut next_fs = Instant::now();
         loop {
-            std::thread::sleep(Duration::from_millis(25));
-            tick = tick.wrapping_add(1);
-            if tick % 40 == 1 {
-                sync(&app);
+            let now = Instant::now();
+            if now >= next_sync || tracks.is_empty() || now >= next_fs {
+                let sig = crate::monitors_sig();
+                if screens.as_ref() != Some(&sig) || now >= next_sync {
+                    screens = Some(sig);
+                    next_sync = now + Duration::from_secs(3);
+                    sync(&app);
+                }
             }
             let wins: Vec<(String, WebviewWindow)> =
                 app.webview_windows().into_iter().filter(|(l, _)| l.starts_with("bar-")).collect();
             tracks.retain(|l, _| wins.iter().any(|(w, _)| w == l));
             if wins.is_empty() {
+                std::thread::sleep(Duration::from_millis(500));
                 continue;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+            let fs_check = now >= next_fs;
+            if fs_check {
+                next_fs = now + Duration::from_millis(500);
             }
             let mut pt = POINT::default();
             let cursor = unsafe { GetCursorPos(&mut pt) }.is_ok();
             for (label, win) in wins {
                 let t = tracks.entry(label.clone()).or_default();
-                if tick % 20 == 0 {
-                    let fs = win.hwnd().is_ok_and(crate::fullscreen_foreground);
+                let Ok(h) = win.hwnd() else { continue };
+                if fs_check {
+                    let fs = crate::fullscreen_foreground(h);
                     if fs != t.hidden {
                         t.hidden = fs;
                         let _ = app.emit("bar-fullscreen", (&label, fs));
@@ -153,20 +168,17 @@ pub fn watch(app: AppHandle, hit: HitMap) {
                         }
                     }
                 }
-                let (Ok(pos), Ok(size), Ok(scale)) = (win.outer_position(), win.outer_size(), win.scale_factor())
-                else {
-                    continue;
-                };
+                let Some((x, y, w, scale)) = crate::geom(h) else { continue };
                 let (inside, top) = if t.hidden || !cursor {
                     (false, false)
                 } else {
-                    let cx = (pt.x - pos.x) as f64 / scale;
-                    let cy = (pt.y - pos.y) as f64 / scale;
+                    let cx = (pt.x - x) as f64 / scale;
+                    let cy = (pt.y - y) as f64 / scale;
                     hit.lock()
                         .unwrap()
                         .get(&label)
                         .map_or((false, false), |h| {
-                            let (inside, _, top) = h.test(cx, cy, size.width as f64 / scale);
+                            let (inside, _, top) = h.test(cx, cy, w as f64 / scale);
                             (inside, top)
                         })
                 };

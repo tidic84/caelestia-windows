@@ -7,7 +7,6 @@ use std::process::Command;
 use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
-use base64::Engine;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use windows::core::Interface;
@@ -93,15 +92,12 @@ pub(crate) fn bitmap_png(hbmp: HBITMAP) -> Option<String> {
     rgba_png(w, h, buf)
 }
 
-/// Pixels RGBA -> PNG en data URL.
+/// Pixels RGBA -> PNG, servi par le protocole `ilot` (URL).
 pub(crate) fn rgba_png(w: u32, h: u32, buf: Vec<u8>) -> Option<String> {
     let img = image::RgbaImage::from_raw(w, h, buf)?;
     let mut out = std::io::Cursor::new(Vec::new());
     img.write_to(&mut out, image::ImageFormat::Png).ok()?;
-    Some(format!(
-        "data:image/png;base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(out.into_inner())
-    ))
+    Some(crate::img::url("image/png", out.into_inner()))
 }
 
 /// Pixels d'un HBITMAP en BGRA 32 bits, de haut en bas.

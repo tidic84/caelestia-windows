@@ -6,7 +6,6 @@ use std::os::windows::process::CommandExt;
 use std::process::Command;
 use std::sync::Mutex;
 
-use base64::Engine;
 use serde::Serialize;
 use sysinfo::{Disks, System};
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -172,13 +171,13 @@ fn hash_of(b: &[u8]) -> u64 {
     h.finish()
 }
 
-/// Miniature PNG (data URL) d'une image RGBA.
+/// Miniature PNG (URL du protocole `ilot`) d'une image RGBA.
 fn rgba_thumb(w: usize, h: usize, bytes: &[u8], size: u32) -> Option<String> {
     let img = image::RgbaImage::from_raw(w as u32, h as u32, bytes.to_vec())?;
     let t = image::DynamicImage::ImageRgba8(img).thumbnail(size, size);
     let mut out = std::io::Cursor::new(Vec::new());
     t.write_to(&mut out, image::ImageFormat::Png).ok()?;
-    Some(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(out.into_inner())))
+    Some(crate::img::CLIPS.url("image/png", out.into_inner()))
 }
 
 fn clips_view(q: &VecDeque<Clip>) -> Vec<ClipView> {

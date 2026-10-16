@@ -6,7 +6,6 @@ use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use base64::Engine;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use windows::core::{w, BOOL, GUID, HSTRING, PCWSTR, PWSTR};
@@ -315,10 +314,7 @@ pub fn task_thumb(id: isize, w: u32, h: u32) -> String {
             let t = image::DynamicImage::ImageRgba8(img).thumbnail(w.max(1), h.max(1)).to_rgb8();
             let mut out = std::io::Cursor::new(Vec::new());
             t.write_to(&mut out, image::ImageFormat::Jpeg).ok()?;
-            Some(format!(
-                "data:image/jpeg;base64,{}",
-                base64::engine::general_purpose::STANDARD.encode(out.into_inner())
-            ))
+            Some(crate::img::THUMBS.url("image/jpeg", out.into_inner()))
         })
         .unwrap_or_default()
 }
@@ -671,8 +667,7 @@ pub fn check_icons() -> String {
             let win = window_icon(h);
             let used = resolve_icon(&key, h.0 as isize);
             if let Some(dir) = std::env::var_os("ILOT_ICON_DIR") {
-                let b64 = used.split(',').nth(1).unwrap_or("");
-                if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(b64) {
+                if let Some(bytes) = crate::img::bytes(&used) {
                     let _ = std::fs::write(std::path::Path::new(&dir).join(format!("{}.png", h.0 as isize)), bytes);
                 }
             }
@@ -697,7 +692,9 @@ pub fn bar_windows(win: WebviewWindow) -> Tasks {
 }
 
 /// Emet `tasks` quand les fenetres ou le bureau changent, et garde la barre
-/// des taches Windows masquee.
+/// des taches Windows masquee. Reveille par les evenements de fenetres
+/// (`events::WINDOWS`), au plus toutes les 250 ms ; sans evenement, un
+/// releve toutes les 3 s rattrape ce qu'ils ne signalent pas.
 pub fn watch(win: WebviewWindow) {
     std::thread::spawn(move || {
         crate::com_init_sta();
@@ -706,8 +703,10 @@ pub fn watch(win: WebviewWindow) {
         let mut order = Vec::new();
         let mut keys = HashMap::new();
         let mut last: Option<Tasks> = None;
+        let mut seen = crate::events::WINDOWS.seq();
         loop {
-            std::thread::sleep(Duration::from_millis(300));
+            std::thread::sleep(Duration::from_millis(250));
+            seen = crate::events::WINDOWS.wait(seen, Duration::from_secs(3));
             if HIDE.load(Ordering::Relaxed) {
                 let fg = unsafe { GetForegroundWindow() };
                 if !SHELL_UI.contains(&class_of(fg).as_str()) {
