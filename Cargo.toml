@@ -17,6 +17,7 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 sysinfo = "0.33"
 arboard = { version = "3", default-features = false, features = ["image-data"] }
 windows-core = "0.61"
+windows-future = "0.2"
 ureq = { version = "2", features = ["native-tls", "json"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 imap = "2.4"

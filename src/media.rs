@@ -13,6 +13,7 @@ use windows::Media::Control::{
 };
 use windows::Foundation::TypedEventHandler;
 use windows::Storage::Streams::DataReader;
+use windows_core::Interface;
 
 #[derive(Serialize, Clone, Default, PartialEq)]
 pub struct MediaInfo {
@@ -32,21 +33,49 @@ const TICKS: f64 = 10_000_000.0;
 /// Ecart entre l'epoque WinRT (1601) et l'epoque Unix, en ticks.
 const EPOCH_DIFF: i64 = 116_444_736_000_000_000;
 
+/// Delai maximal d'un appel au service media (NPSMSvc) ou a l'appli qui joue
+const WAIT_MS: u64 = 3000;
+
 /// Le gestionnaire GSMTC, cree une fois : le redemander a chaque releve
 /// coutait un appel inter-processus asynchrone toutes les 500 ms.
+static MANAGER: Mutex<Option<(Manager, Instant)>> = Mutex::new(None);
+
+/// Sans session, un gestionnaire dont le service a redemarre ne renvoie
+/// aucune erreur (il repond depuis son etat local) : on le renouvelle au
+/// plus toutes les 30 s tant que rien ne joue.
+const RENEW_IDLE: Duration = Duration::from_secs(30);
+
 fn manager() -> windows::core::Result<Manager> {
-    static M: Mutex<Option<Manager>> = Mutex::new(None);
-    let mut m = M.lock().unwrap();
-    if let Some(m) = m.as_ref() {
+    let mut m = MANAGER.lock().unwrap();
+    if let Some((m, _)) = m.as_ref() {
         return Ok(m.clone());
     }
-    let got = Manager::RequestAsync()?.get()?;
-    *m = Some(got.clone());
+    let got = crate::wait(Manager::RequestAsync()?, WAIT_MS)?;
+    *m = Some((got.clone(), Instant::now()));
     Ok(got)
 }
 
+/// Oublie le gestionnaire si le service media a redemarre (connexion
+/// perdue), ne repond plus, ou si rien ne joue depuis `RENEW_IDLE` : le
+/// prochain appel se reconnecte.
+fn lost(e: &windows::core::Error) {
+    const DEAD: [u32; 4] = [
+        0x8001_0108, // RPC_E_DISCONNECTED
+        0x8007_06BA, // RPC_S_SERVER_UNAVAILABLE
+        0x8007_06BE, // RPC_S_CALL_FAILED
+        0x8007_05B4, // delai depasse (crate::wait)
+    ];
+    let mut m = MANAGER.lock().unwrap();
+    let dead = DEAD.contains(&(e.code().0 as u32));
+    // erreur vide : pas de session en cours
+    let idle = e.code().is_ok() && m.as_ref().is_some_and(|(_, at)| at.elapsed() > RENEW_IDLE);
+    if dead || idle {
+        *m = None;
+    }
+}
+
 fn session() -> windows::core::Result<Session> {
-    manager()?.GetCurrentSession()
+    manager()?.GetCurrentSession().inspect_err(lost)
 }
 
 fn now_ticks() -> i64 {
@@ -57,7 +86,11 @@ fn now_ticks() -> i64 {
 }
 
 fn read(s: &Session) -> windows::core::Result<MediaInfo> {
-    let props = s.TryGetMediaPropertiesAsync()?.get()?;
+    read_props(s).inspect_err(lost)
+}
+
+fn read_props(s: &Session) -> windows::core::Result<MediaInfo> {
+    let props = crate::wait(s.TryGetMediaPropertiesAsync()?, WAIT_MS)?;
     let playing = s.GetPlaybackInfo()?.PlaybackStatus()? == Status::Playing;
     let tl = s.GetTimelineProperties()?;
     let duration = (tl.EndTime()?.Duration - tl.StartTime()?.Duration) as f64 / TICKS;
@@ -93,12 +126,16 @@ fn read(s: &Session) -> windows::core::Result<MediaInfo> {
 }
 
 fn art(s: &Session) -> windows::core::Result<String> {
-    let props = s.TryGetMediaPropertiesAsync()?.get()?;
-    let stream = props.Thumbnail()?.OpenReadAsync()?.get()?;
+    art_bytes(s).inspect_err(lost)
+}
+
+fn art_bytes(s: &Session) -> windows::core::Result<String> {
+    let props = crate::wait(s.TryGetMediaPropertiesAsync()?, WAIT_MS)?;
+    let stream = crate::wait(props.Thumbnail()?.OpenReadAsync()?, WAIT_MS)?;
     let size = stream.Size()? as u32;
     let ctype = stream.ContentType()?.to_string();
     let reader = DataReader::CreateDataReader(&stream)?;
-    reader.LoadAsync(size)?.get()?;
+    crate::wait(reader.LoadAsync(size)?.cast::<windows_future::IAsyncOperation<u32>>()?, WAIT_MS)?;
     let mut buf = vec![0u8; size as usize];
     reader.ReadBytes(&mut buf)?;
     Ok(crate::img::url(crate::img::mime(&ctype), buf))
@@ -151,19 +188,24 @@ pub fn watch(app: AppHandle) {
     std::thread::spawn(move || {
         crate::com_init_mta();
         let (tx, rx) = mpsc::channel::<()>();
-        if let Ok(m) = manager() {
-            let tx = tx.clone();
-            let _ = m.CurrentSessionChanged(&TypedEventHandler::new(move |_, _| {
-                let _ = tx.send(());
-                Ok(())
-            }));
-        }
+        // gestionnaire suivi (il change si le service media redemarre)
+        let mut watched: Option<Manager> = None;
         let mut subs: Option<Subs> = None;
         let mut last = MediaInfo::default();
         let mut last_at = Instant::now();
         let mut last_key = String::new();
         let mut first = true;
         loop {
+            if let Ok(m) = manager() {
+                if watched.as_ref() != Some(&m) {
+                    let tx = tx.clone();
+                    let _ = m.CurrentSessionChanged(&TypedEventHandler::new(move |_, _| {
+                        let _ = tx.send(());
+                        Ok(())
+                    }));
+                    watched = Some(m);
+                }
+            }
             let cur = session().ok();
             if cur.as_ref() != subs.as_ref().map(|s| &s.session) {
                 subs = cur.clone().map(|s| Subs::new(s, &tx));
@@ -206,6 +248,17 @@ pub fn watch(app: AppHandle) {
     });
 }
 
+/// Diagnostic (`--check-media`) : `ok` ou l'erreur de la session / lecture.
+pub fn diag() -> String {
+    match session() {
+        Ok(s) => match read(&s) {
+            Ok(_) => "ok".into(),
+            Err(e) => format!("read {:?}", e.code()),
+        },
+        Err(e) => format!("session {:?}", e.code()),
+    }
+}
+
 pub fn media_get() -> MediaInfo {
     crate::com_init_mta();
     session().and_then(|s| read(&s)).unwrap_or_default()
@@ -220,13 +273,15 @@ pub fn media_action(action: String, value: Option<f64>) {
     crate::com_init_mta();
     let Ok(s) = session() else { return };
     let r = match action.as_str() {
-        "toggle" => s.TryTogglePlayPauseAsync().and_then(|o| o.get()),
-        "next" => s.TrySkipNextAsync().and_then(|o| o.get()),
-        "prev" => s.TrySkipPreviousAsync().and_then(|o| o.get()),
+        "toggle" => s.TryTogglePlayPauseAsync().and_then(|o| crate::wait(o, WAIT_MS)),
+        "next" => s.TrySkipNextAsync().and_then(|o| crate::wait(o, WAIT_MS)),
+        "prev" => s.TrySkipPreviousAsync().and_then(|o| crate::wait(o, WAIT_MS)),
         "seek" => s
             .TryChangePlaybackPositionAsync((value.unwrap_or(0.0) * TICKS) as i64)
-            .and_then(|o| o.get()),
+            .and_then(|o| crate::wait(o, WAIT_MS)),
         _ => return,
     };
-    let _ = r;
+    if let Err(e) = r {
+        lost(&e);
+    }
 }

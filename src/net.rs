@@ -21,9 +21,12 @@ use windows::Win32::NetworkManagement::WiFi::{
 
 // ------------------------------------------------------------------ radios
 
+/// Delai maximal d'un appel aux services radio / Bluetooth de Windows
+const WAIT_MS: u64 = 4000;
+
 fn radio(kind: RadioKind) -> Option<Radio> {
-    let _ = Radio::RequestAccessAsync().ok()?.get();
-    let list = Radio::GetRadiosAsync().ok()?.get().ok()?;
+    let _ = crate::wait(Radio::RequestAccessAsync().ok()?, WAIT_MS);
+    let list = crate::wait(Radio::GetRadiosAsync().ok()?, WAIT_MS).ok()?;
     list.into_iter().find(|r| r.Kind().ok() == Some(kind))
 }
 
@@ -43,7 +46,8 @@ pub fn radio_set(kind: String, on: bool) -> bool {
     let k = if kind == "wifi" { RadioKind::WiFi } else { RadioKind::Bluetooth };
     let Some(r) = radio(k) else { return false };
     let st = if on { RadioState::On } else { RadioState::Off };
-    r.SetStateAsync(st).and_then(|op| op.get()).is_ok() && r.State().ok() == Some(st)
+    // allumer une carte peut prendre quelques secondes
+    r.SetStateAsync(st).and_then(|op| crate::wait(op, 10_000)).is_ok() && r.State().ok() == Some(st)
 }
 
 // -------------------------------------------------------------------- Wi-Fi
@@ -234,7 +238,7 @@ fn connected_bt() -> Vec<String> {
         BluetoothLEDevice::GetDeviceSelectorFromConnectionStatus(BluetoothConnectionStatus::Connected),
     ];
     for sel in sels.into_iter().flatten() {
-        let Ok(list) = DeviceInformation::FindAllAsyncAqsFilter(&sel).and_then(|op| op.get()) else { continue };
+        let Ok(list) = DeviceInformation::FindAllAsyncAqsFilter(&sel).and_then(|op| crate::wait(op, WAIT_MS)) else { continue };
         for d in list {
             if let Ok(n) = d.Name() {
                 let n = n.to_string();

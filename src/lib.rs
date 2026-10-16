@@ -54,6 +54,26 @@ pub fn com_init_mta() {
     }
 }
 
+/// Attend une operation WinRT au plus `ms` millisecondes, puis l'annule. Un
+/// service Windows bloque (une appli figee derriere le panneau media...) ne
+/// doit pas retenir un thread de l'ilot indefiniment.
+pub(crate) fn wait<T: windows_core::RuntimeType + 'static>(
+    op: windows_future::IAsyncOperation<T>,
+    ms: u64,
+) -> windows_core::Result<T> {
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    op.SetCompleted(&windows_future::AsyncOperationCompletedHandler::new(move |_, _| {
+        let _ = tx.try_send(());
+        Ok(())
+    }))?;
+    if rx.recv_timeout(std::time::Duration::from_millis(ms)).is_err() {
+        let _ = op.Cancel();
+        // HRESULT_FROM_WIN32(ERROR_TIMEOUT)
+        return Err(windows_core::HRESULT(0x8007_05B4_u32 as i32).into());
+    }
+    op.GetResults()
+}
+
 pub fn com_init_sta() {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
@@ -476,6 +496,7 @@ pub extern "C" fn ilot_cli() -> i32 {
             format!("devices: {}", j(serde_json::to_string(&audio::audio_devices()))),
             format!("mixer: {}", j(serde_json::to_string(&audio::mixer_get()).map(|s| s.chars().take(600).collect()))),
             format!("net: {}", j(serde_json::to_string(&net::net_get()))),
+            format!("media: {} ; pochette {} o", j(serde_json::to_string(&media::media_get())), media::media_art().len()),
             format!("wifi: {}", j(serde_json::to_string(&net::wifi_list(false)))),
             format!("user: {}", j(serde_json::to_string(&system::user_info()).map(|s| s.chars().take(120).collect()))),
             format!("win_light: {}", theme::windows_light()),
@@ -491,6 +512,22 @@ pub extern "C" fn ilot_cli() -> i32 {
         ]
         .join("\n");
         let _ = std::fs::write(out(i, "check.txt"), report);
+        return 0;
+    }
+    // `--check-media <fichier> <secondes>` : releve le media chaque seconde
+    // (reconnexion apres un redemarrage du service media de Windows)
+    if let Some(i) = args.iter().position(|a| a == "--check-media") {
+        com_init_mta();
+        let secs: u64 = args.get(i + 2).and_then(|s| s.parse().ok()).unwrap_or(20);
+        let mut log = String::new();
+        let t0 = std::time::Instant::now();
+        while t0.elapsed().as_secs() < secs {
+            let t = std::time::Instant::now();
+            let m = media::media_get();
+            log += &format!("{:5.1}s {} ({} ms) {}\n", t0.elapsed().as_secs_f32(), if m.has { m.title.as_str() } else { "(rien)" }, t.elapsed().as_millis(), media::diag());
+            let _ = std::fs::write(out(i, "media-check.txt"), &log);
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
         return 0;
     }
     // `--check-imap <hote> <fichier>` : test de connexion IMAP
