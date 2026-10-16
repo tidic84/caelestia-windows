@@ -86,6 +86,17 @@ Item {
         contentHeight: nav.height
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        // un seul fond, qui glisse vers l'onglet choisi (comme les onglets du
+        // panneau) : les boutons eux-memes restent sans fond
+        Rectangle {
+            readonly property int i: Math.max(0, page.sections.findIndex(x => x.id === page.section))
+            y: i * (38 + nav.spacing)
+            width: nav.width
+            height: 38
+            radius: 19
+            color: Theme.secondaryContainer
+            Behavior on y { NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
+        }
         Column {
             id: nav
             width: parent.width
@@ -98,9 +109,7 @@ Item {
                     readonly property bool on: page.section === modelData.id
                     width: nav.width
                     height: 38
-                    radius: on || hovered ? 19 : 14
-                    Behavior on radius { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
-                    color: on ? Theme.secondaryContainer : hovered ? Theme.surfaceHigh : "transparent"
+                    radius: 19
                     readonly property color fg: on ? Theme.inkSecondaryContainer : Theme.ink
                     onClicked: Ilot.settingsSection = modelData.id
                     Ms {
@@ -108,7 +117,8 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         name: navBtn.modelData.icon
                         size: 19
-                        color: navBtn.on ? navBtn.fg : Theme.inkVariant
+                        color: navBtn.on || navBtn.hovered ? navBtn.fg : Theme.inkVariant
+                        Behavior on color { ColorAnimation { duration: 200 } }
                     }
                     Txt {
                         x: 42
