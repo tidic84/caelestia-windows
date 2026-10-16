@@ -488,6 +488,30 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: 138
                 height: 138
+                // barres en cercle autour du disque, suivant la musique (graves en
+                // haut, symetrique) ; le disque bat avec les basses
+                Repeater {
+                    model: Ilot.live && home.shown ? 48 : 0
+                    // un bras par barre, tourne autour du centre du disque
+                    Item {
+                        id: arm
+                        required property int index
+                        readonly property int band: index < 24 ? index : 47 - index
+                        readonly property real v: Ilot.shown[band] || 0
+                        anchors.centerIn: parent
+                        width: 2.6
+                        height: 2 * (76 + 22)
+                        rotation: index * 7.5
+                        Rectangle {
+                            width: parent.width
+                            height: 2 + arm.v * 20
+                            radius: width / 2
+                            y: parent.height / 2 - 76 - height
+                            color: arm.band < 8 ? Theme.primary : arm.band < 16 ? Theme.tertiary : Theme.secondary
+                            opacity: arm.v < 0.01 ? 0 : 0.45 + arm.v * 0.55
+                        }
+                    }
+                }
                 // anneau (box-shadow 0 0 0 5px) : hors de la mise en page
                 Rectangle {
                     anchors.centerIn: parent
@@ -495,6 +519,7 @@ Item {
                     height: 148
                     radius: 74
                     color: Theme.surfaceHigh
+                    scale: Ilot.live ? 1 + (Ilot.shown[0] + Ilot.shown[1] + Ilot.shown[2]) / 3 * 0.07 : 1
                 }
                 Rectangle {
                     anchors.fill: parent
@@ -569,13 +594,64 @@ Item {
                 frac: resCard.r ? resCard.r.mem_used / resCard.r.mem_total : 0
                 value: resCard.r ? Ilot.gb(resCard.r.mem_used) + " / " + Ilot.gb(resCard.r.mem_total) + " Go" : "-"
             }
-            Gauge {
+            // tous les disques : lettre, occupation, place libre (survol : nom du volume)
+            Column {
                 id: disk
-                icon: "hard_drive"
-                label: "C:"
-                animate: home.shown
-                frac: resCard.r && resCard.r.disk_total ? resCard.r.disk_used / resCard.r.disk_total : 0
-                value: resCard.r && resCard.r.disk_total ? Ilot.gb(resCard.r.disk_used) + " / " + Ilot.gb(resCard.r.disk_total) + " Go" : "-"
+                width: 190
+                spacing: 3
+                anchors.verticalCenter: parent.verticalCenter
+                readonly property var list: resCard.r && resCard.r.disks ? resCard.r.disks.slice(0, 3) : []
+                function free(b) {
+                    return b >= Math.pow(1024, 4) ? (b / Math.pow(1024, 4)).toFixed(2).replace(".", ",") + " To" : Math.round(b / Math.pow(1024, 3)) + " Go"
+                }
+                Repeater {
+                    model: disk.list
+                    Btn {
+                        id: dk
+                        required property var modelData
+                        readonly property real frac: modelData.used / Math.max(1, modelData.total)
+                        width: disk.width
+                        height: 16
+                        cursor: Qt.ArrowCursor
+                        tip: (modelData.label ? modelData.label + " (" + modelData.mount + ")" : modelData.mount) + "\n"
+                            + disk.free(modelData.used) + " utilisés sur " + disk.free(modelData.total)
+                        Ms {
+                            name: dk.modelData.removable ? "usb" : "hard_drive"
+                            size: 14
+                            color: dk.frac > 0.9 ? Theme.bad : Theme.inkVariant
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Txt {
+                            x: 18
+                            text: dk.modelData.mount
+                            px: 11.5
+                            weight: Font.Medium
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Rectangle {
+                            x: 40
+                            width: parent.width - 40 - 64
+                            height: 6
+                            radius: 3
+                            color: Theme.surfaceHighest
+                            anchors.verticalCenter: parent.verticalCenter
+                            Rectangle {
+                                width: parent.width * Math.min(1, dk.frac)
+                                height: parent.height
+                                radius: 3
+                                color: dk.frac > 0.9 ? Theme.bad : Theme.primary
+                            }
+                        }
+                        Txt {
+                            anchors.right: parent.right
+                            text: disk.free(dk.modelData.total - dk.modelData.used) + " libres"
+                            px: 10.5
+                            tnum: true
+                            color: Theme.inkVariant
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+                }
             }
             Gauge {
                 id: bat
@@ -596,11 +672,14 @@ Item {
         width: col1 + col2 + gap
         height: row4
         radius: height / 2
-        readonly property int v: Math.round(Ilot.vol.level * 100)
+        // 0-100 % : volume Windows ; jusqu'a 200 % avec Equalizer APO (Watch.boost)
+        readonly property int v: Math.round(Watch.level * 100)
+        readonly property int max: Watch.boost === null ? 100 : 200
+        onVisibleChanged: if (visible) Watch.refreshBoost()
         IconBtn {
             x: 10
             anchors.verticalCenter: parent.verticalCenter
-            icon: Ilot.vol.muted || volCard.v === 0 ? "volume_off" : volCard.v < 50 ? "volume_down" : "volume_up"
+            icon: Ilot.vol.muted || volCard.v === 0 ? "volume_off" : volCard.v > 100 ? "campaign" : volCard.v < 50 ? "volume_down" : "volume_up"
             onClicked: Ilot.setVolume(undefined, !Ilot.vol.muted)
         }
         M3Slider {
@@ -609,9 +688,11 @@ Item {
             width: parent.width - x - 10 - 28 - 18
             anchors.verticalCenter: parent.verticalCenter
             wheelStep: 5
+            to: volCard.max
             value: volCard.v
-            fill: Ilot.vol.muted ? 0 : value / 100
-            onMoved: v => Ilot.setVolume(v / 100, false)
+            fill: Ilot.vol.muted ? 0 : value / volCard.max
+            onMoved: v => Watch.setLevel(v / 100, false)
+            onReleased: v => Watch.setLevel(v / 100, true)
             Binding on value {
                 when: !volSlider.dragging
                 value: volCard.v

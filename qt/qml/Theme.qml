@@ -57,7 +57,57 @@ Item {
     property bool light: false
     // opacite du fond de l'ilot et de la barre (Reglages > Fond de l'ilot)
     property real islandAlpha: 1
-    readonly property color islandBg: alpha(surface, islandAlpha)
+    // fond « Noir pur »
+    property bool islandBlack: false
+    readonly property color islandSurface: islandBlack ? "#000000" : surface
+    readonly property color islandBg: alpha(islandSurface, islandAlpha)
+
+    // ------------------------------------------------ Apparence, accessibilite
+    // taille du texte du panneau (le panneau est agrandi d'autant)
+    property real textK: 1
+    // contraste eleve : textes secondaires et contours aussi marques que le texte
+    property bool highContrast: false
+    // duree des animations de l'ilot : x1, x0.4 (rapide), x1.7 (douce), 0 (instantanee)
+    property real animK: 1
+    // « sans rebond » : la courbe a ressort devient une courbe standard
+    property bool calm: false
+    // mouvements reduits : plus d'animations decoratives en boucle
+    property bool reduced: false
+    // voyants (vert / orange / rouge) et camera / micro, selon le daltonisme
+    property color ok: "#3ba55d"
+    property color warn: "#f0a020"
+    property color bad: error
+    property color cam: "#3ddc84"
+    property color mic: "#ff9f1a"
+    // mouvements reduits demandes par Windows (Accessibilite > Effets d'animation)
+    property bool systemReduced: false
+
+    // duree d'animation de l'ilot selon Apparence > Animations
+    function dur(ms) {
+        return reduced ? Math.min(ms, 120) * animK : ms * animK
+    }
+    readonly property var springCurve: calm ? std : spring
+
+    function applyLook(cfg) {
+        textK = (Number(cfg.text_size) || 100) / 100
+        highContrast = cfg.contrast === "high"
+        animK = ({ fast: 0.4, soft: 1.7, off: 0 })[cfg.anim] !== undefined ? ({ fast: 0.4, soft: 1.7, off: 0 })[cfg.anim] : 1
+        calm = cfg.anim === "calm"
+        reduced = cfg.motion === "reduced" || ((cfg.motion || "system") === "system" && systemReduced)
+        const cvd = ({
+            rg: { ok: "#56b4e9", warn: "#f0e442", cam: "#56b4e9", mic: "#f0e442", bad: "#e66100" },
+            by: { ok: "#2bb673", warn: "#ff6fae", cam: "#2bb673", mic: "#ff6fae", bad: "#ff3b30" }
+        })[cfg.cvd] || { ok: "#3ba55d", warn: "#f0a020", cam: "#3ddc84", mic: "#ff9f1a", bad: null }
+        ok = cvd.ok
+        warn = cvd.warn
+        cam = cvd.cam
+        mic = cvd.mic
+        bad = cvd.bad || error
+        if (highContrast) {
+            inkVariant = ink
+            outlineVariant = outline
+        }
+    }
 
     readonly property string font: "Rubik"
     readonly property string icons: "Material Symbols Rounded"
