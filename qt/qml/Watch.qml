@@ -6,7 +6,7 @@ import IlotCore
 // jour Steam, jeu, GPU), mode jeu, mode absent, partie trouvee, extinction
 // programmee, voyant camera / micro, etat des services, sante des disques,
 // partage avec le telephone, sous-titres en direct, raccourcis clavier,
-// compagnon de la pilule et file des notifications de l'ilot.
+// mises a jour, compagnon de la pilule et file des notifications de l'ilot.
 Item {
     id: w
 
@@ -309,6 +309,8 @@ Item {
     function onIdle(s) {
         idle = s
         petIdle(s)
+        if (s >= awaySecs)
+            maybeInstall()
         if (cfg.away === "off")
             return
         if (!away.on && s >= awaySecs && !gameOn && !Ilot.fullscreen) {
@@ -472,6 +474,52 @@ Item {
         }
         svPrev = prev
         services = list
+    }
+
+    // ================================================== mises a jour
+    // src/update.rs : derniere version publiee sur GitHub, telechargement,
+    // installation (un script remplace les fichiers et relance l'ilot)
+    property var upd: ({ current: "", latest: "", available: false, status: "idle", progress: 0, notes: "", error: "", url: "" })
+    property string updNotified: ""
+    function applyUpdate(u) {
+        const was = upd
+        upd = u
+        // nouvelle version (une fois par version)
+        if (u.available && u.status === "idle" && cfg.update_mode !== "auto" && updNotified !== u.latest) {
+            updNotified = u.latest
+            notify({ app: "Mise à jour", sym: "system_update", title: "Îlot " + u.latest + " est disponible", body: "Voir les nouveautés",
+                action: "Voir", ms: 9000, fn: () => Ilot.openSettings("updates") })
+        }
+        // telechargee : installee tout de suite (mode auto, quand tu ne fais
+        // rien) ou au clic
+        if (u.status === "ready" && was.status !== "ready") {
+            if (cfg.update_mode === "auto")
+                maybeInstall()
+            else
+                notify({ app: "Mise à jour", sym: "restart_alt", title: "Îlot " + u.latest + " est prêt", body: "Redémarrer l'îlot pour l'installer",
+                    action: "Installer", ms: 12000, fn: () => w.installUpdate() })
+        }
+    }
+    // mode auto : seulement apres 10 min sans clavier ni souris, hors jeu
+    function maybeInstall() {
+        if (upd.status === "ready" && cfg.update_mode === "auto" && idle >= awaySecs && !gameOn && !Ilot.fullscreen && Ilot.mode === "collapsed")
+            installUpdate()
+    }
+    function installUpdate() {
+        Api.invoke("update_install").then(ok => {
+            if (ok)
+                Ilot.later(400, () => Backend.quit())
+        }, e => osd("error", null, String(e)))
+    }
+    // apres une mise a jour : proposer les notes de version
+    function checkNewVersion(cur) {
+        // ui.json sans version : ilot d'avant les notes de version (0.3.x)
+        const seen = Ilot.ui.seenVersion || (Object.keys(Ilot.ui).length ? "0" : "")
+        if (seen && seen !== cur)
+            notify({ app: "Mise à jour", sym: "new_releases", title: "Îlot est passé en " + cur, body: "Voir les nouveautés",
+                action: "Voir", ms: 12000, force: true, fn: () => Ilot.openSettings("updates") })
+        if (seen !== cur)
+            Ilot.saveUi({ seenVersion: cur })
     }
 
     // ================================================ partage (QR code)
@@ -679,6 +727,7 @@ Item {
         })
         Api.listen("captions", c => { w.caption = c })
         Api.listen("mail", ib => w.onInbox(ib))
+        Api.listen("update", u => w.applyUpdate(u))
         Api.listen("shortcut", a => {
             if (a === "play")
                 return Api.invoke("media_action", { action: "toggle" })
@@ -692,6 +741,9 @@ Item {
                 Ilot.pinned = true
                 return Ilot.open(Ilot.currentTab)
             }
+            // onglet d'un addon desactive : rien
+            if (!Ilot.hasTab(a))
+                return
             if (Ilot.mode === "open" && Ilot.currentTab === a)
                 return Ilot.close()
             Ilot.pinned = true
@@ -706,8 +758,13 @@ Item {
         Api.invoke("store_get", { key: "mixprofiles" }).then(p => { if (p && typeof p === "object") w.mixProfiles = p })
         Api.invoke("shortcuts_get").then(m => { w.keyMap = m || {} })
         Api.invoke("captions_on").then(v => { w.capOn = v })
-        Api.invoke("services_get").then(l => w.applyServices(l)).catch(() => {})
+        if (Ilot.hasTab("pc"))
+            Api.invoke("services_get").then(l => w.applyServices(l)).catch(() => {})
         Api.invoke("mail_get").then(ib => w.onInbox(ib))
+        Api.invoke("update_get").then(u => {
+            w.applyUpdate(u)
+            w.checkNewVersion(u.current)
+        })
         Api.invoke("motion_reduced").then(r => {
             Theme.systemReduced = r
             Theme.applyLook(Ilot.cfg)

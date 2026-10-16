@@ -38,6 +38,7 @@ mod system;
 mod tasks;
 mod theme;
 mod translate;
+mod update;
 mod wall;
 mod we;
 mod winkey;
@@ -345,6 +346,12 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "shortcuts_set" => json(prefs::shortcuts_set(a!("map"))),
         "settings_export" => json(prefs::settings_export(app)),
         "settings_import" => prefs::settings_import(app).and_then(json),
+        // mises a jour, notes de version
+        "update_get" => json(update::update_get()),
+        "update_check" => json(update::update_check(app)),
+        "update_download" => json(update::update_download(app)),
+        "update_install" => update::update_install(app).and_then(json),
+        "changelog" => json(update::changelog_get()),
         // barre
         "bar_windows" => json(bar::bar_windows(w.clone())),
         "task_icon" => json(bar::task_icon(a!("key"), a!("id"))),
@@ -469,6 +476,7 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
     health::watch(app);
     status::watch(app);
     privacy::watch(app);
+    update::watch(app);
 }
 
 /// Au moment de quitter : barre des taches Windows et ecran rendus.
@@ -609,6 +617,21 @@ pub extern "C" fn ilot_cli() -> i32 {
     // `--check-games <fichier>` : jeux detectes
     if let Some(i) = args.iter().position(|a| a == "--check-games") {
         let _ = std::fs::write(out(i, "games-check.txt"), games::report());
+        return 0;
+    }
+    // `--check-update <fichier>` : derniere version publiee et notes de version
+    if let Some(i) = args.iter().position(|a| a == "--check-update") {
+        let report = format!(
+            "{}\n{}",
+            serde_json::to_string_pretty(&update::update_check(AppHandle)).unwrap_or_default(),
+            serde_json::to_string_pretty(&update::changelog()).unwrap_or_default()
+        );
+        let _ = std::fs::write(out(i, "update-check.txt"), report);
+        return 0;
+    }
+    // mise a jour telechargee (mode automatique) : installee avant de lancer
+    // l'interface, le script relance l'ilot
+    if args.len() <= 1 && update::install_pending_at_start() {
         return 0;
     }
     -1

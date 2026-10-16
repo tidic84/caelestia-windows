@@ -1,13 +1,31 @@
 import QtQuick
 import IlotCore
 
-// Reglages : demarrage, touche Windows, ecran, barre, apparence, pilule,
-// mode jeu, mode absent, accessibilite, meteo, agendas, rotation des fonds,
-// notifications, raccourcis clavier, sauvegarde
+// Reglages, en onglets (a gauche) : general (demarrage, touche Windows,
+// ecran, notifications, sauvegarde), barre, apparence (et rotation des
+// fonds), pilule, jeu et absence, accessibilite, meteo et agenda, raccourcis
+// clavier, addons (onglets facultatifs), mises a jour et notes de version
 Item {
     id: page
     readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "settings"
     readonly property var cfg: Ilot.cfg
+    // onglet des reglages (Ilot.openSettings l'ouvre de l'exterieur)
+    readonly property string section: Ilot.settingsSection
+    readonly property var sections: [
+        { id: "general", icon: "settings", label: "Général" },
+        { id: "bar", icon: "dashboard", label: "Barre" },
+        { id: "look", icon: "palette", label: "Apparence" },
+        { id: "pill", icon: "pill", label: "Pilule" },
+        { id: "game", icon: "sports_esports", label: "Jeu et absence" },
+        { id: "access", icon: "accessibility_new", label: "Accessibilité" },
+        { id: "weather", icon: "partly_cloudy_day", label: "Météo et agenda" },
+        { id: "keys", icon: "keyboard", label: "Raccourcis" },
+        { id: "addons", icon: "grid_view", label: "Addons" },
+        { id: "updates", icon: "system_update", label: "Mises à jour" }
+    ]
+    onSectionChanged: flick.contentY = 0
+    // notes de version (CHANGELOG.md embarque)
+    property var changelog: []
     property bool autostart: false
     property bool autostartBusy: false
     property var monitors: []
@@ -25,6 +43,9 @@ Item {
             Ilot.cfg = Object.assign({}, Ilot.cfg, s)
         })
         refreshWinKey()
+        if (!changelog.length)
+            Api.invoke("changelog").then(l => { page.changelog = l })
+        Api.invoke("update_get").then(u => { Watch.upd = u })
     }
     function refreshWinKey() {
         Api.invoke("winkey_status").then(st => { page.winkey = st })
@@ -48,15 +69,76 @@ Item {
     Connections {
         target: Ilot
         function onFocusCity() {
-            flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, cityCard.y - 40))
-            Ilot.grabFocus()
-            cityField.input.forceActiveFocus()
+            Ilot.settingsSection = "weather"
+            Qt.callLater(() => {
+                flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, cityCard.y - 40))
+                Ilot.grabFocus()
+                cityField.input.forceActiveFocus()
+            })
+        }
+    }
+
+    // ------------------------------------------------- onglets (a gauche)
+    Flickable {
+        id: navFlick
+        width: 176
+        height: parent.height
+        contentHeight: nav.height
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        Column {
+            id: nav
+            width: parent.width
+            spacing: 3
+            Repeater {
+                model: page.sections
+                Btn {
+                    id: navBtn
+                    required property var modelData
+                    readonly property bool on: page.section === modelData.id
+                    width: nav.width
+                    height: 38
+                    radius: on || hovered ? 19 : 14
+                    Behavior on radius { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
+                    color: on ? Theme.secondaryContainer : hovered ? Theme.surfaceHigh : "transparent"
+                    readonly property color fg: on ? Theme.inkSecondaryContainer : Theme.ink
+                    onClicked: Ilot.settingsSection = modelData.id
+                    Ms {
+                        x: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: navBtn.modelData.icon
+                        size: 19
+                        color: navBtn.on ? navBtn.fg : Theme.inkVariant
+                    }
+                    Txt {
+                        x: 42
+                        width: parent.width - x - 22
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: navBtn.modelData.label
+                        weight: navBtn.on ? Font.Medium : Font.Normal
+                        color: navBtn.fg
+                        elide: Text.ElideRight
+                    }
+                    // pastille : mise a jour disponible
+                    Rectangle {
+                        visible: navBtn.modelData.id === "updates" && !!Watch.upd.available
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 8
+                        height: 8
+                        radius: 4
+                        color: Theme.error
+                    }
+                }
+            }
         }
     }
 
     Flickable {
         id: flick
         anchors.fill: parent
+        anchors.leftMargin: navFlick.width + 12
         anchors.rightMargin: 4
         contentHeight: col.height
         clip: true
@@ -70,6 +152,7 @@ Item {
 
             // ------------------------------------------------- demarrage
             Block {
+                sec: "general"
                 SetRow {
                     icon: "rocket_launch"
                     title: "Lancer au démarrage de Windows"
@@ -86,6 +169,7 @@ Item {
 
             // ------------------------------------------- touche Windows
             Block {
+                sec: "general"
                 SetRow {
                     icon: "apps"
                     title: "Touche Windows"
@@ -134,6 +218,7 @@ Item {
 
             // ------------------------------------------------------ ecran
             Block {
+                sec: "general"
                 SetRow {
                     icon: "desktop_windows"
                     title: "Écran de l'îlot"
@@ -191,6 +276,7 @@ Item {
 
             // ------------------------------------------------------ barre
             Block {
+                sec: "bar"
                 SetRow {
                     icon: "dashboard"
                     title: "Barre en haut de l'écran"
@@ -239,6 +325,7 @@ Item {
 
             // ------------------------------------------------- apparence
             Block {
+                sec: "look"
                 SetRow {
                     icon: "palette"
                     title: "Apparence"
@@ -496,6 +583,7 @@ Item {
 
             // ---------------------------------------------------- pilule
             Block {
+                sec: "pill"
                 SetRow {
                     icon: "pill"
                     title: "Pilule"
@@ -564,6 +652,7 @@ Item {
 
             // -------------------------------------------- mode jeu, absent
             Block {
+                sec: "game"
                 SetRow {
                     icon: "sports_esports"
                     title: "Mode jeu"
@@ -621,6 +710,7 @@ Item {
 
             // --------------------------------------------- accessibilite
             Block {
+                sec: "access"
                 SetRow {
                     icon: "accessibility_new"
                     title: "Accessibilité"
@@ -655,6 +745,7 @@ Item {
             // ------------------------------------------------------ meteo
             Block {
                 id: cityCard
+                sec: "weather"
                 SetRow {
                     icon: "partly_cloudy_day"
                     title: "Météo"
@@ -749,6 +840,7 @@ Item {
 
             // ---------------------------------------------------- agendas
             Block {
+                sec: "weather"
                 SetRow {
                     icon: "event"
                     title: "Agenda"
@@ -833,6 +925,7 @@ Item {
 
             // ------------------------------------------ rotation des fonds
             Block {
+                sec: "look"
                 SetRow {
                     icon: "autorenew"
                     title: "Changer de fond automatiquement"
@@ -847,6 +940,7 @@ Item {
 
             // ---------------------------------------------- notifications
             Block {
+                sec: "general"
                 SetRow {
                     icon: "notifications"
                     title: "Notifications dans l'îlot"
@@ -867,6 +961,7 @@ Item {
 
             // ----------------------------------------- raccourcis clavier
             Block {
+                sec: "keys"
                 SetRow {
                     icon: "keyboard"
                     title: "Raccourcis clavier"
@@ -881,6 +976,7 @@ Item {
 
             // ---------------------------------------------- sauvegarde
             Block {
+                sec: "general"
                 SetRow {
                     icon: "settings_backup_restore"
                     title: "Sauvegarde des réglages"
@@ -908,9 +1004,294 @@ Item {
                     }
                 }
             }
+
+            // ---------------------------------------------------- addons
+            Block {
+                sec: "addons"
+                SetRow {
+                    icon: "grid_view"
+                    title: "Addons"
+                    sub: "Choisis les onglets du panneau. Les essentiels sont toujours là ; un addon désactivé n'a plus d'onglet et ne tourne plus en arrière-plan"
+                }
+                SubTitle { text: "Essentiels" }
+                Flow {
+                    width: parent.width
+                    topPadding: 8
+                    spacing: 6
+                    Repeater {
+                        model: Ilot.catalog.filter(t => t.core)
+                        Rectangle {
+                            required property var modelData
+                            width: coreRow.implicitWidth + 22
+                            height: 30
+                            radius: 15
+                            color: Theme.surfaceHigh
+                            Row {
+                                id: coreRow
+                                anchors.centerIn: parent
+                                spacing: 6
+                                Ms {
+                                    name: parent.parent.modelData.icon
+                                    size: 16
+                                    color: Theme.inkVariant
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Txt {
+                                    text: parent.parent.modelData.label || parent.parent.modelData.tip
+                                    px: 12.5
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+                        }
+                    }
+                }
+                Row {
+                    topPadding: 14
+                    spacing: 8
+                    TextBtn {
+                        icon: "check"
+                        text: "Tout activer"
+                        disabled: Ilot.addons.every(a => Ilot.hasTab(a.id))
+                        onClicked: Ilot.setCfg({ addons: Ilot.addons.map(a => a.id) })
+                    }
+                    TextBtn {
+                        icon: "remove"
+                        text: "Essentiels seulement"
+                        disabled: !(Ilot.cfg.addons || []).length
+                        onClicked: {
+                            if (Ilot.hasTab("sounds"))
+                                Ilot.setAddon("sounds", false)
+                            Ilot.setCfg({ addons: [] })
+                        }
+                    }
+                }
+            }
+            Block {
+                sec: "addons"
+                SetRow {
+                    title: "Disponibles"
+                    sub: (Ilot.cfg.addons || []).length + " sur " + Ilot.addons.length + " activés"
+                }
+                Column {
+                    width: parent.width
+                    topPadding: 6
+                    spacing: 12
+                    Repeater {
+                        model: Ilot.addons
+                        SetRow {
+                            required property var modelData
+                            icon: modelData.icon
+                            title: modelData.label
+                            sub: modelData.desc
+                            toggle: true
+                            checked: Ilot.hasTab(modelData.id)
+                            onToggled: on => Ilot.setAddon(modelData.id, on)
+                        }
+                    }
+                }
+            }
+
+            // ----------------------------------------------- mises a jour
+            Block {
+                sec: "updates"
+                SetRow {
+                    icon: "system_update"
+                    title: "Îlot " + (Watch.upd.current || "")
+                    sub: page.updateText(Watch.upd)
+                }
+                // avancement du telechargement
+                Item {
+                    visible: Watch.upd.status === "downloading"
+                    width: parent.width
+                    height: visible ? 18 : 0
+                    Rectangle {
+                        x: 54
+                        y: 12
+                        width: parent.width - 54
+                        height: 6
+                        radius: 3
+                        color: Theme.surfaceHighest
+                        Rectangle {
+                            width: parent.width * Math.max(0.02, Watch.upd.progress || 0)
+                            height: parent.height
+                            radius: 3
+                            color: Theme.primary
+                            Behavior on width { NumberAnimation { duration: 250 } }
+                        }
+                    }
+                }
+                Flow {
+                    x: 54
+                    width: parent.width - 54
+                    topPadding: 12
+                    spacing: 8
+                    TextBtn {
+                        icon: "refresh"
+                        text: "Rechercher"
+                        busy: Watch.upd.status === "checking"
+                        disabled: ["checking", "downloading", "installing"].indexOf(Watch.upd.status) >= 0
+                        onClicked: Api.invoke("update_check").then(u => { Watch.upd = u })
+                    }
+                    TextBtn {
+                        visible: !!Watch.upd.available && ["idle", "error"].indexOf(Watch.upd.status) >= 0
+                        primary: true
+                        icon: "download"
+                        text: "Télécharger " + Watch.upd.latest + (Watch.upd.size ? " (" + Watch.fmtSize(Watch.upd.size) + ")" : "")
+                        onClicked: Api.invoke("update_download").then(u => { Watch.upd = u })
+                    }
+                    TextBtn {
+                        visible: Watch.upd.status === "ready" || Watch.upd.status === "installing"
+                        primary: true
+                        icon: "restart_alt"
+                        text: "Installer et redémarrer"
+                        busy: Watch.upd.status === "installing"
+                        disabled: Watch.upd.status === "installing"
+                        onClicked: Watch.installUpdate()
+                    }
+                    TextBtn {
+                        visible: !!Watch.upd.url
+                        icon: "open_in_new"
+                        text: "Sur GitHub"
+                        onClicked: Api.invoke("open_url", { url: Watch.upd.url })
+                    }
+                }
+                // notes de la version disponible
+                Column {
+                    visible: !!Watch.upd.available && !!Watch.upd.notes
+                    x: 54
+                    width: parent.width - 54
+                    topPadding: 6
+                    SubTitle { text: "Nouveautés de la version " + Watch.upd.latest }
+                    Txt {
+                        topPadding: 6
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        textFormat: Text.MarkdownText
+                        text: Watch.upd.notes || ""
+                        px: 12.5
+                        onLinkActivated: l => Api.invoke("open_url", { url: l })
+                    }
+                }
+                SubTitle { text: "Mises à jour automatiques" }
+                Chips {
+                    model: [["auto", "Télécharger et installer"], ["notify", "Prévenir seulement"], ["off", "Ne pas vérifier"]]
+                    current: page.cfg.update_mode || "notify"
+                    onPicked: v => Ilot.setCfg({ update_mode: v })
+                }
+                Txt {
+                    topPadding: 8
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    px: 11.5
+                    color: Theme.inkVariant
+                    text: page.cfg.update_mode === "auto"
+                        ? "Vérifié au démarrage puis toutes les 6 h. La nouvelle version est installée après 10 min sans clavier ni souris (hors jeu), ou au lancement suivant ; l'îlot redémarre tout seul."
+                        : page.cfg.update_mode === "off" ? "Le bouton Rechercher vérifie quand tu veux."
+                        : "Vérifié au démarrage puis toutes les 6 h ; la pilule te prévient quand une version sort."
+                }
+            }
+            // notes de version de chaque version (CHANGELOG.md)
+            Block {
+                sec: "updates"
+                SetRow {
+                    icon: "new_releases"
+                    title: "Notes de version"
+                    sub: "Ce qui a changé dans chaque version"
+                }
+                Column {
+                    width: parent.width
+                    topPadding: 8
+                    spacing: 8
+                    Repeater {
+                        model: page.changelog
+                        Rectangle {
+                            id: rel
+                            required property var modelData
+                            required property int index
+                            readonly property bool cur: modelData.version === Watch.upd.current
+                            // les deux dernieres versions depliees
+                            property bool open: index < 2
+                            width: parent.width
+                            height: relCol.height + 20
+                            radius: 16
+                            color: cur ? Theme.secondaryContainer : Theme.surfaceHigh
+                            Column {
+                                id: relCol
+                                x: 14
+                                y: 10
+                                width: parent.width - 28
+                                spacing: 4
+                                Btn {
+                                    width: parent.width
+                                    height: 28
+                                    radius: 10
+                                    color: "transparent"
+                                    onClicked: rel.open = !rel.open
+                                    Txt {
+                                        id: relVer
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: rel.modelData.version
+                                        px: 15
+                                        weight: Font.DemiBold
+                                        color: rel.cur ? Theme.inkSecondaryContainer : Theme.ink
+                                    }
+                                    Txt {
+                                        x: relVer.width + 10
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: (rel.cur ? "Version actuelle" : "") + (rel.cur && rel.modelData.date ? " · " : "") + rel.modelData.date
+                                        px: 12
+                                        color: rel.cur ? Theme.inkSecondaryContainer : Theme.inkVariant
+                                    }
+                                    Ms {
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        name: "expand_more"
+                                        size: 20
+                                        rotation: rel.open ? 180 : 0
+                                        color: rel.cur ? Theme.inkSecondaryContainer : Theme.inkVariant
+                                        Behavior on rotation { NumberAnimation { duration: 250 } }
+                                    }
+                                }
+                                Txt {
+                                    visible: rel.open
+                                    width: parent.width
+                                    wrapMode: Text.Wrap
+                                    textFormat: Text.MarkdownText
+                                    text: rel.modelData.notes
+                                    px: 12.5
+                                    color: rel.cur ? Theme.inkSecondaryContainer : Theme.ink
+                                    onLinkActivated: l => Api.invoke("open_url", { url: l })
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     Scroller { flick: flick }
+
+    // etat de la mise a jour, en une phrase
+    function updateText(u) {
+        switch (u.status) {
+        case "checking":
+            return "Recherche d'une nouvelle version…"
+        case "downloading":
+            return "Téléchargement de la version " + u.latest + "… " + Math.round((u.progress || 0) * 100) + " %"
+        case "ready":
+            return "Version " + u.latest + " téléchargée, prête à installer"
+        case "installing":
+            return "Installation : l'îlot va redémarrer…"
+        case "error":
+            return u.error || "La recherche a échoué"
+        }
+        if (u.available)
+            return "La version " + u.latest + " est disponible"
+        if (!u.checked)
+            return "Pas encore vérifié"
+        const d = new Date(u.checked * 1000)
+        return "Tu as la dernière version · vérifié à " + Ilot.pad(d.getHours()) + ":" + Ilot.pad(d.getMinutes())
+    }
 
     // recherche de ville (geocodage Open-Meteo)
     property var cities: []
@@ -943,11 +1324,10 @@ Item {
         ["Rétro", { color: "#c0ca33", variant: "fruitsalad", mode: "dark", island_bg: "solid", border: "pulse", shape: "square" }],
         ["Monochrome", { color: "#9e9e9e", variant: "monochrome", mode: "dark", island_bg: "black", border: "none", shape: "pill" }]
     ]
+    // actions, puis un raccourci par onglet affiche (essentiels + addons actives)
     readonly property var keyActions: [
-        ["toggle", "Ouvrir / fermer l’îlot"], ["play", "Lecture / pause"], ["next", "Morceau suivant"], ["captions", "Sous-titres en direct"],
-        ["home", "Accueil"], ["media", "Média"], ["ctrl", "Contrôles"], ["apps", "Apps"], ["mail", "Mail"], ["pc", "PC"],
-        ["sounds", "Soundboard"], ["tasks", "Tâches"], ["clips", "Presse-papiers"], ["assist", "Assistant"], ["walls", "Fonds"], ["settings", "Réglages"]
-    ]
+        ["toggle", "Ouvrir / fermer l’îlot"], ["play", "Lecture / pause"], ["next", "Morceau suivant"], ["captions", "Sous-titres en direct"]
+    ].concat(Ilot.tabItems.map(t => [t.id, t.label || t.tip]))
     // « Ctrl+Alt+KeyM » -> « Ctrl+Alt+M »
     function keyLabel(c) {
         return c.replace(/Key([A-Z])/g, "$1").replace(/Digit(\d)/g, "$1").replace(/Numpad/g, "Pavé ").replace(/VK(\d+)/, "touche $1")
@@ -957,6 +1337,9 @@ Item {
     // carte de reglages
     component Block: Card {
         default property alias content: inner.data
+        // onglet des reglages ou la carte s'affiche
+        property string sec
+        visible: sec === page.section
         width: col.width
         height: inner.height + 28
         Column {

@@ -331,7 +331,7 @@ fn refresh(app: &AppHandle) -> Inbox {
 /// Verifie les boites toutes les deux minutes.
 pub fn watch(app: AppHandle) {
     std::thread::spawn(move || loop {
-        if !load_accounts().is_empty() {
+        if crate::settings::addon_on(&app, "mail") && !load_accounts().is_empty() {
             refresh(&app);
         }
         std::thread::sleep(POLL);

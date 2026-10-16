@@ -1,0 +1,72 @@
+# Publie une version : pousser un tag `v<version>` (la version de Cargo.toml).
+# Compile l'ilot (coeur Rust + interface Qt), l'emballe dans
+# `ilot-<version>-win64.zip` et cree la version GitHub avec les notes de
+# CHANGELOG.md. Les ilots installes la trouvent par l'API Releases
+# (src/update.rs) et l'installent.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Qt 6.9
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.9.3"
+          arch: win64_msvc2022_64
+          modules: qtshadertools
+          cache: true
+
+      - name: Version
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq "tag" -and $env:GITHUB_REF_NAME -ne "v$v") {
+            throw "Le tag $env:GITHUB_REF_NAME ne correspond pas a la version $v de Cargo.toml"
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Compiler
+        shell: cmd
+        run: |
+          set QTDIR=%QT_ROOT_DIR%
+          call qt\build.cmd
+
+      - name: Archive et notes de version
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          # memes fichiers que install.ps1 : sans les fichiers de compilation
+          robocopy "qt\build" "dist\Ilot" /E /XD CMakeFiles .rcc .qt ilot_autogen Ilot /XF *.obj *.ninja* *.cmake CMakeCache.txt *.lib *.exp *.pdb *.ilk /NFL /NDL /NJH /NJS
+          if ($LASTEXITCODE -ge 8) { throw "robocopy $LASTEXITCODE" }
+          Compress-Archive -Path "dist\Ilot" -DestinationPath "ilot-$v-win64.zip"
+          # section `## <version>` de CHANGELOG.md
+          $notes = @(); $in = $false
+          foreach ($l in Get-Content CHANGELOG.md -Encoding utf8) {
+            if ($l -match '^## ') { if ($in) { break }; $in = $l -match "^## v?$([regex]::Escape($v))\b"; continue }
+            if ($in) { $notes += $l }
+          }
+          ($notes -join "`n").Trim() | Out-File notes.md -Encoding utf8
+          exit 0
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Îlot ${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          body_path: notes.md
+          files: ilot-${{ steps.version.outputs.version }}-win64.zip
