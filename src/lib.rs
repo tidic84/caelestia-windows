@@ -4,26 +4,40 @@
 //! arguments que les commandes Tauri d'avant) et recoit les evenements par
 //! la fonction passee a `ilot_start`.
 
+mod activity;
 mod apps;
 mod audio;
 mod bar;
+mod boost;
+mod captions;
+mod decode;
 mod discord;
 mod display;
 mod events;
+mod files;
 mod games;
+mod health;
 mod host;
 mod google;
 mod img;
+mod lyrics;
 mod mail;
 mod media;
 mod net;
 mod notif;
 mod pc;
+mod pdh;
+mod prefs;
+mod privacy;
 mod settings;
+mod share;
+mod soundboard;
+mod status;
 mod store;
 mod system;
 mod tasks;
 mod theme;
+mod translate;
 mod wall;
 mod we;
 mod winkey;
@@ -73,6 +87,16 @@ pub(crate) fn wait<T: windows_core::RuntimeType + 'static>(
         return Err(windows_core::HRESULT(0x8007_05B4_u32 as i32).into());
     }
     op.GetResults()
+}
+
+/// Client HTTPS (TLS de Windows) pour les services web (paroles, traduction,
+/// etat des services, pilote NVIDIA).
+pub fn http() -> ureq::Agent {
+    let mut b = ureq::AgentBuilder::new().timeout_connect(std::time::Duration::from_secs(6));
+    if let Ok(tls) = native_tls::TlsConnector::new() {
+        b = b.tls_connector(std::sync::Arc::new(tls));
+    }
+    b.build()
 }
 
 pub fn com_init_sta() {
@@ -252,6 +276,7 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "caffeine_set" => json(system::caffeine_set(app, a!("on"))),
         "caffeine_get" => json(system::caffeine_get()),
         "user_info" => json(system::user_info()),
+        "motion_reduced" => json(system::motion_reduced()),
         "http_get" => system::http_get(a!("url")).and_then(json),
         "open_url" => json(system::open_url(a!("url"))),
         // son
@@ -262,6 +287,9 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "viz_set" => json(audio::viz_set(app, a!("on"))),
         "app_volume_get" => json(audio::app_volume_get(a!("app"), a!("mic"))),
         "app_volume_set" => json(audio::app_volume_set(a!("app"), a!("mic"), a!("level"), a!("muted"))),
+        "fg_volume" => json(audio::fg_volume(a!("step"))),
+        "boost_get" => json(boost::boost_get()),
+        "boost_set" => json(boost::boost_set(a!("gain"))),
         // ecran, reseau
         "brightness_get" => json(display::brightness_get(w.clone())),
         "brightness_set" => json(display::brightness_set(w.clone(), a!("level"))),
@@ -299,12 +327,24 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "pick_folder" => json(games::pick_folder(app, a!("title"))),
         "file_info" => json(games::file_info(a!("path"))),
         "file_open" => json(games::file_open(a!("path"))),
+        "file_reveal" => json(files::file_reveal(a!("path"))),
+        "img_convert" => files::img_convert(a!("path"), a!("to")).and_then(json),
+        "img_shrink" => files::img_shrink(a!("path")).and_then(json),
+        "zip_files" => files::zip_files(a!("paths")).and_then(json),
+        "files_copy" => json(files::files_copy(a!("paths"))),
+        // partage avec le telephone
+        "share_start" => share::share_start(app, app.state(), a!("paths")).and_then(json),
+        "share_stop" => json(share::share_stop(app.state())),
         // reglages
         "settings_get" => json(settings::settings_get(app.state())),
         "settings_autostart" => json(settings::settings_autostart(a!("on"))),
         "settings_monitor" => json(settings::settings_monitor(app, app.state(), a!("id"))),
         "settings_set" => json(settings::settings_set(app, a!("patch"))),
         "monitor_target" => json(settings::target_screen(&app)),
+        "shortcuts_get" => json(prefs::shortcuts_get()),
+        "shortcuts_set" => json(prefs::shortcuts_set(a!("map"))),
+        "settings_export" => json(prefs::settings_export(app)),
+        "settings_import" => prefs::settings_import(app).and_then(json),
         // barre
         "bar_windows" => json(bar::bar_windows(w.clone())),
         "task_icon" => json(bar::task_icon(a!("key"), a!("id"))),
@@ -320,6 +360,25 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "tasks_get" => json(tasks::tasks_get(app.state())),
         "task_kill" => json(tasks::task_kill(app.state(), a!("name"))),
         "taskmgr_open" => json(tasks::taskmgr_open()),
+        // sante, services, jeux en cours, inactivite
+        "health_get" => json(health::health_get()),
+        "health_clean" => json(health::health_clean(a!("ids"))),
+        "idle_secs" => json(health::idle_secs()),
+        "services_get" => json(status::services_get(app, a!("fresh"))),
+        "game_focus" => json(activity::game_focus()),
+        // soundboard
+        "sb_devices" => json(soundboard::sb_devices()),
+        "sb_config" => json(soundboard::sb_config(app, a!("cfg"))),
+        "sb_import" => soundboard::sb_import(a!("path")).and_then(json),
+        "sb_pick" => json(soundboard::sb_pick(app)),
+        "sb_delete" => json(soundboard::sb_delete(a!("id"))),
+        "sb_play" => json(soundboard::sb_play(app, a!("id"), a!("volume"), a!("exclusive"))),
+        "sb_stop" => json(soundboard::sb_stop(a!("id"))),
+        // paroles, traduction, sous-titres
+        "lyrics_get" => lyrics::lyrics_get(a!("artist"), a!("title"), a!("album"), a!("duration")).and_then(json),
+        "translate" => translate::translate(a!("text"), a!("from"), a!("to")).and_then(json),
+        "captions_set" => json(captions::captions_set(app, a!("on"))),
+        "captions_on" => json(captions::captions_on()),
         // Discord
         "discord_get" => json(discord::discord_get(app.state())),
         "discord_setup" => discord::discord_setup(app.state(), a!("clientId"), a!("secret")).and_then(json),
@@ -382,7 +441,9 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
     app.manage(tasks::Tasks::default());
     app.manage(discord::Discord::default());
     app.manage(mail::MailState(Mutex::new(Default::default())));
+    app.manage(share::Share::default());
     settings::init(&app);
+    prefs::init(&app);
     winkey::init(&app);
     events::start();
     bar::sync(&app);
@@ -404,6 +465,10 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
     discord::start(app);
     games::load(app);
     apps::load(app);
+    activity::watch(app);
+    health::watch(app);
+    status::watch(app);
+    privacy::watch(app);
 }
 
 /// Au moment de quitter : barre des taches Windows et ecran rendus.

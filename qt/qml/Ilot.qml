@@ -14,7 +14,13 @@ Item {
     property var cfg: ({
         variant: "tonalspot", mode: "dark", win_accent: false, win_mode: false, island_bg: "solid", city: null, icals: [],
         rotate_min: 0, notif_popups: true, dnd: false, osd: true, bar: false, hide_taskbar: true,
-        bar_islands: true, bar_tasks: false, bar_autohide: true, win_key: false
+        bar_islands: true, bar_tasks: false, bar_autohide: true, win_key: false,
+        // apparence de la pilule, compagnon, accessibilite, mode jeu... (gardes
+        // tels quels par le coeur dans settings.json)
+        color: "auto", day: "07:00", night: "20:00", border: "none", shape: "round", anim: "normal",
+        text_size: 100, contrast: "normal", motion: "system", cvd: "off", activity: true, game_mode: true,
+        game_perf: true, game_notif: false, match_alert: true, mix_auto: true, away: "on", pet: "blob",
+        pet_walk: true, clock: "digital", privacy: true, wxfx: true, dc_pill: true, media_bg: "art", pill_size: "m"
     })
     signal settingsChanged()
 
@@ -40,7 +46,8 @@ Item {
     // ======================================================= ilot
     // collapsed -> (survol) peek -> (clic / molette) open
     // En replie, une « activite » (OSD, notification...) peut agrandir la pilule.
-    readonly property var openSize: ({ w: 740, h: 540 })
+    // Apparence > Taille du texte : le panneau grandit avec le texte
+    readonly property var openSize: ({ w: Math.round(740 * Theme.textK), h: Math.round(540 * Theme.textK) })
     readonly property int earMax: 22
     readonly property int barH: 30
     property string mode: "collapsed"
@@ -56,7 +63,7 @@ Item {
     property var act: null
     property string currentTab: "home"
     property int tabDir: 1
-    readonly property var tabs: ["home", "media", "ctrl", "apps", "mail", "pc", "tasks", "clips", "walls", "settings"]
+    readonly property var tabs: ["home", "media", "ctrl", "apps", "mail", "pc", "sounds", "tasks", "clips", "assist", "walls", "settings"]
     // taille de l'ecran de l'ilot (pixels logiques), pour le panneau agrandi
     property real screenW: 1920
     property real screenH: 1080
@@ -99,23 +106,36 @@ Item {
     readonly property int unread: inbox.accounts.reduce((n, a) => n + a.unread, 0)
     readonly property int indCount: (caffeine ? 1 : 0) + (cfg.dnd ? 1 : 0) + (unread > 0 ? 1 : 0)
     readonly property bool timerShown: tmr.running
+    // Apparence > Taille de la pilule (replie / survol ; pas le panneau ouvert)
+    readonly property real pillK: mode === "open" ? 1 : ({ s: 0.85, m: 1, l: 1.2 })[cfg.pill_size] || 1
+    // largeur de l'horloge selon son style (Apparence > Horloge de la pilule)
+    readonly property int clockExtra: ({ flip: 10, analog: -16, pixel: 6 })[cfg.clock] || 0
 
     function sizeFor(s) {
         if (s === "open")
             return big ? bigSize : openSize
-        if (s === "peek")
-            return hasMedia ? { w: 420, h: 66 } : { w: weather ? 320 : 250, h: 50 }
+        if (s === "peek") {
+            const p = hasMedia ? { w: 420, h: 66 } : Watch.actShown ? { w: 380, h: 60 } : { w: weather ? 320 : 250, h: 50 }
+            return Watch.dcShown ? { w: p.w + 70, h: p.h } : p
+        }
         if (act)
             return act.size
         let w = hasMedia ? 200 : 132
-        w += indCount * 24
+        w += indCount * 24 + clockExtra
         if (timerShown)
             w += 70
+        // compagnon, activite (telechargement, jeu), Discord, voyant, extinction
+        w += (Watch.petShown ? 24 : 0) + (Watch.actShown ? 72 : 0) + (Watch.dcShown ? 26 : 0)
+            + (Watch.privShown ? 18 : 0) + (Watch.offShown ? 62 : 0)
         return { w: w, h: 30 }
     }
     // rayon des coins bas
     function radiusFor(s) {
-        return s === "open" ? 30 : s === "peek" ? (hasMedia ? 26 : 22) : act ? 20 : 15
+        const r = s === "open" ? 30 : s === "peek" ? (hasMedia ? 26 : 22) : act ? 20 : 15
+        // Apparence > Forme de l'ilot (le panneau ouvert garde ses coins)
+        if (s === "open")
+            return r
+        return cfg.shape === "pill" ? Math.min(sizeFor(s).h, r * 1.6) : cfg.shape === "square" ? r * 0.35 : r
     }
     readonly property var size: sizeFor(mode)
     readonly property real radius: radiusFor(mode)
@@ -210,6 +230,8 @@ Item {
         if (save !== false)
             saveLayout()
     }
+    // taille du texte changee : la fenetre suit le panneau normal
+    onOpenSizeChanged: if (!big) Backend.winResize(openSize.w + 60, openSize.h + 60)
     function setLocked(on, save) {
         locked = on
         if (on)
@@ -430,14 +452,20 @@ Item {
             return
         }
         const url = "https://api.open-meteo.com/v1/forecast?latitude=" + c.lat + "&longitude=" + c.lon
-            + "&current=temperature_2m,apparent_temperature,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1"
+            + "&current=temperature_2m,apparent_temperature,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto&forecast_days=1"
         Api.invoke("http_get", { url: url }).then(text => {
             const j = JSON.parse(text)
             const w = wmo[j.current.weather_code] || ["cloud", "—"]
+            // « 2026-10-16T08:12 » -> minutes (theme clair / sombre « soleil »)
+            const mins = t => t ? Number(t.slice(11, 13)) * 60 + Number(t.slice(14, 16)) : NaN
+            const sun = [mins((j.daily.sunrise || [])[0]), mins((j.daily.sunset || [])[0])]
+            if (sun.every(Number.isFinite))
+                root.sunTimes = sun
             root.weather = {
                 icon: j.current.is_day ? w[0] : night[w[0]] || w[0], label: w[1],
                 temp: Math.round(j.current.temperature_2m), feels: Math.round(j.current.apparent_temperature),
-                min: Math.round(j.daily.temperature_2m_min[0]), max: Math.round(j.daily.temperature_2m_max[0])
+                min: Math.round(j.daily.temperature_2m_min[0]), max: Math.round(j.daily.temperature_2m_max[0]),
+                code: j.current.weather_code, day: !!j.current.is_day
             }
         }).catch(e => console.warn("météo", e))
     }
@@ -740,16 +768,49 @@ Item {
     // ==================================================== theme
     property bool winLight: false
     property var sourceArgb: null
-    readonly property bool dark: cfg.mode === "auto" ? !winLight : cfg.mode !== "light"
+    // couleur tiree de la pochette en cours (Apparence > Couleur : Pochette)
+    property var artArgb: null
+    // lever / coucher du soleil, en minutes depuis minuit (donnes par la meteo)
+    property var sunTimes: null
+    // minute courante, pour les modes « selon l'heure » et « soleil »
+    readonly property int nowMin: now.getHours() * 60 + now.getMinutes()
+    function hmMin(s) {
+        const p = String(s || "0:0").split(":").map(Number)
+        return p[0] * 60 + (p[1] || 0)
+    }
+    readonly property bool dark: {
+        const m = cfg.mode
+        if (m === "auto")
+            return !winLight
+        if (m === "time" || m === "sun") {
+            const ab = m === "sun" && sunTimes ? sunTimes : [hmMin(cfg.day), hmMin(cfg.night)]
+            const a = ab[0], b = ab[1], n = nowMin
+            return a <= b ? !(n >= a && n < b) : (n >= b && n < a)
+        }
+        return m !== "light"
+    }
+    onDarkChanged: applyTheme()
     property int themeSerial: 0
+    // couleur source effective : fixe, pochette (sinon fond d'ecran), fond d'ecran
+    readonly property var themeArgb: {
+        const c = cfg.color || "auto"
+        if (/^#[0-9a-fA-F]{6}$/.test(c))
+            return 0xff000000 | parseInt(c.slice(1), 16)
+        if (c === "art" && hasMedia && artArgb !== null)
+            return artArgb
+        return sourceArgb
+    }
+    onThemeArgbChanged: applyTheme()
 
     function applyTheme() {
         Theme.light = !dark
-        if (sourceArgb === null)
+        const src = themeArgb
+        if (src === null || src === undefined)
             return
-        const s = Theme.scheme(sourceArgb, cfg.variant, dark)
+        const s = Theme.scheme(src, cfg.variant, dark)
         const p = Theme.paletteOf(s)
         Theme.applyPalette(p)
+        Theme.applyLook(cfg)
         saveUi({ palette: p, light: !dark })
         syncWindows(s, dark)
         themeSerial++
@@ -772,7 +833,13 @@ Item {
     property WorkerScript quant: WorkerScript {
         source: "quant.mjs"
         onMessage: m => {
-            if (m.id !== root.quantId || m.source === null)
+            if (m.source === null)
+                return
+            if (m.id === root.artQuantId) {
+                root.artArgb = m.source
+                return
+            }
+            if (m.id !== root.quantId)
                 return
             root.sourceArgb = m.source
             root.saveUi({ source: m.source })
@@ -790,6 +857,20 @@ Item {
         quantId++
         quant.sendMessage({ id: quantId, pixels: px })
     }
+    // couleur de la pochette, seulement si elle sert (Apparence > Couleur : Pochette)
+    property int artQuantId: -1
+    property int artSeq: 0
+    function artColor() {
+        if (cfg.color !== "art" || !art)
+            return
+        const px = Backend.imagePixels(art, 64)
+        if (!px.length)
+            return
+        // identifiants a part : ceux du fond d'ecran restent valables
+        artQuantId = 1000000 + ++artSeq
+        quant.sendMessage({ id: artQuantId, pixels: px })
+    }
+    onArtChanged: artColor()
 
     // --- fond de l'ilot : opacite de la couleur de surface, ou flou acrylique
     // de Windows derriere (WinCtl.setBackdrop)
@@ -797,13 +878,17 @@ Item {
     property bool acrylic: false
     function applyIslandBg() {
         const m = cfg.island_bg || "solid"
-        Theme.islandAlpha = islandAlpha[m] !== undefined ? islandAlpha[m] : 1
-        acrylic = m === "wall"
+        // contraste eleve : fond toujours opaque
+        Theme.islandAlpha = cfg.contrast === "high" ? 1 : islandAlpha[m] !== undefined ? islandAlpha[m] : 1
+        Theme.islandBlack = m === "black"
+        acrylic = m === "wall" && cfg.contrast !== "high"
     }
 
     // les reglages ont change (ici ou par une commande)
     function onSettings() {
+        Theme.applyLook(cfg)
         applyTheme()
+        artColor()
         applyIslandBg()
         if (!barAuto)
             barPeek = false
@@ -903,14 +988,10 @@ Item {
         Api.listen("net", n => { root.net = n })
         Api.listen("caffeine", c => { root.caffeine = c })
         Api.listen("notifs", l => { root.notifs = l })
+        // notifications Windows : par la file de Watch (mode jeu, mode absent)
         Api.listen("notif", x => {
-            if (!root.cfg.notif_popups || root.cfg.dnd)
-                return
             const app = root.appFor(x.app)
-            root.showActivity({
-                kind: "notif", ms: 5200, onClick: () => root.open("ctrl"),
-                pic: x.image || app.icon, title: x.title, sub: app.name + (x.body ? " · " + x.body : "")
-            })
+            Watch.notify({ app: app.name, icon: x.image || app.icon, title: x.title, body: x.body || "", tab: "ctrl", ms: 5200 })
         })
         Api.listen("apps", l => {
             root.apps = l
@@ -1017,6 +1098,7 @@ Item {
             root.seedGames()
         })
         syncWall()
+        Watch.start()
         const t = Backend.startupTab()
         if (t) {
             pinned = true

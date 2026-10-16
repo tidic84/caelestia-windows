@@ -28,7 +28,7 @@ fn default_device() -> windows::core::Result<IMMDevice> {
     unsafe { enumerator()?.GetDefaultAudioEndpoint(eRender, eConsole) }
 }
 
-fn device_id(d: &IMMDevice) -> String {
+pub(crate) fn device_id(d: &IMMDevice) -> String {
     unsafe {
         match d.GetId() {
             Ok(p) => {
@@ -41,7 +41,7 @@ fn device_id(d: &IMMDevice) -> String {
     }
 }
 
-fn device_name(d: &IMMDevice) -> String {
+pub(crate) fn device_name(d: &IMMDevice) -> String {
     unsafe {
         d.OpenPropertyStore(STGM_READ)
             .and_then(|st| st.GetValue(&PKEY_Device_FriendlyName))
@@ -633,4 +633,44 @@ pub fn app_volume_set(app: String, mic: Option<bool>, level: Option<f32>, muted:
         }
     }
     !s.is_empty()
+}
+#[derive(Serialize)]
+pub struct FgVolume {
+    /// nom affiche (description de l'executable, sinon son nom)
+    name: String,
+    level: f32,
+}
+
+/// Maj + molette sur la pilule : volume de l'appli au premier plan (jeu,
+/// navigateur...), par pas de `step`. None si elle ne joue pas de son.
+pub fn fg_volume(step: f32) -> Option<FgVolume> {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+    crate::com_init_mta();
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(GetForegroundWindow(), Some(&mut pid)) };
+    let exe = exe_name_of(pid)?;
+    let list: Vec<ISimpleAudioVolume> = sessions()
+        .ok()?
+        .into_iter()
+        .filter(|(p, system, _)| !system && *p != 0 && exe_name_of(*p).as_deref() == Some(exe.as_str()))
+        .map(|(_, _, v)| v)
+        .collect();
+    let first = list.first()?;
+    let level = unsafe { first.GetMasterVolume().ok()? };
+    // pas de 2 %, comme la molette sur le volume general
+    let level = (((level + step) * 50.0).round() / 50.0).clamp(0.0, 1.0);
+    unsafe {
+        for v in &list {
+            let _ = v.SetMasterVolume(level, std::ptr::null());
+            if level > 0.0 {
+                let _ = v.SetMute(false, std::ptr::null());
+            }
+        }
+    }
+    let path = crate::tasks::exe_path(pid).unwrap_or_default();
+    let name = crate::apps::file_description(&path).unwrap_or_else(|| {
+        let mut c = exe.chars();
+        c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
+    });
+    Some(FgVolume { name, level })
 }

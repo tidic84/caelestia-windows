@@ -63,6 +63,10 @@ pub struct Config {
     /// Remappage de la touche Windows modifie depuis le demarrage de Windows
     /// (un redemarrage est alors necessaire)
     pub win_key_boot: Option<crate::winkey::BootRemap>,
+    /// Reglages de l'interface seule (apparence de la pilule, compagnon,
+    /// accessibilite, mode jeu...) : gardes tels quels, l'interface les lit
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -97,6 +101,7 @@ impl Default for Config {
             taskbar_autohide: None,
             win_key: false,
             win_key_boot: None,
+            extra: serde_json::Map::new(),
         }
     }
 }
@@ -247,7 +252,7 @@ pub fn settings_set(app: AppHandle, patch: serde_json::Value) -> Config {
         let mut v = serde_json::to_value(&*cfg).unwrap_or_default();
         if let (Some(obj), Some(p)) = (v.as_object_mut(), patch.as_object()) {
             for (k, val) in p {
-                if !matches!(k.as_str(), "monitor" | "taskbar_autohide" | "win_key_boot") {
+                if !matches!(k.as_str(), "monitor" | "taskbar_autohide" | "win_key_boot" | "autostart" | "monitors") {
                     obj.insert(k.clone(), val.clone());
                 }
             }

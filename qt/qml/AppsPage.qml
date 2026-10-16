@@ -543,7 +543,9 @@ Item {
             anchors.fill: parent
             anchors.topMargin: -(gridArea.y - folderBar.y)
             onEntered: d => {
-                if (!d.hasUrls)
+                // la Corbeille, Ce PC... n'apportent pas de chemin, mais des
+                // donnees du Shell : on les accepte pour proposer l'emplacement
+                if (!d.hasUrls && !d.formats.some(f => /Shell IDList/i.test(f)))
                     d.accepted = false
             }
             onPositionChanged: d => {
@@ -562,23 +564,82 @@ Item {
                 const chip = page.dropChip
                 page.dropChip = null
                 const paths = d.urls.map(u => decodeURIComponent(String(u).replace(/^file:\/\/\//, "")).replace(/\//g, "\\"))
-                if (!paths.length)
-                    return
+                if (!paths.length) {
+                    // Corbeille, Ce PC... : Windows ne donne pas de chemin, on propose l'emplacement
+                    const q = mapToItem(page, d.x, d.y)
+                    const into = page.findFolder(chip ? chip.fid : "") || page.launcherFolder()
+                    return page.showCtx(q.x, q.y, [{ type: "title", label: "Ajouter un emplacement" }].concat(page.specials.map(x => ({
+                        icon: x[1], label: x[2], run: () => { ctx.hide(); page.addFiles(into, [x[0]]) }
+                    }))))
+                }
                 d.acceptProposedAction()
-                const target = page.findFolder(chip ? chip.fid : Ilot.folders.sel)
+                // lache sur un dossier : range directement
+                const target = chip ? page.findFolder(chip.fid) : null
                 if (target)
                     return page.addFiles(target, paths)
-                // depose hors d'un dossier : demander lequel
+                // ailleurs : actions sur le fichier (conversion, zip, Discord,
+                // telephone) ou dossier ou le ranger
                 const p = mapToItem(page, d.x, d.y)
                 const what = paths.length > 1 ? paths.length + " éléments" : paths[0].split("\\").pop()
-                page.showCtx(p.x, p.y, [
-                    { type: "title", label: "Ranger " + what + " dans…" },
+                const sel = page.findFolder(Ilot.folders.sel)
+                page.showCtx(p.x, p.y, [{ type: "title", label: what }].concat(page.fileActions(paths, p), [
+                    { type: "sep" },
+                    { type: "title", label: "Ranger dans…" }
+                ], sel ? [{ icon: "check", label: sel.name, run: () => { ctx.hide(); page.addFiles(sel, paths) } }] : [], [
                     { icon: "stadia_controller", label: "Launcher de jeux", run: () => { ctx.hide(); page.addFiles(page.launcherFolder(), paths) } }
-                ].concat(Ilot.folders.list.map(f => ({ icon: page.folderIcon(f.name), label: f.name, run: () => { ctx.hide(); page.addFiles(f, paths) } })),
+                ], Ilot.folders.list.filter(f => f !== sel).map(f => ({ icon: page.folderIcon(f.name), label: f.name, run: () => { ctx.hide(); page.addFiles(f, paths) } })),
                     [{ icon: "create_new_folder", label: "Nouveau dossier…", run: () => page.askName(p, "Nouveau dossier", "", name => page.addFiles(Ilot.newFolder(name), paths)) }]))
             }
         }
     }
+    // --- actions sur les fichiers deposes (src/files.rs) : le resultat est cree
+    // a cote du fichier d'origine, puis propose (afficher, ouvrir, Discord)
+    readonly property var specials: [
+        ["shell:RecycleBinFolder", "delete", "Corbeille"], ["shell:MyComputerFolder", "computer", "Ce PC"],
+        ["shell:Downloads", "download", "Téléchargements"], ["shell:ControlPanelFolder", "tune", "Panneau de configuration"],
+        ["shell:NetworkPlacesFolder", "lan", "Réseau"]
+    ]
+    function fileActions(paths, p) {
+        const run = (label, job) => {
+            page.showCtx(p.x, p.y, [{ type: "title", label: "En cours…" }])
+            job().then(outs => page.doneCtx(p, label, outs), e => page.doneCtx(p, "Échec : " + e, []))
+        }
+        const imgs = paths.filter(f => /\.(png|jpe?g|webp|bmp|gif)$/i.test(f))
+        const out = []
+        if (imgs.length) {
+            const toPng = imgs.every(f => /\.jpe?g$/i.test(f))
+            out.push({ icon: "image", label: toPng ? "Convertir en PNG" : "Convertir en JPG", run: () => run("Converti",
+                () => Promise.all(imgs.map(f => Api.invoke("img_convert", { path: f, to: toPng ? "png" : "jpg" })))) })
+            out.push({ icon: "photo_size_select_large", label: "Réduire la taille (1920 px)", run: () => run("Réduit",
+                () => Promise.all(imgs.map(f => Api.invoke("img_shrink", { path: f })))) })
+        }
+        out.push({ icon: "folder_zip", label: "Compresser (.zip)", run: () => run("Compressé", () => Api.invoke("zip_files", { paths: paths }).then(z => [z])) })
+        out.push({ icon: "send", label: "Envoyer sur Discord", run: () => page.sendToDiscord(paths, p) })
+        out.push({ icon: "phonelink", label: "Envoyer sur le téléphone (QR)", run: () => { ctx.hide(); Watch.openShare(paths) } })
+        return out
+    }
+    function doneCtx(p, label, outs) {
+        outs = (outs || []).filter(Boolean)
+        const name = f => f.split("\\").pop()
+        if (!outs.length)
+            return page.showCtx(p.x, p.y, [{ type: "title", label: label }, { icon: "close", label: "Fermer", run: () => ctx.hide() }])
+        page.showCtx(p.x, p.y, [
+            { type: "title", label: label + " : " + (outs.length > 1 ? outs.length + " fichiers" : name(outs[0])) },
+            { icon: "folder_open", label: "Afficher dans l’Explorateur", run: () => { ctx.hide(); Api.invoke("file_reveal", { path: outs[0] }) } }
+        ].concat(outs.length === 1 ? [{ icon: "open_in_new", label: "Ouvrir", run: () => { ctx.hide(); Api.invoke("file_open", { path: outs[0] }) } }] : [],
+            [{ icon: "send", label: "Envoyer sur Discord", run: () => page.sendToDiscord(outs, p) }]))
+    }
+    // Discord n'a pas d'API d'envoi : les fichiers sont copies (comme dans
+    // l'Explorateur), puis Discord passe au premier plan : il reste a coller
+    function sendToDiscord(paths, p) {
+        Api.invoke("files_copy", { paths: paths }).then(ok => {
+            if (ok)
+                Api.invoke("open_url", { url: "discord://-/channels/@me" })
+            page.showCtx(p.x, p.y, [{ type: "title", label: ok ? "Copié ! Dans Discord : Ctrl+V" : "Copie impossible (presse-papiers occupé)" }]
+                .concat(ok ? [{ icon: "check", label: "OK", run: () => ctx.hide() }] : []))
+        })
+    }
+
     function addFiles(f, paths) {
         Ilot.folders.added = Ilot.folders.added || {}
         const list = f.apps.slice()
@@ -845,6 +906,58 @@ Item {
                         px: 9.5
                         opacity: 0.75
                         color: game.cover ? "#ffffff" : Theme.ink
+                    }
+                }
+            }
+            // mise a jour Steam en cours : progression posee sur la jaquette
+            Rectangle {
+                id: dlBox
+                readonly property var d: (Watch.gaming.downloads || []).find(x => "steam:" + x.appid === game.modelData.id) || null
+                visible: !!d
+                anchors.fill: parent
+                radius: parent.radius
+                color: Qt.rgba(0, 0, 0, 0.55)
+                Column {
+                    anchors.centerIn: parent
+                    width: parent.width - 20
+                    spacing: 4
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 4
+                        Ms {
+                            name: !dlBox.d ? "" : !dlBox.d.active ? "pause" : dlBox.d.phase === "install" ? "install_desktop" : "download"
+                            size: 18
+                            color: "#ffffff"
+                        }
+                        Txt {
+                            text: dlBox.d ? Math.floor(Watch.dlPct(dlBox.d)) + " %" : ""
+                            px: 15
+                            weight: Font.DemiBold
+                            color: "#ffffff"
+                        }
+                    }
+                    Txt {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideRight
+                        px: 10
+                        color: "#ffffff"
+                        opacity: 0.85
+                        text: !dlBox.d ? "" : !dlBox.d.active ? "En pause" : dlBox.d.phase === "install" ? "Installation"
+                            : ["Téléchargement", dlBox.d.speed && Watch.fmtSpeed(dlBox.d.speed), Watch.fmtEta(dlBox.d)].filter(Boolean).join(" · ")
+                    }
+                    Rectangle {
+                        width: parent.width
+                        height: 4
+                        radius: 2
+                        color: Qt.rgba(1, 1, 1, 0.25)
+                        Rectangle {
+                            width: parent.width * (dlBox.d ? Watch.dlPct(dlBox.d) / 100 : 0)
+                            height: parent.height
+                            radius: 2
+                            color: dlBox.d && dlBox.d.active ? Theme.primary : "#cccccc"
+                            Behavior on width { NumberAnimation { duration: 900 } }
+                        }
                     }
                 }
             }

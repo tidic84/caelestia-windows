@@ -43,6 +43,9 @@ Window {
     Binding { target: Ilot; property: "screenH"; value: win.Screen.height }
 
     TipWindow {}
+    // bandeau des sous-titres en direct, promenade du compagnon
+    Captions { host: win }
+    PetWindow { host: win }
 
     Item {
         id: root
@@ -105,10 +108,12 @@ Window {
             id: hoverZone
             z: 1000
             readonly property var s: Ilot.size
-            x: (win.width - s.w) / 2 - Ilot.ear
+            // Apparence > Taille de la pilule
+            readonly property real k: Ilot.pillK
+            x: (win.width - (s.w + Ilot.ear * 2) * k) / 2
             y: 0
-            width: s.w + Ilot.ear * 2
-            height: s.h + (Ilot.mode === "collapsed" ? 6 : 2)
+            width: (s.w + Ilot.ear * 2) * k
+            height: (s.h + (Ilot.mode === "collapsed" ? 6 : 2)) * k
             HoverHandler {
                 onHoveredChanged: Ilot.setHovered(hovered)
             }
@@ -118,8 +123,9 @@ Window {
     // zones cliquables (masque de la fenetre)
     function updateHit() {
         const rects = [{ x: hoverZone.x, y: 0, w: hoverZone.width, h: hoverZone.height }]
-        // l'ilot tel qu'il est dessine (pendant les animations)
-        rects.push({ x: island.x - island.ear, y: 0, w: island.width + island.ear * 2, h: island.height + 2 })
+        // l'ilot tel qu'il est dessine (pendant les animations, a sa taille)
+        const k = Ilot.pillK
+        rects.push({ x: island.x + island.width * (1 - k) / 2 - island.ear * k, y: 0, w: (island.width + island.ear * 2) * k, h: (island.height + 2) * k })
         if (bar.visible)
             for (const r of bar.hitRects())
                 rects.push(r)
@@ -132,10 +138,11 @@ Window {
     function updateBackdrop() {
         if (!Ilot.acrylic || Ilot.fullscreen)
             return ctl.setBackdrop([])
-        const ix = island.x, w = island.width, h = island.height
-        const shapes = [{ kind: "island", x: ix, y: 0, w: w, h: h, r: island.r }]
-        const e = island.ear
-        const eh = Math.min(e, h - island.r - island.earTop)
+        const k = Ilot.pillK
+        const w = island.width * k, h = island.height * k, ix = island.x + island.width * (1 - k) / 2, r = island.r * k
+        const shapes = [{ kind: "island", x: ix, y: 0, w: w, h: h, r: r }]
+        const e = island.ear * k
+        const eh = Math.min(e, h - r - island.earTop)
         if (e > 0.5 && eh > 0.5) {
             shapes.push({ kind: "earLeft", x: ix - e, y: island.earTop, w: e, h: eh, r: e })
             shapes.push({ kind: "earRight", x: ix + w, y: island.earTop, w: e, h: eh, r: e })
@@ -154,6 +161,7 @@ Window {
         function onModeChanged() { Qt.callLater(win.updateHit) }
         function onBarVisibleChanged() { Qt.callLater(win.updateHit) }
         function onAcrylicChanged() { Qt.callLater(win.updateBackdrop) }
+        function onPillKChanged() { Qt.callLater(win.updateHit) }
         function onFullscreenChanged() { Qt.callLater(win.updateBackdrop) }
     }
     onWidthChanged: Qt.callLater(updateHit)
