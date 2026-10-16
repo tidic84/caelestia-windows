@@ -4,6 +4,12 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.3 — 2026-10-17
+
+- **Quick Share** : le vrai partage de Google des téléphones Android remplace le partage par QR code. Bouton en haut à gauche du panneau (ou glisser des fichiers sur l'îlot) : appareils à proximité, envoi de fichiers, de texte ou de liens, QR code à scanner avec le téléphone, progression et annulation.
+- Réception : demande à accepter ou refuser dans la pilule, avec le code de vérification ; fichiers dans Téléchargements, texte dans le presse-papiers, liens et mots de passe Wi-Fi.
+- Nom du PC et visibilité (visible, 10 minutes, masqué). PC et téléphone sur le même Wi-Fi ; Windows demande d'autoriser l'îlot dans le pare-feu au premier lancement.
+
 ## 0.4.2 — 2026-10-17
 
 - Réglages : en changeant d'onglet, le fond de l'onglet précédent s'efface bien (un seul fond, qui glisse vers l'onglet choisi).
