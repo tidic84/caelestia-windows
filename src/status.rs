@@ -1,7 +1,7 @@
 //! Etat des services (onglet PC) : page d'etat officielle quand elle existe
 //! (Statuspage : Discord, Spotify, Epic, Claude) et test de connexion depuis
 //! ce PC. On distingue ainsi « panne chez eux » et « probleme de ton cote ».
-//! Releve toutes les 3 min, envoye a l'interface (`services`).
+//! Releve toutes les 3 min (addon PC active), envoye a l'interface (`services`).
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -107,9 +107,12 @@ pub fn watch(app: AppHandle) {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(20));
         loop {
-            let v = check_all();
-            *LAST.lock().unwrap() = Some((Instant::now(), v.clone()));
-            let _ = app.emit("services", &v);
+            // addon PC desactive : pas de releve
+            if crate::settings::addon_on(&app, "pc") {
+                let v = check_all();
+                *LAST.lock().unwrap() = Some((Instant::now(), v.clone()));
+                let _ = app.emit("services", &v);
+            }
             std::thread::sleep(Duration::from_secs(180));
         }
     });

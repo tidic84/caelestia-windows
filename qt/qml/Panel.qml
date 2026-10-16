@@ -53,20 +53,20 @@ Item {
     ]
 
     // ---------------------------------------------------------- onglets
-    readonly property var tabList: [
-        { id: "home", icon: "dashboard", label: "Accueil" },
-        { id: "media", icon: "music_note", label: "Média" },
-        { id: "ctrl", icon: "tune", label: "Contrôles" },
-        { id: "apps", icon: "apps", label: "Apps" },
-        { id: "mail", icon: "mail", label: "Mail" },
-        { id: "pc", icon: "sports_esports", label: "PC" },
-        { id: "sounds", icon: "graphic_eq", label: "Soundboard" },
-        { id: "tasks", icon: "monitoring", label: "Tâches" },
-        { id: "clips", icon: "content_paste", label: "Presse-papiers" },
-        { id: "assist", icon: "translate", label: "Assistant", tip: "Traduction, sous-titres en direct et Claude" },
-        { id: "walls", icon: "wallpaper", label: "Fonds" },
-        { id: "settings", icon: "settings", label: "", tip: "Réglages" }
-    ]
+    // essentiels + addons actives (Ilot.catalog, Reglages > Addons)
+    readonly property var tabList: Ilot.tabItems
+    // tous les onglets nommes s'ils tiennent entre le partage et les outils
+    FontMetrics {
+        id: tabFm
+        font.family: Theme.font
+        font.pointSize: 13 * 0.75
+    }
+    readonly property bool allNamed: {
+        let w = 8 + (tabList.length - 1) * 4
+        for (const t of tabList)
+            w += 19 + 16 + (t.label ? Math.ceil(tabFm.advanceWidth(t.label)) + 6 : 0)
+        return w <= tools.x - 12 - (shareBtn.x + shareBtn.width)
+    }
 
     // partage avec le telephone (QR code), a gauche
     IconBtn {
@@ -128,9 +128,9 @@ Item {
                     id: tab
                     required property var modelData
                     readonly property bool on: Ilot.currentTab === modelData.id
-                    // panneau normal : trop d'onglets pour tous les nommer, seul
+                    // panneau normal : avec trop d'onglets pour tous les nommer, seul
                     // l'onglet actif garde son nom (les autres l'ont en info-bulle)
-                    readonly property bool named: modelData.label !== "" && (Ilot.big || on)
+                    readonly property bool named: modelData.label !== "" && (Ilot.big || on || panel.allNamed)
                     readonly property real padX: Ilot.big ? 13 : 8
                     width: content.width + padX * 2
                     height: 35
@@ -246,26 +246,26 @@ Item {
         width: parent.width - 32
         height: parent.height - y - 16
 
+        // tout le catalogue (et non les seuls onglets affiches) : activer un
+        // addon ne recree pas les pages deja ouvertes
         Repeater {
-            model: panel.tabList
+            model: Ilot.catalog
             Loader {
                 id: page
                 required property var modelData
                 required property int index
                 readonly property bool on: Ilot.currentTab === modelData.id
                 // une page n'est creee qu'a sa premiere ouverture, puis gardee
+                // tant que son addon reste active
                 property bool wanted: false
-                active: wanted
+                readonly property bool allowed: Ilot.tabs.indexOf(modelData.id) >= 0
+                active: wanted && allowed
+                onAllowedChanged: if (!allowed) wanted = false
                 onOnChanged: if (on) wanted = true
                 Component.onCompleted: if (on) wanted = true
                 width: pages.width
                 height: pages.height
-                source: {
-                    const names = { home: "HomePage", media: "MediaPage", ctrl: "CtrlPage", apps: "AppsPage", mail: "MailPage",
-                        pc: "PcPage", sounds: "SoundsPage", tasks: "TasksPage", clips: "ClipsPage", assist: "AssistPage",
-                        walls: "WallsPage", settings: "SettingsPage" }
-                    return names[modelData.id] + ".qml"
-                }
+                source: modelData.page + ".qml"
                 opacity: on ? 1 : 0
                 visible: opacity > 0
                 enabled: on

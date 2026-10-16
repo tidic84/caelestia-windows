@@ -18,6 +18,12 @@ pour ouvrir le panneau. Les couleurs suivent votre fond d'écran (Material You).
 
 ## Fonctionnalités
 
+Le panneau garde les onglets **essentiels** : Accueil, Média, Contrôles, Apps
+et Réglages. Les autres sont des **addons** à activer dans Réglages › Addons
+(Mail, PC, Soundboard, Tâches, Presse-papiers, Assistant, Fonds) : un addon
+désactivé n'a ni onglet ni travail en arrière-plan (relevé des mails, état des
+services, moteur de la soundboard).
+
 | Onglet | Contenu |
 |---|---|
 | **Barre** | Façon Waybar, l'îlot au centre : lanceur, bureaux virtuels (clic ou molette), fenêtres ouvertes, regroupées par appli (clic : activer / réduire ou fenêtre suivante, clic molette : fermer ; au survol, aperçu de chaque fenêtre pour choisir ou fermer), applications en arrière-plan (zone de notification, dépliée par la flèche ; clic, clic droit et double clic transmis à l'appli), CPU / RAM, Wi-Fi, Bluetooth, volume (molette), batterie, notifications, date. Le haut de l'écran est réservé (les fenêtres maximisées s'arrêtent dessous) et la barre des tâches Windows peut être masquée, sur tous les écrans. Les autres écrans ont aussi leur barre, avec l'heure au centre ; ses boutons ouvrent l'îlot sur son écran. Options : îlots séparés (sans fond, chaque groupe flotte seul), fenêtres ouvertes affichées ou non, masquage automatique (la barre apparaît quand la souris touche le haut de l'écran) |
@@ -27,14 +33,14 @@ pour ouvrir le panneau. Les couleurs suivent votre fond d'écran (Material You).
 | **Média** | Lecteur complet avec avance dans le morceau, visualiseur audio, **paroles synchronisées** ([LRCLIB](https://lrclib.net), puis NetEase ; clic sur une ligne pour y aller), volume de l'appli qui joue, pochette inclinable en 3D. Fonctionne avec tout ce que Windows voit (Spotify, navigateurs…) |
 | **Contrôles** | Wi-Fi (réseaux, connexion avec mot de passe), Bluetooth, caféine (empêche la veille), ne pas déranger, mode sombre, minuteur / Pomodoro, luminosité, sortie audio, volume par application avec profils « Jeu » et « Chill », centre de notifications |
 | **Apps** | Toutes les applis du menu Démarrer avec icônes, recherche, navigation clavier. Préfixes : `>` commandes (fond au hasard, variantes de couleurs, minuteur, Wi-Fi, session…), `=` calculatrice, `:` emoji, `?` recherche web. Un calcul tapé directement s'affiche aussi. **Ctrl+Alt+Espace** ouvre le lanceur, ainsi que la touche Windows seule si le réglage est activé (la touche est alors remappée au niveau du pilote clavier pour que Windows n'ouvre plus le menu Démarrer : droits administrateur et redémarrage requis ; les raccourcis Win+… restent ceux de Windows, Ctrl+Échap ouvre le menu Démarrer). **Dossiers** (clic droit sur une appli, ou glisser une appli sur un dossier), fichiers et raccourcis déposés depuis l'Explorateur, applis masquées (clic droit sur « Toutes » pour les réafficher), tri par nom ou date d'ajout. **Launcher** de jeux : Steam, Epic Games, Ubisoft Connect et GOG avec jaquettes, plus les jeux ajoutés à la main |
-| **Mail** | Comptes IMAP (Gmail, Yahoo, iCloud, Orange…) avec mot de passe d'application chiffré (DPAPI), boîte de réception de chaque compte, lecture du message ; nombre de non-lus sur l'onglet et dans la pilule |
-| **PC** | Discord : micro, sourdine, volume de chaque personne du salon et de son propre micro (RPC, avec une application Discord à soi ; sinon mélangeur Windows). **État des services** (Discord, Steam, EA, Spotify, Epic, Roblox, Claude : page officielle + temps de réponse depuis le PC), **santé du PC** (place et état des disques, pilote NVIDIA à jour, nettoyage des temporaires, caches de shaders, miniatures et corbeille), **extinction programmée** (dans 30 min, 1 h, 2 h, à une heure, à la fin du média ou des mises à jour Steam), logiciels du PC (MSI Center, Armoury Crate, G HUB), mode d'alimentation de Windows 11, convertisseur de sensibilité entre jeux |
-| **Soundboard** | Sons joués dans le vocal Discord par un micro virtuel (VB-CABLE, Steam Streaming Microphone, Voicemod…) avec votre vrai micro ; mp3, wav, ogg, flac, m4a (bouton Ajouter ou glisser-déposer) ; volume et couleur par son, un son à la fois ou superposés |
-| **Tâches** | Gestionnaire des tâches : programmes regroupés avec CPU (en « utilité », comme Windows), mémoire privée, disque, GPU et connexions réseau (colonnes colorées selon la charge), sections Applications / arrière-plan / Windows, tri, filtre, fin de tâche (processus Windows protégés) |
-| **Presse-papiers** | Les 40 derniers textes et images copiés, un clic pour recopier ; bloc-notes enregistré automatiquement |
-| **Assistant** | **Traduction** (17 langues, détection automatique), **sous-titres en direct** de tout le son du PC traduits en français (Live Captions de Windows, bandeau en bas de l'écran), questions envoyées à l'application **Claude** (discussion ou Cowork, raccourcis Résumer / Expliquer / Corriger… avec le dernier texte copié) |
-| **Fonds** | Vos images de `Images\Wallpapers` + celles de Windows ; choisir un fond recalcule la palette. Avec **Wallpaper Engine**, un second onglet liste vos fonds WE. Bouton « Au hasard » |
-| **Réglages** (⚙) | Démarrage avec Windows, écran de l'îlot, thèmes prêts, couleur (fond d'écran, pochette en cours ou couleur choisie), clair / sombre / auto / selon l'heure / lever et coucher du soleil, variante Material You (Tonal Spot, Vibrant, Expressive…), accent et mode appliqués à Windows, fond de l'îlot (opaque, noir, translucide, acrylique, aurore boréale), contour, forme, animations, pilule (taille, horloge, compagnon, activités, Discord, voyant, météo animée), mode jeu, mode absent, accessibilité (taille du texte, contraste, mouvements, couleurs pour daltoniens), ville de la météo, agendas iCal, rotation automatique des fonds, notifications et indicateurs, **raccourcis clavier** globaux pour chaque onglet et action, sauvegarde / restauration des réglages |
+| **Mail** (addon) | Comptes IMAP (Gmail, Yahoo, iCloud, Orange…) avec mot de passe d'application chiffré (DPAPI), boîte de réception de chaque compte, lecture du message ; nombre de non-lus sur l'onglet et dans la pilule |
+| **PC** (addon) | Discord : micro, sourdine, volume de chaque personne du salon et de son propre micro (RPC, avec une application Discord à soi ; sinon mélangeur Windows). **État des services** (Discord, Steam, EA, Spotify, Epic, Roblox, Claude : page officielle + temps de réponse depuis le PC), **santé du PC** (place et état des disques, pilote NVIDIA à jour, nettoyage des temporaires, caches de shaders, miniatures et corbeille), **extinction programmée** (dans 30 min, 1 h, 2 h, à une heure, à la fin du média ou des mises à jour Steam), logiciels du PC (MSI Center, Armoury Crate, G HUB), mode d'alimentation de Windows 11, convertisseur de sensibilité entre jeux |
+| **Soundboard** (addon) | Sons joués dans le vocal Discord par un micro virtuel (VB-CABLE, Steam Streaming Microphone, Voicemod…) avec votre vrai micro ; mp3, wav, ogg, flac, m4a (bouton Ajouter ou glisser-déposer) ; volume et couleur par son, un son à la fois ou superposés |
+| **Tâches** (addon) | Gestionnaire des tâches : programmes regroupés avec CPU (en « utilité », comme Windows), mémoire privée, disque, GPU et connexions réseau (colonnes colorées selon la charge), sections Applications / arrière-plan / Windows, tri, filtre, fin de tâche (processus Windows protégés) |
+| **Presse-papiers** (addon) | Les 40 derniers textes et images copiés, un clic pour recopier ; bloc-notes enregistré automatiquement |
+| **Assistant** (addon) | **Traduction** (17 langues, détection automatique), **sous-titres en direct** de tout le son du PC traduits en français (Live Captions de Windows, bandeau en bas de l'écran), questions envoyées à l'application **Claude** (discussion ou Cowork, raccourcis Résumer / Expliquer / Corriger… avec le dernier texte copié) |
+| **Fonds** (addon) | Vos images de `Images\Wallpapers` + celles de Windows ; choisir un fond recalcule la palette. Avec **Wallpaper Engine**, un second onglet liste vos fonds WE. Bouton « Au hasard » |
+| **Réglages** (⚙) | En onglets. **Général** : démarrage avec Windows, touche Windows, écran de l'îlot, notifications et indicateurs, sauvegarde / restauration des réglages. **Barre**. **Apparence** : thèmes prêts, couleur (fond d'écran, pochette en cours ou couleur choisie), clair / sombre / auto / selon l'heure / lever et coucher du soleil, variante Material You (Tonal Spot, Vibrant, Expressive…), accent et mode appliqués à Windows, fond de l'îlot (opaque, noir, translucide, acrylique, aurore boréale), contour, forme, animations, rotation automatique des fonds. **Pilule** : taille, horloge, compagnon, activités, Discord, voyant, météo animée. **Jeu et absence**. **Accessibilité** : taille du texte, contraste, mouvements, couleurs pour daltoniens. **Météo et agenda** : ville, agendas iCal. **Raccourcis** clavier globaux pour chaque onglet et action. **Addons**. **Mises à jour** : version, recherche, téléchargement, installation, mode automatique et notes de version |
 
 La pilule s'agrandit aussi un instant pour signaler :
 - un changement de volume ou de luminosité (OSD) ;
@@ -93,9 +99,37 @@ il est détecté automatiquement (toutes les bibliothèques Steam sont parcourue
 
 ## Installation
 
-Pas encore de version publiée : il faut compiler (voir plus bas). `install.ps1`
-compile, copie l'îlot dans `%LOCALAPPDATA%\Programs\Ilot` et l'ajoute au
-démarrage.
+Téléchargez `ilot-<version>-win64.zip` dans les
+[versions publiées](https://github.com/tidic84/caelestia-windows/releases),
+décompressez-le dans `%LOCALAPPDATA%\Programs\Ilot` (ou ailleurs, tant que le
+dossier vous appartient) et lancez `ilot.exe`. Sinon, `install.ps1` compile
+(voir plus bas), copie l'îlot dans `%LOCALAPPDATA%\Programs\Ilot` et l'ajoute
+au démarrage.
+
+## Mises à jour et notes de version
+
+L'îlot cherche une nouvelle version au démarrage puis toutes les 6 h
+(API Releases de GitHub). Dans Réglages › Mises à jour :
+
+- **Télécharger et installer** : l'archive est téléchargée en arrière-plan,
+  puis installée après 10 min sans clavier ni souris (hors jeu) ou au
+  lancement suivant ;
+- **Prévenir seulement** (par défaut) : la pilule annonce la version, un clic
+  ouvre ses notes ; boutons Télécharger puis Installer et redémarrer ;
+- **Ne pas vérifier** : seulement avec le bouton Rechercher.
+
+L'installation est faite par un petit script PowerShell : il attend la fin de
+l'îlot, vérifie la somme SHA-256 de l'archive (donnée par GitHub), copie les
+fichiers par-dessus l'installation et relance l'îlot. Les fichiers de travail
+sont dans `%LOCALAPPDATA%\Ilot\update` (compte rendu dans `update.log`).
+
+Les notes de version viennent de [`CHANGELOG.md`](CHANGELOG.md), embarqué dans
+l'îlot ; après une mise à jour, la pilule propose de les lire.
+
+**Publier une version** : mettre à jour `version` dans `Cargo.toml`, ajouter sa
+section `## <version> — <date>` en haut de `CHANGELOG.md`, puis pousser le tag
+`v<version>`. Le workflow `.github/workflows/release.yml` compile l'îlot, crée
+`ilot-<version>-win64.zip` et la version GitHub avec ces notes.
 
 ## Compiler
 
@@ -118,10 +152,14 @@ compatibles avec la toolchain installée.
 
 Options utiles pour travailler l'interface :
 - `ilot.exe --open <onglet>` ouvre le panneau au démarrage (`home`, `media`,
-  `ctrl`, `apps`, `mail`, `pc`, `sounds`, `tasks`, `clips`, `assist`, `walls`, `settings`) ;
+  `ctrl`, `apps`, `settings`, et pour les addons activés `mail`, `pc`,
+  `sounds`, `tasks`, `clips`, `assist`, `walls`) ;
 - `ILOT_QT_LOG=<fichier>` écrit les messages de Qt et du QML dans un fichier ;
 - `ILOT_QT_SHOT=<fichier.png>` capture la fenêtre de l'îlot après
   `ILOT_QT_SHOT_DELAY` ms (4000 par défaut), puis quitte si `ILOT_QT_SHOT_QUIT` est défini.
+
+`ilot.exe --check-update rapport.txt` écrit la dernière version publiée et les
+notes de version embarquées.
 
 `ilot.exe --check-all rapport.txt` écrit un diagnostic des modules système (audio, réseau,
 notifications, visualiseur, HTTP) sans lancer l'interface.
