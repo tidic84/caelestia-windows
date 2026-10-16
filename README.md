@@ -21,22 +21,26 @@ pour ouvrir le panneau. Les couleurs suivent votre fond d'écran (Material You).
 | Onglet | Contenu |
 |---|---|
 | **Barre** | Façon Waybar, l'îlot au centre : lanceur, bureaux virtuels (clic ou molette), fenêtres ouvertes, regroupées par appli (clic : activer / réduire ou fenêtre suivante, clic molette : fermer ; au survol, aperçu de chaque fenêtre pour choisir ou fermer), applications en arrière-plan (zone de notification, dépliée par la flèche ; clic, clic droit et double clic transmis à l'appli), CPU / RAM, Wi-Fi, Bluetooth, volume (molette), batterie, notifications, date. Le haut de l'écran est réservé (les fenêtres maximisées s'arrêtent dessous) et la barre des tâches Windows peut être masquée, sur tous les écrans. Les autres écrans ont aussi leur barre, avec l'heure au centre ; ses boutons ouvrent l'îlot sur son écran. Options : îlots séparés (sans fond, chaque groupe flotte seul), fenêtres ouvertes affichées ou non, masquage automatique (la barre apparaît quand la souris touche le haut de l'écran) |
-| **Îlot replié** | Heure ; pochette qui tourne et égaliseur qui suit vraiment le son ; icônes caféine, ne pas déranger et minuteur en cours |
-| **Survol** | Titre, artiste, progression, lecture/pause ; sinon date et météo |
-| **Accueil** | Profil (avatar Windows, durée d'allumage), météo, horloge, calendrier avec vos agendas iCal (clic sur un jour : ses événements), lecteur avec visualiseur, CPU / RAM / disque / batterie, volume, verrouiller · veille · déconnexion · redémarrer · éteindre (second clic pour confirmer) |
-| **Média** | Lecteur complet avec avance dans le morceau et visualiseur audio. Fonctionne avec tout ce que Windows voit (Spotify, navigateurs…) |
-| **Contrôles** | Wi-Fi (réseaux, connexion avec mot de passe), Bluetooth, caféine (empêche la veille), ne pas déranger, mode sombre, minuteur / Pomodoro, luminosité, sortie audio, volume par application, centre de notifications |
+| **Îlot replié** | Heure (classique, à volets, à aiguilles, néon, pixel) ; pochette qui tourne et égaliseur qui suit vraiment le son ; icônes caféine, ne pas déranger et minuteur en cours ; **compagnon** (blob, chat ou fantôme) qui danse sur la musique, met un casque en jeu, transpire si le GPU chauffe, dort la nuit et part se promener au-dessus de la barre des tâches quand vous ne faites rien ; activité en cours (mise à jour Steam, jeu, température du GPU) ; micro Discord en vocal ; minuteur d'extinction ; voyant caméra (vert) / micro (orange). Molette : volume (Maj + molette : appli au premier plan), clic molette : lecture / pause |
+| **Survol** | Titre, artiste, progression, lecture/pause ; sinon l'activité en cours, ou la date et la météo ; boutons micro et sourdine Discord |
+| **Accueil** | Profil (avatar Windows, durée d'allumage), météo, horloge, calendrier avec vos agendas iCal (clic sur un jour : ses événements), lecteur avec visualiseur (barres en cercle autour du disque), CPU / RAM / batterie et tous les disques, volume (jusqu'à 200 % avec [Equalizer APO](https://sourceforge.net/projects/equalizerapo/)), verrouiller · veille · déconnexion · redémarrer · éteindre (second clic pour confirmer) |
+| **Média** | Lecteur complet avec avance dans le morceau, visualiseur audio, **paroles synchronisées** ([LRCLIB](https://lrclib.net), puis NetEase ; clic sur une ligne pour y aller), volume de l'appli qui joue, pochette inclinable en 3D. Fonctionne avec tout ce que Windows voit (Spotify, navigateurs…) |
+| **Contrôles** | Wi-Fi (réseaux, connexion avec mot de passe), Bluetooth, caféine (empêche la veille), ne pas déranger, mode sombre, minuteur / Pomodoro, luminosité, sortie audio, volume par application avec profils « Jeu » et « Chill », centre de notifications |
 | **Apps** | Toutes les applis du menu Démarrer avec icônes, recherche, navigation clavier. Préfixes : `>` commandes (fond au hasard, variantes de couleurs, minuteur, Wi-Fi, session…), `=` calculatrice, `:` emoji, `?` recherche web. Un calcul tapé directement s'affiche aussi. **Ctrl+Alt+Espace** ouvre le lanceur, ainsi que la touche Windows seule si le réglage est activé (la touche est alors remappée au niveau du pilote clavier pour que Windows n'ouvre plus le menu Démarrer : droits administrateur et redémarrage requis ; les raccourcis Win+… restent ceux de Windows, Ctrl+Échap ouvre le menu Démarrer). **Dossiers** (clic droit sur une appli, ou glisser une appli sur un dossier), fichiers et raccourcis déposés depuis l'Explorateur, applis masquées (clic droit sur « Toutes » pour les réafficher), tri par nom ou date d'ajout. **Launcher** de jeux : Steam, Epic Games, Ubisoft Connect et GOG avec jaquettes, plus les jeux ajoutés à la main |
 | **Mail** | Comptes IMAP (Gmail, Yahoo, iCloud, Orange…) avec mot de passe d'application chiffré (DPAPI), boîte de réception de chaque compte, lecture du message ; nombre de non-lus sur l'onglet et dans la pilule |
-| **PC** | Discord : micro, sourdine, volume de chaque personne du salon et de son propre micro (RPC, avec une application Discord à soi ; sinon mélangeur Windows). Logiciels du PC (MSI Center, Armoury Crate, G HUB) et mode d'alimentation de Windows 11 |
-| **Tâches** | Gestionnaire des tâches : programmes regroupés avec CPU, mémoire, disque et connexions réseau (colonnes colorées selon la charge), tri, filtre, fin de tâche (processus Windows protégés) |
+| **PC** | Discord : micro, sourdine, volume de chaque personne du salon et de son propre micro (RPC, avec une application Discord à soi ; sinon mélangeur Windows). **État des services** (Discord, Steam, EA, Spotify, Epic, Roblox, Claude : page officielle + temps de réponse depuis le PC), **santé du PC** (place et état des disques, pilote NVIDIA à jour, nettoyage des temporaires, caches de shaders, miniatures et corbeille), **extinction programmée** (dans 30 min, 1 h, 2 h, à une heure, à la fin du média ou des mises à jour Steam), logiciels du PC (MSI Center, Armoury Crate, G HUB), mode d'alimentation de Windows 11, convertisseur de sensibilité entre jeux |
+| **Soundboard** | Sons joués dans le vocal Discord par un micro virtuel (VB-CABLE, Steam Streaming Microphone, Voicemod…) avec votre vrai micro ; mp3, wav, ogg, flac, m4a (bouton Ajouter ou glisser-déposer) ; volume et couleur par son, un son à la fois ou superposés |
+| **Tâches** | Gestionnaire des tâches : programmes regroupés avec CPU (en « utilité », comme Windows), mémoire privée, disque, GPU et connexions réseau (colonnes colorées selon la charge), sections Applications / arrière-plan / Windows, tri, filtre, fin de tâche (processus Windows protégés) |
 | **Presse-papiers** | Les 40 derniers textes et images copiés, un clic pour recopier ; bloc-notes enregistré automatiquement |
+| **Assistant** | **Traduction** (17 langues, détection automatique), **sous-titres en direct** de tout le son du PC traduits en français (Live Captions de Windows, bandeau en bas de l'écran), questions envoyées à l'application **Claude** (discussion ou Cowork, raccourcis Résumer / Expliquer / Corriger… avec le dernier texte copié) |
 | **Fonds** | Vos images de `Images\Wallpapers` + celles de Windows ; choisir un fond recalcule la palette. Avec **Wallpaper Engine**, un second onglet liste vos fonds WE. Bouton « Au hasard » |
-| **Réglages** (⚙) | Démarrage avec Windows, écran de l'îlot, mode clair / sombre / auto, variante Material You (Tonal Spot, Vibrant, Expressive…), accent et mode appliqués à Windows, ville de la météo, agendas iCal, rotation automatique des fonds, notifications et indicateurs |
+| **Réglages** (⚙) | Démarrage avec Windows, écran de l'îlot, thèmes prêts, couleur (fond d'écran, pochette en cours ou couleur choisie), clair / sombre / auto / selon l'heure / lever et coucher du soleil, variante Material You (Tonal Spot, Vibrant, Expressive…), accent et mode appliqués à Windows, fond de l'îlot (opaque, noir, translucide, acrylique, aurore boréale), contour, forme, animations, pilule (taille, horloge, compagnon, activités, Discord, voyant, météo animée), mode jeu, mode absent, accessibilité (taille du texte, contraste, mouvements, couleurs pour daltoniens), ville de la météo, agendas iCal, rotation automatique des fonds, notifications et indicateurs, **raccourcis clavier** globaux pour chaque onglet et action, sauvegarde / restauration des réglages |
 
 La pilule s'agrandit aussi un instant pour signaler :
 - un changement de volume ou de luminosité (OSD) ;
-- une notification Windows ;
+- une notification Windows, un nouveau mail ;
+- une mise à jour Steam terminée (bouton Jouer), une **partie trouvée** pendant que vous attendez hors du jeu (carillon, îlot qui clignote, clic pour y retourner), le bilan de la session de jeu ;
+- une appli qui allume la caméra, un service en panne ou de retour, un disque presque plein, un fichier reçu du téléphone, l'extinction programmée dans une minute ;
 - un appareil Bluetooth connecté ou déconnecté ;
 - une image copiée (capture d'écran) ;
 - le chargeur branché ou débranché ;
@@ -44,7 +48,10 @@ La pilule s'agrandit aussi un instant pour signaler :
 - la fin du minuteur.
 
 Autres comportements :
-- en haut à droite du panneau : **agrandir** (presque tout l'écran), **verrouiller** (l'îlot reste ouvert quand la souris sort) et **quitter l'îlot** (second clic pour confirmer ; aussi la commande `>quitter` du lanceur) ;
+- en haut à droite du panneau : **agrandir** (presque tout l'écran), **verrouiller** (l'îlot reste ouvert quand la souris sort) et **quitter l'îlot** (second clic pour confirmer ; aussi la commande `>quitter` du lanceur) ; en haut à gauche : **partage avec le téléphone** (QR code : le téléphone, sur le même Wi-Fi, télécharge les fichiers déposés sur l'îlot ou envoie les siens dans Téléchargements) ;
+- fichiers déposés sur l'onglet Apps : conversion PNG ↔ JPG, réduction à 1920 px, compression .zip, copie pour Discord, envoi au téléphone, ou rangement dans un dossier ; la Corbeille, Ce PC… s'ajoutent comme emplacements ;
+- **mode jeu** (jeu du Launcher lancé) : mode Performances, notifications en silence, profil de volume « Jeu », rétablis à la fermeture ;
+- **mode absent** (10 min sans clavier ni souris) : la musique se met en pause et les notifications attendent votre retour (récapitulatif) ;
 - calendrier : une **note** par jour (clic sur un jour) ;
 - Média : **playlists** favorites (liens Spotify, Deezer, YouTube) ;
 - Réglages › Apparence : **fond de l'îlot** (et de la barre) opaque, translucide ou fond d'écran flouté ;
@@ -62,7 +69,13 @@ Autres comportements :
 - **Météo** : [Open-Meteo](https://open-meteo.com), sans clé.
 - **Mail** : IMAP en TLS ; les mots de passe sont chiffrés avec DPAPI (déchiffrables seulement par la session Windows) dans `%LOCALAPPDATA%\Ilot\mail.json`.
 - **Discord** : RPC local (`\\.\pipe\discord-ipc-0`), avec une application créée sur le portail développeurs Discord (redirection `http://localhost`) ; jetons chiffrés avec DPAPI.
-- **Tâches** : `sysinfo` pour CPU / mémoire / disque ; connexions TCP par processus via `GetExtendedTcpTable` (le débit réseau par processus demanderait ETW et des droits administrateur).
+- **Tâches** : compteurs de performance de Windows (PDH : `% Processor Utility`, `GPU Engine`, `PhysicalDisk`) comme le Gestionnaire des tâches, `sysinfo` pour la liste des processus, mémoire privée par `GetProcessMemoryInfo` ; connexions TCP par processus via `GetExtendedTcpTable` (le débit réseau par processus demanderait ETW et des droits administrateur).
+- **Activités** : journal de Steam (`logs\content_log.txt`) et manifestes `appmanifest_*.acf` pour les mises à jour ; `nvidia-smi` pour la charge et la température du GPU ; partie trouvée : fenêtre du jeu qui clignote (crochet Shell) ou lecture disque soutenue (chargement de la carte).
+- **Voyant caméra / micro** : registre `CapabilityAccessManager\ConsentStore`, comme l'icône de la barre des tâches.
+- **Soundboard** : sons décodés par [symphonia](https://github.com/pdeljanov/Symphonia) en 48 kHz stéréo ; le moteur WASAPI mélange le vrai micro et les sons dans la sortie du câble virtuel, et les rejoue dans votre casque.
+- **Sous-titres en direct** : Live Captions de Windows 11 (`LiveCaptions.exe`), lu par UI Automation (sa fenêtre est rendue invisible), traduit par le service de traduction de Google.
+- **Volume au-delà de 100 %** : préampli d'Equalizer APO (`config.txt` géré par l'îlot, l'ancien est gardé dans `config.ilot-backup.txt`).
+- **Raccourcis clavier** : `RegisterHotKey` ; les actions de lecture ne prennent pas le clavier du jeu en cours.
 - **Dossiers, notes, playlists** : petits fichiers JSON dans `%LOCALAPPDATA%\Ilot`.
 - **Accent Windows** : écrit dans le registre (`AccentPalette`, `AccentColor`…) et désactive la couleur automatique de Windows.
 
@@ -105,7 +118,7 @@ compatibles avec la toolchain installée.
 
 Options utiles pour travailler l'interface :
 - `ilot.exe --open <onglet>` ouvre le panneau au démarrage (`home`, `media`,
-  `ctrl`, `apps`, `mail`, `pc`, `tasks`, `clips`, `walls`, `settings`) ;
+  `ctrl`, `apps`, `mail`, `pc`, `sounds`, `tasks`, `clips`, `assist`, `walls`, `settings`) ;
 - `ILOT_QT_LOG=<fichier>` écrit les messages de Qt et du QML dans un fichier ;
 - `ILOT_QT_SHOT=<fichier.png>` capture la fenêtre de l'îlot après
   `ILOT_QT_SHOT_DELAY` ms (4000 par défaut), puis quitte si `ILOT_QT_SHOT_QUIT` est défini.
