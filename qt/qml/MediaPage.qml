@@ -146,11 +146,15 @@ Rectangle {
         anchors.fill: parent
         anchors.leftMargin: 32
         anchors.rightMargin: 32
-        anchors.topMargin: 24
-        anchors.bottomMargin: page.lyricsOn ? lyBox.height + 16 : 24
+        // avec les paroles (.ly-on) : le bandeau prend le bas, pochette de 190 px
+        anchors.topMargin: page.lyricsOn ? 14 : 24
+        anchors.bottomMargin: page.lyricsOn ? 96 : 24
+        Behavior on anchors.topMargin { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
         Behavior on anchors.bottomMargin { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
         spacing: 28
-        readonly property real artSize: Math.min(260, height)
+        property real artMax: page.lyricsOn ? 190 : 260
+        Behavior on artMax { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
+        readonly property real artSize: Math.min(artMax, height)
 
         // grande pochette, inclinee en 3D au survol
         Item {
@@ -252,7 +256,7 @@ Rectangle {
             }
             Item {
                 width: 1
-                height: 14
+                height: page.lyricsOn ? 6 : 14
             }
             // progression (glisser pour se deplacer dans le titre)
             M3Slider {
@@ -342,15 +346,21 @@ Rectangle {
         }
     }
 
-    // paroles, en bas de la page
-    Item {
+    // paroles : bandeau en bas de la page (.ly-bar), la ligne chantee au centre
+    Rectangle {
         id: lyBox
         visible: page.lyricsOn
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.margins: 16
-        height: 96
+        height: 104
+        bottomLeftRadius: page.radius
+        bottomRightRadius: page.radius
+        gradient: Gradient {
+            GradientStop { position: 0; color: "transparent" }
+            GradientStop { position: 0.3; color: Theme.alpha(Theme.surface, 0.55) }
+            GradientStop { position: 1; color: Theme.alpha(Theme.surface, 0.55) }
+        }
         Txt {
             visible: page.ly.state !== "synced" && page.ly.state !== "plain"
             anchors.centerIn: parent
@@ -361,16 +371,21 @@ Rectangle {
         }
         ListView {
             id: lyList
+            readonly property bool synced: page.ly.state === "synced"
             anchors.fill: parent
-            visible: page.ly.state === "synced" || page.ly.state === "plain"
+            anchors.leftMargin: 32
+            anchors.rightMargin: 32
+            visible: synced || page.ly.state === "plain"
             clip: true
             model: page.ly.lines
-            spacing: 2
-            interactive: page.ly.state === "plain"
+            spacing: 4
+            topMargin: synced ? 36 : 8
+            bottomMargin: topMargin
+            interactive: !synced
             boundsBehavior: Flickable.StopAtBounds
-            highlightRangeMode: page.ly.state === "synced" ? ListView.StrictlyEnforceRange : ListView.NoHighlightRange
-            preferredHighlightBegin: height / 2 - 14
-            preferredHighlightEnd: height / 2 + 14
+            highlightRangeMode: synced ? ListView.StrictlyEnforceRange : ListView.NoHighlightRange
+            preferredHighlightBegin: height / 2 - 12
+            preferredHighlightEnd: height / 2 + 12
             highlightMoveDuration: 400
             currentIndex: Math.max(0, page.lyOn)
             delegate: Btn {
@@ -378,25 +393,32 @@ Rectangle {
                 required property var modelData
                 required property int index
                 readonly property bool on: index === page.lyOn
+                // fondu en haut et en bas du bandeau (mask-image : transparent, 32 %, 68 %, transparent)
+                readonly property real mid: y - lyList.contentY + height / 2
+                readonly property real edge: lyList.synced ? Math.max(0, Math.min(1, Math.min(mid, lyList.height - mid) / (lyList.height * 0.32))) : 1
                 width: lyList.width
-                height: 28
-                radius: 10
-                active: modelData.t >= 0
-                cursor: active ? Qt.PointingHandCursor : Qt.ArrowCursor
-                color: hovered && active ? Theme.alpha(Theme.ink, 0.06) : "transparent"
+                height: txt.implicitHeight
+                active: lyList.synced && modelData.t >= 0
+                color: "transparent"
+                opacity: edge
                 // clic sur une ligne : le lecteur y saute
                 onClicked: Ilot.seek(modelData.t)
                 Txt {
-                    anchors.centerIn: parent
-                    width: parent.width - 20
+                    id: txt
+                    width: parent.width
                     horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideRight
+                    wrapMode: Text.WordWrap
+                    lineHeightMode: Text.FixedHeight
+                    lineHeight: px * 1.3
                     text: line.modelData.text || "♪"
-                    px: line.on ? 16 : 13.5
+                    px: !lyList.synced ? 13 : line.modelData.text ? 15 : 12
                     weight: line.on ? Font.DemiBold : Font.Normal
                     color: line.on ? Theme.primary : Theme.inkVariant
-                    opacity: line.on || page.ly.state === "plain" ? 1 : 0.7
-                    Behavior on px { NumberAnimation { duration: 200 } }
+                    opacity: line.on ? 1 : !lyList.synced ? 0.9 : line.hovered ? 0.85 : 0.5
+                    scale: line.on ? 1.12 : 1
+                    Behavior on opacity { NumberAnimation { duration: 300 } }
+                    Behavior on color { ColorAnimation { duration: 300 } }
+                    Behavior on scale { NumberAnimation { duration: 350; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
                 }
             }
         }
