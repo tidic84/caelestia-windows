@@ -599,6 +599,61 @@ Item {
             }
         }
 
+        // Quick Share : un appareil veut envoyer quelque chose
+        Row {
+            visible: actBox.s.kind === "qs"
+            anchors.fill: parent
+            spacing: 12
+            Rectangle {
+                width: 40
+                height: 40
+                radius: 20
+                color: Theme.primaryContainer
+                anchors.verticalCenter: parent.verticalCenter
+                Ms {
+                    anchors.centerIn: parent
+                    name: actBox.s.sym || "nearby"
+                    color: Theme.inkPrimaryContainer
+                }
+            }
+            Column {
+                width: parent.width - 52 - qsBtns.width - 12
+                spacing: 1
+                anchors.verticalCenter: parent.verticalCenter
+                Txt {
+                    width: parent.width
+                    text: actBox.s.title || ""
+                    px: 13.5
+                    weight: Font.Medium
+                    elide: Text.ElideRight
+                }
+                Txt {
+                    width: parent.width
+                    text: actBox.s.sub || ""
+                    px: 11.5
+                    color: Theme.inkVariant
+                    elide: Text.ElideRight
+                }
+            }
+            Row {
+                id: qsBtns
+                spacing: 6
+                anchors.verticalCenter: parent.verticalCenter
+                IconBtn {
+                    icon: "close"
+                    tip: "Refuser"
+                    color: hovered ? Theme.surfaceHighest : Theme.surfaceHigh
+                    onClicked: Watch.qsAnswer(actBox.s.qsId, false)
+                }
+                IconBtn {
+                    icon: "check"
+                    filled: true
+                    tip: "Accepter"
+                    onClicked: Watch.qsAnswer(actBox.s.qsId, true)
+                }
+            }
+        }
+
         // capture d'ecran copiee
         Row {
             visible: actBox.s.kind === "shot"

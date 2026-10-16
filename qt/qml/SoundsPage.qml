@@ -271,11 +271,15 @@ Item {
     // fichiers audio deposes sur l'onglet
     DropArea {
         anchors.fill: grid
-        onEntered: d => { if (!d.hasUrls) d.accepted = false }
+        onEntered: d => {
+            if (!d.hasUrls)
+                return d.accepted = false
+            Ilot.dragIn()
+        }
+        onExited: Ilot.dragLeft()
         onDropped: d => {
-            const paths = d.urls.map(u => decodeURIComponent(String(u).replace(/^file:\/\/\//, "")).replace(/\//g, "\\"))
-            Ilot.fileDragOpened = false
-            page.importPaths(paths)
+            Ilot.dragDone()
+            page.importPaths(Ilot.dropPaths(d.urls))
         }
     }
 
