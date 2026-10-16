@@ -148,6 +148,20 @@ Item {
         border.color: Theme.alpha(island.lineColor, (island.border === "line" && !island.flash ? 0.45 : 0.8) * island.pulse)
     }
 
+    // ilot ouvert : un glisser entre deux zones de depot (vers le bouton
+    // Quick Share...) reste « dans » l'ilot, qui ne se referme pas
+    DropArea {
+        anchors.fill: parent
+        enabled: Ilot.mode === "open"
+        onEntered: d => {
+            if (!d.hasUrls)
+                return d.accepted = false
+            Ilot.dragIn()
+        }
+        onExited: Ilot.dragLeft()
+        onDropped: Ilot.dragDone()
+    }
+
     Item {
         id: clipBox
         anchors.fill: parent
@@ -164,15 +178,23 @@ Item {
     }
 
     // fichiers glisses depuis l'Explorateur : l'ilot s'ouvre sur les applis
+    // (actions sur les fichiers) et le bouton Quick Share s'allume. Ouvert
+    // sur les applis, les sons ou Quick Share, leurs propres zones de depot
+    // prennent le relais.
     DropArea {
         anchors.fill: parent
-        enabled: Ilot.mode !== "open" || Ilot.currentTab !== "apps"
+        enabled: Ilot.mode !== "open" || (["apps", "sounds"].indexOf(Ilot.currentTab) < 0 && !Watch.shareOpen)
         onEntered: d => {
             if (!d.hasUrls)
                 return
-            Ilot.fileDragOpened = true
+            Ilot.dragIn()
+            if (Ilot.mode !== "open")
+                Ilot.fileDragOpened = true
             Ilot.pinned = true
             Ilot.open("apps")
         }
+        // desactivee par l'ouverture : les zones de l'ilot ouvert prennent le relais
+        onExited: if (Ilot.mode !== "open") Ilot.dragLeft()
+        onDropped: Ilot.dragDone()
     }
 }

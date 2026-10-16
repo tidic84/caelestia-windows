@@ -24,9 +24,21 @@ imap = "2.4"
 native-tls = "0.2"
 mailparse = "0.18"
 qrcode = { version = "0.14", default-features = false }
+# Quick Share (protocole Nearby Share de Google)
+prost = "0.13"
+p256 = { version = "0.13", features = ["ecdh", "ecdsa"] }
+sha2 = "0.10"
+hmac = "0.12"
+hkdf = "0.12"
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+aes-gcm = "0.10"
+rand = "0.8"
+mdns-sd = "0.13"
 symphonia = { version = "0.5", default-features = false, features = ["mp3", "aac", "isomp4", "flac", "vorbis", "ogg", "wav", "pcm", "adpcm"] }
 windows = { version = "0.61", features = [
   "Devices_Bluetooth",
+  "Devices_Bluetooth_Advertisement",
   "Devices_Enumeration",
   "Devices_Radios",
   "Foundation",

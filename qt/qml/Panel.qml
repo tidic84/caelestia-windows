@@ -68,7 +68,8 @@ Item {
         { id: "settings", icon: "settings", label: "", tip: "Réglages" }
     ]
 
-    // partage avec le telephone (QR code), a gauche
+    // Quick Share, a gauche. Des fichiers glisses sur l'ilot le font
+    // s'allumer ; les garder 200 ms dessus ouvre Quick Share.
     IconBtn {
         id: shareBtn
         x: 18
@@ -77,11 +78,95 @@ Item {
         width: 34
         height: 34
         iconSize: 19
+        readonly property bool lit: Ilot.fileDrag && !Watch.shareOpen
         on: Watch.shareOpen
-        fg: on ? Theme.inkSecondaryContainer : Theme.inkVariant
-        icon: "phonelink"
-        tip: "Partager avec le téléphone (QR code)"
+        filled: lit
+        fg: lit ? Theme.inkPrimary : on ? Theme.inkSecondaryContainer : Theme.inkVariant
+        icon: "nearby"
+        tip: "Quick Share : envoyer aux appareils à proximité, recevoir"
         onClicked: Watch.shareOpen ? (Watch.shareOpen = false) : Watch.openShare([])
+        // une demande de reception attend
+        readonly property bool asking: Watch.qs.transfers.some(t => t.status === "ask")
+        property real pulse: 1
+        scale: pressed ? 0.9 : shareDrop.containsDrag ? 1.2 : 1
+        transform: Scale {
+            origin.x: shareBtn.width / 2
+            origin.y: shareBtn.height / 2
+            xScale: shareBtn.pulse
+            yScale: shareBtn.pulse
+        }
+        SequentialAnimation on pulse {
+            running: (shareBtn.lit || shareBtn.asking) && !shareDrop.containsDrag && !Theme.reduced
+            loops: Animation.Infinite
+            NumberAnimation { to: 1.12; duration: 450; easing.type: Easing.InOutSine }
+            NumberAnimation { to: 1; duration: 450; easing.type: Easing.InOutSine }
+            onRunningChanged: if (!running) shareBtn.pulse = 1
+        }
+        // ondes autour du bouton, comme l'icone « a proximite »
+        Repeater {
+            model: shareBtn.lit && !Theme.reduced ? 2 : 0
+            Rectangle {
+                required property int index
+                anchors.centerIn: parent
+                width: shareBtn.width
+                height: width
+                radius: width / 2
+                color: "transparent"
+                border.width: 2
+                border.color: Theme.primary
+                z: -1
+                opacity: 0
+                SequentialAnimation on scale {
+                    loops: Animation.Infinite
+                    PauseAnimation { duration: index * 600 }
+                    NumberAnimation { from: 1; to: 1.6; duration: 1200; easing.type: Easing.OutCubic }
+                }
+                SequentialAnimation on opacity {
+                    loops: Animation.Infinite
+                    PauseAnimation { duration: index * 600 }
+                    NumberAnimation { from: 0.8; to: 0; duration: 1200; easing.type: Easing.OutCubic }
+                }
+            }
+        }
+        Rectangle {
+            visible: shareBtn.asking
+            x: parent.width - 10
+            y: 0
+            width: 10
+            height: 10
+            radius: 5
+            color: Theme.error
+        }
+        DropArea {
+            id: shareDrop
+            anchors.fill: parent
+            anchors.margins: -8
+            onEntered: d => {
+                if (!d.hasUrls)
+                    return d.accepted = false
+                Ilot.dragIn()
+                hoverOpen.restart()
+            }
+            onExited: {
+                hoverOpen.stop()
+                Ilot.dragLeft()
+            }
+            onDropped: d => {
+                hoverOpen.stop()
+                Ilot.dragDone()
+                d.acceptProposedAction()
+                Watch.openShare(Ilot.dropPaths(d.urls))
+            }
+        }
+        Timer {
+            id: hoverOpen
+            interval: 200
+            onTriggered: {
+                // l'ilot ouvert par le glisser reste ouvert : on va deposer ici
+                Ilot.fileDragOpened = false
+                Watch.openShare([])
+            }
+        }
     }
 
     Rectangle {
@@ -107,6 +192,9 @@ Item {
         Rectangle {
             id: ind
             readonly property Item on: tabsRow.children[Ilot.tabs.indexOf(Ilot.currentTab)] || null
+            // Quick Share ouvert : aucun onglet n'est actif
+            opacity: Watch.shareOpen ? 0 : 1
+            Behavior on opacity { NumberAnimation { duration: 200 } }
             x: on ? on.x + 4 : 4
             y: 4
             width: on ? on.width : 0
@@ -127,7 +215,7 @@ Item {
                 Btn {
                     id: tab
                     required property var modelData
-                    readonly property bool on: Ilot.currentTab === modelData.id
+                    readonly property bool on: Ilot.currentTab === modelData.id && !Watch.shareOpen
                     // panneau normal : trop d'onglets pour tous les nommer, seul
                     // l'onglet actif garde son nom (les autres l'ont en info-bulle)
                     readonly property bool named: modelData.label !== "" && (Ilot.big || on)
@@ -253,6 +341,7 @@ Item {
                 required property var modelData
                 required property int index
                 readonly property bool on: Ilot.currentTab === modelData.id
+                readonly property bool shown: on && !Watch.shareOpen
                 // une page n'est creee qu'a sa premiere ouverture, puis gardee
                 property bool wanted: false
                 active: wanted
@@ -266,9 +355,9 @@ Item {
                         walls: "WallsPage", settings: "SettingsPage" }
                     return names[modelData.id] + ".qml"
                 }
-                opacity: on ? 1 : 0
+                opacity: shown ? 1 : 0
                 visible: opacity > 0
-                enabled: on
+                enabled: shown
                 Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std } }
                 // la page arrivante glisse du cote de l'onglet choisi
                 property real dx: on ? 0 : -Ilot.tabDir * 24
@@ -279,10 +368,19 @@ Item {
             }
         }
 
-        // partage avec le telephone, par-dessus la page
-        SharePop {
+        // Quick Share, a la place de la page en cours
+        QuickShare {
+            id: quickShare
             anchors.fill: parent
             z: 10
+            opacity: Watch.shareOpen ? 1 : 0
+            visible: opacity > 0
+            enabled: Watch.shareOpen
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std } }
+            transform: Translate {
+                x: Watch.shareOpen ? 0 : -24
+                Behavior on x { NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
+            }
         }
     }
 }
