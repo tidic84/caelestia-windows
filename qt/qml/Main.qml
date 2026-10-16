@@ -27,14 +27,18 @@ Window {
         value: media.playing && !island.fullscreen && (win.mode !== "open" || win.tab === "home" || win.tab === "media")
     }
 
-    // heure, rafraichie chaque seconde : les textes ne se redessinent que
-    // quand leur valeur change (minutes)
+    // heure : relue chaque seconde, mais `now` ne change qu'a la minute (rien
+    // a reevaluer ni a redessiner entre deux)
     property date now: new Date()
     Timer {
         interval: 1000
         running: true
         repeat: true
-        onTriggered: win.now = new Date()
+        onTriggered: {
+            const d = new Date()
+            if (d.getMinutes() !== win.now.getMinutes() || d.getHours() !== win.now.getHours())
+                win.now = d
+        }
     }
 
     Timer {

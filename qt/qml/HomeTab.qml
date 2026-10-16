@@ -47,7 +47,7 @@ Item {
                     // ne tourne que si l'accueil se voit
                     RotationAnimator on rotation {
                         from: 0; to: 360; duration: 14000; loops: Animation.Infinite
-                        running: media.playing && home.shown
+                        running: media.playing && media.hasArt && home.shown
                     }
                 }
             }
@@ -68,9 +68,9 @@ Item {
         Row {
             anchors.centerIn: parent
             spacing: 24
-            Gauge { label: "CPU"; value: sys.cpu / 100; text: Math.round(sys.cpu) + " %" }
-            Gauge { label: "RAM"; value: sys.memTotal ? sys.memUsed / sys.memTotal : 0; text: (sys.memUsed / 1073741824).toFixed(1) + " / " + (sys.memTotal / 1073741824).toFixed(1) + " Go" }
-            Gauge { label: "C:"; value: sys.diskTotal ? sys.diskUsed / sys.diskTotal : 0; text: Math.round(sys.diskUsed / 1073741824) + " / " + Math.round(sys.diskTotal / 1073741824) + " Go" }
+            Gauge { animate: home.shown; label: "CPU"; value: sys.cpu / 100; text: Math.round(sys.cpu) + " %" }
+            Gauge { animate: home.shown; label: "RAM"; value: sys.memTotal ? sys.memUsed / sys.memTotal : 0; text: (sys.memUsed / 1073741824).toFixed(1) + " / " + (sys.memTotal / 1073741824).toFixed(1) + " Go" }
+            Gauge { animate: home.shown; label: "C:"; value: sys.diskTotal ? sys.diskUsed / sys.diskTotal : 0; text: Math.round(sys.diskUsed / 1073741824) + " / " + Math.round(sys.diskTotal / 1073741824) + " Go" }
         }
     }
 

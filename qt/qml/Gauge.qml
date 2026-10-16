@@ -7,6 +7,9 @@ Row {
     property string label
     property string text
     property real value: 0
+    // anime seulement quand la jauge se voit : une animation QML tourne (et
+    // fait redessiner la fenetre) meme sur un element invisible
+    property bool animate: true
     spacing: 10
 
     Shape {
@@ -26,7 +29,7 @@ Row {
             PathAngleArc {
                 centerX: 22; centerY: 22; radiusX: 18; radiusY: 18; startAngle: -90
                 sweepAngle: 360 * Math.max(0, Math.min(1, g.value))
-                Behavior on sweepAngle { NumberAnimation { duration: 600; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std } }
+                Behavior on sweepAngle { enabled: g.animate; NumberAnimation { duration: 600; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std } }
             }
         }
     }

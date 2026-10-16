@@ -26,7 +26,7 @@ Item {
                 // ne tourne que si la pilule repliee se voit
                 RotationAnimator on rotation {
                     from: 0; to: 360; duration: 8000; loops: Animation.Infinite
-                    running: media.playing && win.mode === "collapsed"
+                    running: media.playing && media.hasArt && win.mode === "collapsed"
                 }
             }
         }
@@ -47,33 +47,41 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             Repeater {
                 model: 3
-                Rectangle {
-                    id: bar
+                // barre de 12 px qui sort d'une case de 12 px (clip) : sa
+                // hauteur visible se regle par sa position, qu'un YAnimator
+                // anime sur le thread de rendu, sans resynchroniser l'interface
+                Item {
+                    id: cell
                     required property int index
                     width: 3
                     height: 12
-                    radius: 1.5
-                    color: Theme.primary
+                    clip: true
                     // trames du visualiseur : moyenne de 8 bandes
-                    property real level: {
+                    readonly property real level: {
                         const b = viz.bands
                         let s = 0
                         for (let i = index * 8; i < index * 8 + 8; i++) s += b[i] || 0
                         return (3 + s / 8 * 9) / 12
                     }
-                    transform: Scale {
-                        id: sc
-                        origin.y: 12
-                        yScale: viz.live ? bar.level : 0.33
-                        Behavior on yScale { enabled: viz.live; NumberAnimation { duration: 50 } }
+                    Rectangle {
+                        visible: viz.live
+                        width: 3; height: 12; radius: 1.5
+                        color: Theme.primary
+                        y: 12 * (1 - cell.level)
                     }
-                    // sans trames (silence) : animation de repos, seulement si visible
-                    SequentialAnimation {
-                        running: media.playing && !viz.live && win.mode === "collapsed"
-                        loops: Animation.Infinite
-                        PauseAnimation { duration: bar.index * 350 }
-                        NumberAnimation { target: sc; property: "yScale"; to: 1; duration: 500; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std }
-                        NumberAnimation { target: sc; property: "yScale"; to: 0.25; duration: 500; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std }
+                    Rectangle {
+                        id: idle
+                        visible: !viz.live
+                        width: 3; height: 12; radius: 1.5
+                        color: Theme.primary
+                        y: 8
+                        // sans trames (silence) : animation de repos, seulement si visible
+                        SequentialAnimation {
+                            running: media.playing && !viz.live && win.mode === "collapsed"
+                            loops: Animation.Infinite
+                            YAnimator { target: idle; from: 9; to: 0; duration: 450 + cell.index * 100; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std }
+                            YAnimator { target: idle; from: 0; to: 9; duration: 450 + cell.index * 100; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std }
+                        }
                     }
                 }
             }
