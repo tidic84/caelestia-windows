@@ -89,6 +89,8 @@ bool Shell::start()
             place();
         } else if (name == QLatin1String("@quit")) {
             QCoreApplication::quit();
+        } else if (name == QLatin1String("@restart")) {
+            restart();
         }
     });
     connect(b, &Backend::event, this, [this](const QString &name, const QString &json) {

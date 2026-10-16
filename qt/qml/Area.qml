@@ -11,6 +11,8 @@ Rectangle {
     property real padY: 8
     signal edited()
     signal focused()
+    // touches, avant la zone de texte (Entree pour envoyer...)
+    signal keyPressed(var event)
     radius: 14
     color: Theme.surfaceHigh
     border.width: 2
@@ -46,6 +48,7 @@ Rectangle {
             onCursorRectangleChanged: fl.ensureVisible(cursorRectangle)
             onTextChanged: if (activeFocus) a.edited()
             onActiveFocusChanged: if (activeFocus) a.focused()
+            Keys.onPressed: e => a.keyPressed(e)
         }
         Txt {
             id: ph

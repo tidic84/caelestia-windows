@@ -6,8 +6,10 @@ Item {
     id: panel
     readonly property bool open: Ilot.mode === "open"
     readonly property var target: Ilot.big ? Ilot.bigSize : Ilot.openSize
-    width: target.w
-    height: target.h
+    // Apparence > Taille du texte : tout le panneau est agrandi d'autant
+    readonly property real k: Theme.textK
+    width: target.w / k
+    height: target.h / k
     Behavior on width { NumberAnimation { duration: 500; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
     Behavior on height { NumberAnimation { duration: 500; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
     enabled: open
@@ -21,6 +23,12 @@ Item {
         }
     }
     transform: [
+        Scale {
+            origin.x: panel.width / 2
+            origin.y: 0
+            xScale: panel.k
+            yScale: panel.k
+        },
         Scale {
             origin.x: panel.width / 2
             origin.y: 0
@@ -52,16 +60,37 @@ Item {
         { id: "apps", icon: "apps", label: "Apps" },
         { id: "mail", icon: "mail", label: "Mail" },
         { id: "pc", icon: "sports_esports", label: "PC" },
+        { id: "sounds", icon: "graphic_eq", label: "Soundboard" },
         { id: "tasks", icon: "monitoring", label: "Tâches" },
         { id: "clips", icon: "content_paste", label: "Presse-papiers" },
+        { id: "assist", icon: "translate", label: "Assistant", tip: "Traduction, sous-titres en direct et Claude" },
         { id: "walls", icon: "wallpaper", label: "Fonds" },
         { id: "settings", icon: "settings", label: "", tip: "Réglages" }
     ]
 
+    // partage avec le telephone (QR code), a gauche
+    IconBtn {
+        id: shareBtn
+        x: 18
+        y: 12
+        z: 2
+        width: 34
+        height: 34
+        iconSize: 19
+        on: Watch.shareOpen
+        fg: on ? Theme.inkSecondaryContainer : Theme.inkVariant
+        icon: "phonelink"
+        tip: "Partager avec le téléphone (QR code)"
+        onClicked: Watch.shareOpen ? (Watch.shareOpen = false) : Watch.openShare([])
+    }
+
     Rectangle {
         id: tabsBox
         y: 10
-        anchors.horizontalCenter: parent.horizontalCenter
+        // centre entre le bouton de partage et les outils de droite
+        readonly property real minX: shareBtn.x + shareBtn.width + 6
+        readonly property real maxX: tools.x - 6
+        x: Math.max(minX, Math.min(maxX - width, (panel.width - width) / 2))
         width: tabsRow.width + 8
         height: tabsRow.height + 8
         radius: height / 2
@@ -102,7 +131,7 @@ Item {
                     // panneau normal : trop d'onglets pour tous les nommer, seul
                     // l'onglet actif garde son nom (les autres l'ont en info-bulle)
                     readonly property bool named: modelData.label !== "" && (Ilot.big || on)
-                    readonly property real padX: Ilot.big ? 13 : 10
+                    readonly property real padX: Ilot.big ? 13 : 8
                     width: content.width + padX * 2
                     height: 35
                     radius: height / 2
@@ -158,6 +187,7 @@ Item {
 
     // ---------------------------------------------------------- outils
     Row {
+        id: tools
         anchors.right: parent.right
         anchors.rightMargin: 18
         y: 12
@@ -232,7 +262,8 @@ Item {
                 height: pages.height
                 source: {
                     const names = { home: "HomePage", media: "MediaPage", ctrl: "CtrlPage", apps: "AppsPage", mail: "MailPage",
-                        pc: "PcPage", tasks: "TasksPage", clips: "ClipsPage", walls: "WallsPage", settings: "SettingsPage" }
+                        pc: "PcPage", sounds: "SoundsPage", tasks: "TasksPage", clips: "ClipsPage", assist: "AssistPage",
+                        walls: "WallsPage", settings: "SettingsPage" }
                     return names[modelData.id] + ".qml"
                 }
                 opacity: on ? 1 : 0
@@ -246,6 +277,12 @@ Item {
                     Behavior on x { NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
                 }
             }
+        }
+
+        // partage avec le telephone, par-dessus la page
+        SharePop {
+            anchors.fill: parent
+            z: 10
         }
     }
 }

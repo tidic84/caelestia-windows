@@ -452,3 +452,15 @@ pub fn session_action(action: String) {
         _ => {}
     }
 }
+
+/// Windows demande moins d'animations (Accessibilite > Effets visuels >
+/// Effets d'animation desactives) : Apparence > Mouvements « Comme Windows ».
+pub fn motion_reduced() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{SystemParametersInfoW, SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS};
+    let mut on = windows::core::BOOL(1);
+    let ok = unsafe {
+        SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, Some(&mut on as *mut _ as _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0))
+    }
+    .is_ok();
+    ok && !on.as_bool()
+}

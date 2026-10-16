@@ -1,7 +1,9 @@
 import QtQuick
+import IlotCore
 
-// Reglages : demarrage, touche Windows, ecran, barre, apparence, meteo,
-// agendas, rotation des fonds, notifications
+// Reglages : demarrage, touche Windows, ecran, barre, apparence, pilule,
+// mode jeu, mode absent, accessibilite, meteo, agendas, rotation des fonds,
+// notifications, raccourcis clavier, sauvegarde
 Item {
     id: page
     readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "settings"
@@ -240,14 +242,132 @@ Item {
                 SetRow {
                     icon: "palette"
                     title: "Apparence"
-                    sub: "Les couleurs sont tirées du fond d'écran"
-                    Seg {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        model: [{ id: "auto", label: "Auto" }, { id: "dark", label: "Sombre" }, { id: "light", label: "Clair" }]
-                        current: page.cfg.mode
-                        onPicked: id => Ilot.setCfg({ mode: id })
+                    sub: page.cfg.color === "art" ? "Les couleurs suivent la pochette du morceau (sinon le fond d'écran)"
+                        : page.cfg.color && page.cfg.color !== "auto" ? "Couleur choisie" : "Les couleurs sont tirées du fond d'écran"
+                }
+                // themes prets : un clic applique couleur, style, fond, contour et forme
+                SubTitle { text: "Thèmes prêts" }
+                Flow {
+                    width: parent.width
+                    topPadding: 8
+                    spacing: 6
+                    Repeater {
+                        model: page.presets
+                        Btn {
+                            required property var modelData
+                            readonly property bool on: Object.keys(modelData[1]).every(k => page.cfg[k] === modelData[1][k])
+                            width: prRow.implicitWidth + 22
+                            height: 30
+                            radius: 15
+                            color: on ? Theme.secondaryContainer : hovered ? Theme.surfaceHighest : Theme.surfaceHigh
+                            onClicked: Ilot.setCfg(modelData[1])
+                            Row {
+                                id: prRow
+                                anchors.centerIn: parent
+                                spacing: 6
+                                Rectangle {
+                                    width: 12
+                                    height: 12
+                                    radius: 6
+                                    color: parent.parent.modelData[1].color
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Txt {
+                                    text: parent.parent.modelData[0]
+                                    px: 12.5
+                                    color: parent.parent.on ? Theme.inkSecondaryContainer : Theme.ink
+                                }
+                            }
+                        }
                     }
+                }
+                SubTitle { text: "Couleur" }
+                Flow {
+                    width: parent.width
+                    topPadding: 8
+                    spacing: 6
+                    Swatch {
+                        on: (page.cfg.color || "auto") === "auto"
+                        icon: "wallpaper"
+                        tip: "Automatique (fond d’écran)"
+                        onClicked: Ilot.setCfg({ color: "auto" })
+                    }
+                    Swatch {
+                        on: page.cfg.color === "art"
+                        icon: "album"
+                        tip: "Pochette du morceau en cours (sinon fond d’écran)"
+                        onClicked: Ilot.setCfg({ color: "art" })
+                    }
+                    Repeater {
+                        model: page.swatches
+                        Swatch {
+                            required property var modelData
+                            fill: modelData
+                            on: page.cfg.color === modelData
+                            onClicked: Ilot.setCfg({ color: modelData })
+                        }
+                    }
+                    // autre couleur : #rrggbb
+                    Rectangle {
+                        width: 100
+                        height: 30
+                        radius: 15
+                        color: Theme.surfaceHigh
+                        border.width: hexField.bad ? 2 : 0
+                        border.color: Theme.error
+                        Ms {
+                            x: 8
+                            name: "colorize"
+                            size: 16
+                            color: Theme.inkVariant
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Field {
+                            id: hexField
+                            x: 26
+                            width: parent.width - 28
+                            height: parent.height
+                            bg: "transparent"
+                            pad: 4
+                            fontSize: 12
+                            placeholder: "#6750a4"
+                            text: /^#[0-9a-f]{6}$/i.test(page.cfg.color || "") && page.swatches.indexOf(page.cfg.color) < 0 ? page.cfg.color : ""
+                            onFocused: Ilot.pinned = true
+                            onEdited: bad = false
+                            onAccepted: {
+                                const v = text.trim().startsWith("#") ? text.trim() : "#" + text.trim()
+                                if (!/^#[0-9a-fA-F]{6}$/.test(v))
+                                    return bad = true
+                                Ilot.setCfg({ color: v.toLowerCase() })
+                            }
+                        }
+                    }
+                }
+                SubTitle { text: "Thème" }
+                Chips {
+                    model: [["auto", "Comme Windows"], ["dark", "Sombre"], ["light", "Clair"], ["time", "Selon l’heure"], ["sun", "Lever / coucher du soleil"]]
+                    current: page.cfg.mode
+                    onPicked: v => Ilot.setCfg({ mode: v })
+                }
+                Row {
+                    visible: page.cfg.mode === "time"
+                    topPadding: 8
+                    spacing: 8
+                    Txt { text: "Clair de"; anchors.verticalCenter: parent.verticalCenter }
+                    TimeField { value: page.cfg.day || "07:00"; onDone: v => Ilot.setCfg({ day: v }) }
+                    Txt { text: "à"; anchors.verticalCenter: parent.verticalCenter }
+                    TimeField { value: page.cfg.night || "20:00"; onDone: v => Ilot.setCfg({ night: v }) }
+                }
+                Txt {
+                    visible: page.cfg.mode === "sun"
+                    topPadding: 6
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    px: 11.5
+                    color: Theme.inkVariant
+                    text: Ilot.sunTimes ? "Clair de " + Ilot.pad(Math.floor(Ilot.sunTimes[0] / 60)) + ":" + Ilot.pad(Ilot.sunTimes[0] % 60)
+                        + " à " + Ilot.pad(Math.floor(Ilot.sunTimes[1] / 60)) + ":" + Ilot.pad(Ilot.sunTimes[1] % 60) + " (" + (page.cfg.city ? page.cfg.city.name : "") + ")"
+                        : "Choisis une ville dans Météo pour connaître les heures du soleil."
                 }
                 Flow {
                     id: variants
@@ -344,9 +464,191 @@ Item {
                     sub: "Opaque, translucide, ou flou acrylique de Windows derrière l'îlot et la barre"
                 }
                 Chips {
-                    model: [["solid", "Opaque"], ["glass", "Translucide"], ["clear", "Très transparent"], ["wall", "Acrylique"]]
+                    model: [["solid", "Opaque"], ["black", "Noir pur"], ["glass", "Translucide"], ["clear", "Très transparent"], ["wall", "Acrylique"], ["aurora", "Aurore boréale"]]
                     current: page.cfg.island_bg || "solid"
                     onPicked: v => Ilot.setCfg({ island_bg: v })
+                }
+                SubTitle { text: "Contour de l'îlot" }
+                Chips {
+                    model: [["none", "Aucun"], ["line", "Liseré"], ["glow", "Lueur"], ["rgb", "Arc-en-ciel"], ["pulse", "Pulsation"]]
+                    current: page.cfg.border || "none"
+                    onPicked: v => Ilot.setCfg({ border: v })
+                }
+                SubTitle { text: "Forme de l'îlot" }
+                Chips {
+                    model: [["round", "Arrondie"], ["pill", "Pilule"], ["square", "Carrée"]]
+                    current: page.cfg.shape || "round"
+                    onPicked: v => Ilot.setCfg({ shape: v })
+                }
+                SubTitle { text: "Animations" }
+                Chips {
+                    model: [["normal", "Normale"], ["fast", "Rapide"], ["soft", "Douce"], ["calm", "Sans rebond"], ["off", "Instantanée"]]
+                    current: page.cfg.anim || "normal"
+                    onPicked: v => Ilot.setCfg({ anim: v })
+                }
+                SubTitle { text: "Fond de l'onglet Média" }
+                Chips {
+                    model: [["art", "Pochette floutée"], ["color", "Couleur"], ["gradient", "Dégradé"], ["none", "Aucun"]]
+                    current: page.cfg.media_bg || "art"
+                    onPicked: v => Ilot.setCfg({ media_bg: v })
+                }
+            }
+
+            // ---------------------------------------------------- pilule
+            Block {
+                SetRow {
+                    icon: "pill"
+                    title: "Pilule"
+                    sub: "Ce que l'îlot replié affiche"
+                }
+                SubTitle { text: "Taille de la pilule" }
+                Chips {
+                    model: [["s", "Petite"], ["m", "Moyenne"], ["l", "Grande"]]
+                    current: page.cfg.pill_size || "m"
+                    onPicked: v => Ilot.setCfg({ pill_size: v })
+                }
+                SubTitle { text: "Horloge" }
+                Chips {
+                    model: [["digital", "Classique"], ["flip", "À volets"], ["analog", "À aiguilles"], ["neon", "Néon"], ["pixel", "Pixel"]]
+                    current: page.cfg.clock || "digital"
+                    onPicked: v => Ilot.setCfg({ clock: v })
+                }
+                SubTitle { text: "Compagnon" }
+                Chips {
+                    model: [["blob", "Blob"], ["cat", "Chat"], ["ghost", "Fantôme"], ["off", "Masqué"]]
+                    current: page.cfg.pet || "blob"
+                    onPicked: v => Ilot.setCfg({ pet: v })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Il se promène quand tu ne fais rien"
+                    sub: "Après 90 s sans clavier ni souris, au-dessus de la barre des tâches"
+                    toggle: true
+                    disabled: page.cfg.pet === "off"
+                    checked: !!page.cfg.pet_walk
+                    onToggled: on => Ilot.setCfg({ pet_walk: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Activités en cours"
+                    sub: "Téléchargements Steam, jeu lancé, charge et température du GPU"
+                    toggle: true
+                    checked: !!page.cfg.activity
+                    onToggled: on => Ilot.setCfg({ activity: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Raccourcis Discord"
+                    sub: "Micro et sourdine dans la pilule quand tu es en vocal"
+                    toggle: true
+                    checked: !!page.cfg.dc_pill
+                    onToggled: on => Ilot.setCfg({ dc_pill: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Voyant caméra / micro"
+                    sub: "Vert : une appli filme ; orange : une appli écoute le micro"
+                    toggle: true
+                    checked: !!page.cfg.privacy
+                    onToggled: on => Ilot.setCfg({ privacy: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Météo animée"
+                    sub: "Pluie, neige, soleil ou étoiles derrière la pilule"
+                    toggle: true
+                    checked: !!page.cfg.wxfx
+                    onToggled: on => Ilot.setCfg({ wxfx: on })
+                }
+            }
+
+            // -------------------------------------------- mode jeu, absent
+            Block {
+                SetRow {
+                    icon: "sports_esports"
+                    title: "Mode jeu"
+                    sub: "Quand un jeu du Launcher tourne"
+                    toggle: true
+                    checked: !!page.cfg.game_mode
+                    onToggled: on => Ilot.setCfg({ game_mode: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Passer en mode Performances"
+                    sub: "Le mode d'alimentation d'avant revient à la fermeture du jeu"
+                    toggle: true
+                    disabled: !page.cfg.game_mode
+                    checked: !!page.cfg.game_perf
+                    onToggled: on => Ilot.setCfg({ game_perf: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Garder les notifications"
+                    sub: "Sinon, l'îlot reste silencieux pendant la partie"
+                    toggle: true
+                    disabled: !page.cfg.game_mode
+                    checked: !!page.cfg.game_notif
+                    onToggled: on => Ilot.setCfg({ game_notif: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Profil de volume « Jeu »"
+                    sub: "Appliqué au lancement (Contrôles › profils), volumes d'avant rétablis ensuite"
+                    toggle: true
+                    disabled: !page.cfg.game_mode
+                    checked: !!page.cfg.mix_auto
+                    onToggled: on => Ilot.setCfg({ mix_auto: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Alerte « partie trouvée »"
+                    sub: "Son et îlot qui clignote quand tu attends hors du jeu"
+                    toggle: true
+                    checked: !!page.cfg.match_alert
+                    onToggled: on => Ilot.setCfg({ match_alert: on })
+                }
+                SetRow {
+                    icon: "bedtime"
+                    title: "Mode absent"
+                    sub: "10 min sans clavier ni souris : les notifications attendent ton retour"
+                }
+                Chips {
+                    model: [["on", "Pause musique + récap"], ["recap", "Récap seulement"], ["off", "Désactivé"]]
+                    current: page.cfg.away || "on"
+                    onPicked: v => Ilot.setCfg({ away: v })
+                }
+            }
+
+            // --------------------------------------------- accessibilite
+            Block {
+                SetRow {
+                    icon: "accessibility_new"
+                    title: "Accessibilité"
+                    sub: "Texte, contraste, animations et couleurs des voyants"
+                }
+                SubTitle { text: "Taille du texte du panneau" }
+                Chips {
+                    model: [[100, "Normale"], [112, "Grande"], [125, "Très grande"]]
+                    current: Number(page.cfg.text_size) || 100
+                    onPicked: v => Ilot.setCfg({ text_size: v })
+                }
+                SubTitle { text: "Contraste" }
+                Chips {
+                    model: [["normal", "Normal"], ["high", "Élevé"]]
+                    current: page.cfg.contrast || "normal"
+                    onPicked: v => Ilot.setCfg({ contrast: v })
+                }
+                SubTitle { text: "Mouvements et animations" }
+                Chips {
+                    model: [["system", "Comme Windows"], ["full", "Toutes"], ["reduced", "Réduites"]]
+                    current: page.cfg.motion || "system"
+                    onPicked: v => Ilot.setCfg({ motion: v })
+                }
+                SubTitle { text: "Couleurs des voyants (vert / orange / rouge)" }
+                Chips {
+                    model: [["off", "Standard"], ["rg", "Daltonien rouge-vert"], ["by", "Daltonien bleu-jaune"]]
+                    current: page.cfg.cvd || "off"
+                    onPicked: v => Ilot.setCfg({ cvd: v })
                 }
             }
 
@@ -562,6 +864,50 @@ Item {
                     onToggled: on => Ilot.setCfg({ osd: on })
                 }
             }
+
+            // ----------------------------------------- raccourcis clavier
+            Block {
+                SetRow {
+                    icon: "keyboard"
+                    title: "Raccourcis clavier"
+                    sub: "Partout dans Windows. Clic puis la combinaison · Échap : annuler · Retour arrière : effacer"
+                }
+                Item { width: 1; height: 8 }
+                Repeater {
+                    model: page.keyActions
+                    KeyRow {}
+                }
+            }
+
+            // ---------------------------------------------- sauvegarde
+            Block {
+                SetRow {
+                    icon: "settings_backup_restore"
+                    title: "Sauvegarde des réglages"
+                    sub: "Thème, dossiers, profils, notes, soundboard… (sans les mots de passe)"
+                }
+                Row {
+                    topPadding: 10
+                    x: 54
+                    spacing: 8
+                    TextBtn {
+                        icon: "download"
+                        text: "Exporter"
+                        onClicked: Api.invoke("settings_export").then(p => Watch.osd(p ? "download_done" : "error", null, p ? "Réglages exportés dans Téléchargements" : "Export impossible"))
+                    }
+                    TextBtn {
+                        icon: "upload"
+                        text: "Importer"
+                        onClicked: Api.invoke("settings_import").then(ok => {
+                            if (!ok)
+                                return
+                            Watch.osd("upload", null, "Réglages restaurés")
+                            // relance l'ilot pour tout relire
+                            Ilot.later(900, () => Backend.restart())
+                        }, e => Watch.osd("error", null, String(e)))
+                    }
+                }
+            }
         }
     }
     Scroller { flick: flick }
@@ -585,6 +931,28 @@ Item {
             page.cityMsg = "Recherche impossible (" + e + ")"
         })
     }
+
+    // ------------------------------------------------- donnees des choix
+    readonly property var swatches: ["#6750a4", "#3f51b5", "#1e88e5", "#00bcd4", "#00897b", "#43a047", "#c0ca33", "#fbc02d", "#fb8c00", "#e53935", "#d81b60", "#8e24aa", "#795548", "#607d8b"]
+    readonly property var presets: [
+        ["Minuit", { color: "#1e88e5", variant: "neutral", mode: "dark", island_bg: "glass", border: "line", shape: "round" }],
+        ["Néon", { color: "#d81b60", variant: "vibrant", mode: "dark", island_bg: "black", border: "rgb", shape: "pill" }],
+        ["Forêt", { color: "#43a047", variant: "tonalspot", mode: "dark", island_bg: "solid", border: "none", shape: "round" }],
+        ["Coucher de soleil", { color: "#fb8c00", variant: "expressive", mode: "dark", island_bg: "wall", border: "glow", shape: "round" }],
+        ["Glace", { color: "#4fc3f7", variant: "tonalspot", mode: "light", island_bg: "clear", border: "line", shape: "pill" }],
+        ["Rétro", { color: "#c0ca33", variant: "fruitsalad", mode: "dark", island_bg: "solid", border: "pulse", shape: "square" }],
+        ["Monochrome", { color: "#9e9e9e", variant: "monochrome", mode: "dark", island_bg: "black", border: "none", shape: "pill" }]
+    ]
+    readonly property var keyActions: [
+        ["toggle", "Ouvrir / fermer l’îlot"], ["play", "Lecture / pause"], ["next", "Morceau suivant"], ["captions", "Sous-titres en direct"],
+        ["home", "Accueil"], ["media", "Média"], ["ctrl", "Contrôles"], ["apps", "Apps"], ["mail", "Mail"], ["pc", "PC"],
+        ["sounds", "Soundboard"], ["tasks", "Tâches"], ["clips", "Presse-papiers"], ["assist", "Assistant"], ["walls", "Fonds"], ["settings", "Réglages"]
+    ]
+    // « Ctrl+Alt+KeyM » -> « Ctrl+Alt+M »
+    function keyLabel(c) {
+        return c.replace(/Key([A-Z])/g, "$1").replace(/Digit(\d)/g, "$1").replace(/Numpad/g, "Pavé ").replace(/VK(\d+)/, "touche $1")
+    }
+    property string keyRec: ""
 
     // carte de reglages
     component Block: Card {
@@ -660,6 +1028,142 @@ Item {
         Item {
             id: extraBox
             anchors.fill: parent
+        }
+    }
+
+    component SubTitle: Txt {
+        topPadding: 14
+        px: 12
+        weight: Font.Medium
+        color: Theme.inkVariant
+    }
+    // pastille de couleur (ou icone : fond d'ecran, pochette)
+    component Swatch: Btn {
+        id: sw
+        property color fill: Theme.surfaceHigh
+        property string icon: ""
+        property bool on: false
+        width: 30
+        height: 30
+        radius: 15
+        color: icon ? (on ? Theme.secondaryContainer : Theme.surfaceHigh) : fill
+        border.width: on ? 3 : 0
+        border.color: Theme.ink
+        Ms {
+            anchors.centerIn: parent
+            visible: sw.icon !== ""
+            name: sw.icon
+            size: 17
+            color: sw.on ? Theme.inkSecondaryContainer : Theme.inkVariant
+        }
+    }
+    // heure « HH:MM » (Entree pour valider)
+    component TimeField: Field {
+        id: tf
+        property string value
+        signal done(string v)
+        width: 70
+        height: 30
+        radius: 10
+        pad: 8
+        fontSize: 12.5
+        bg: Theme.surfaceHigh
+        text: value
+        input.inputMask: "99:99;_"
+        onFocused: Ilot.pinned = true
+        onAccepted: {
+            const m = text.match(/^(\d\d):(\d\d)$/)
+            if (m && Number(m[1]) < 24 && Number(m[2]) < 60)
+                tf.done(text)
+            else
+                bad = true
+        }
+        onEdited: bad = false
+    }
+    // une action et sa combinaison ; clic : enregistrement de la combinaison
+    component KeyRow: Item {
+        id: kr
+        required property var modelData
+        readonly property string action: modelData[0]
+        readonly property string combo: Watch.keyMap[action] || ""
+        readonly property bool rec: page.keyRec === action
+        readonly property bool bad: Watch.keyBad.indexOf(action) >= 0
+        width: parent ? parent.width : 0
+        height: 34
+        Txt {
+            x: 54
+            anchors.verticalCenter: parent.verticalCenter
+            text: kr.modelData[1]
+            color: kr.bad ? Theme.error : Theme.ink
+        }
+        Btn {
+            id: keyBtn
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(90, keyText.implicitWidth + 24)
+            height: 28
+            radius: 14
+            color: kr.rec ? Theme.primary : kr.combo ? Theme.secondaryContainer : Theme.surfaceHigh
+            border.width: kr.bad ? 2 : 0
+            border.color: Theme.error
+            tip: kr.bad ? "Déjà pris par une autre appli : choisis-en un autre" : "Clic puis appuie sur la combinaison · Échap : annuler · Retour arrière : effacer"
+            onClicked: {
+                page.keyRec = kr.rec ? "" : kr.action
+                if (page.keyRec) {
+                    Ilot.pinned = true
+                    Ilot.grabFocus()
+                    keyBtn.forceActiveFocus()
+                }
+            }
+            Keys.onPressed: e => {
+                if (!kr.rec)
+                    return
+                e.accepted = true
+                if (e.key === Qt.Key_Escape) {
+                    page.keyRec = ""
+                    return
+                }
+                const map = Object.assign({}, Watch.keyMap)
+                if (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete) {
+                    delete map[kr.action]
+                    page.keyRec = ""
+                    return Watch.saveKeys(map)
+                }
+                if ([Qt.Key_Control, Qt.Key_Alt, Qt.Key_Shift, Qt.Key_Meta, Qt.Key_AltGr].indexOf(e.key) >= 0)
+                    return
+                const mods = []
+                if (e.modifiers & Qt.ControlModifier) mods.push("Ctrl")
+                if (e.modifiers & Qt.AltModifier) mods.push("Alt")
+                if (e.modifiers & Qt.ShiftModifier) mods.push("Shift")
+                if (e.modifiers & Qt.MetaModifier) mods.push("Super")
+                let k
+                if (e.key >= Qt.Key_A && e.key <= Qt.Key_Z)
+                    k = "Key" + String.fromCharCode(e.key)
+                else if (e.key >= Qt.Key_0 && e.key <= Qt.Key_9)
+                    k = (e.modifiers & Qt.KeypadModifier ? "Numpad" : "Digit") + String.fromCharCode(e.key)
+                else if (e.key >= Qt.Key_F1 && e.key <= Qt.Key_F24)
+                    k = "F" + (e.key - Qt.Key_F1 + 1)
+                else if (e.nativeVirtualKey)
+                    k = "VK" + e.nativeVirtualKey
+                else
+                    return
+                // une touche seule bloquerait la frappe partout dans Windows (sauf F1-F24)
+                if (!mods.length && !/^F\d+$/.test(k)) {
+                    Watch.osd("keyboard", null, "Ajoute Ctrl, Alt ou Maj")
+                    return
+                }
+                map[kr.action] = mods.concat([k]).join("+")
+                page.keyRec = ""
+                Watch.saveKeys(map)
+            }
+            Txt {
+                id: keyText
+                anchors.centerIn: parent
+                text: kr.rec ? "Appuie…" : kr.combo ? page.keyLabel(kr.combo) : "—"
+                px: 12
+                weight: kr.combo ? Font.Medium : Font.Normal
+                color: kr.rec ? Theme.inkPrimary : kr.combo ? Theme.inkSecondaryContainer : Theme.inkVariant
+            }
         }
     }
 

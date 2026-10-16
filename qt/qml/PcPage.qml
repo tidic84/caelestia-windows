@@ -1,15 +1,17 @@
 import QtQuick
 
-// PC : Discord (RPC si configure, sinon melangeur de Windows), logiciels du
-// constructeur, mode d'alimentation de Windows 11
+// PC : Discord (RPC si configure, sinon melangeur de Windows) ; a droite,
+// etat des services, sante du PC, extinction programmee, logiciels du
+// constructeur, mode d'alimentation de Windows 11, convertisseur de sensibilite
 Item {
     id: page
     readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "pc"
     readonly property var dc: Ilot.dc
     readonly property bool rpc: dc.status === "ready"
-    // sourdines Windows (mode simple)
-    property bool localMic: false
-    property bool localOut: false
+    // sourdines Windows (mode simple) : partagees avec la pilule (Watch)
+    readonly property bool localMic: Watch.dcLocalMic
+    readonly property bool localOut: Watch.dcLocalOut
+    readonly property real side: 270
     property var dcVol: null
     property bool setupOpen: false
     property string dcErr: ""
@@ -23,12 +25,13 @@ Item {
         onTriggered: page.refresh()
     }
     function refresh() {
+        health.refresh(false)
         renderHardware()
         refreshPower()
         Api.invoke("app_volume_get", { app: "discord" }).then(v => {
             page.dcVol = v
             if (v && !page.rpc)
-                page.localOut = v.muted
+                Watch.dcLocalOut = v.muted
         })
     }
 
@@ -59,7 +62,7 @@ Item {
     // ----------------------------------------------------------- Discord
     Card {
         id: dcCard
-        width: parent.width - 250 - 10
+        width: parent.width - page.side - 10
         height: parent.height
         readonly property bool mic: page.rpc ? !!page.dc.mute : page.localMic
         readonly property bool deaf: page.rpc ? !!page.dc.deaf : page.localOut
@@ -118,24 +121,14 @@ Item {
                 icon: dcCard.mic ? "mic_off" : "mic"
                 text: "Micro"
                 tip: dcCard.mic ? "Réactiver le micro" : "Couper le micro"
-                onClicked: {
-                    if (page.rpc)
-                        return Api.invoke("discord_self", { mute: !page.dc.mute })
-                    page.localMic = !page.localMic
-                    Api.invoke("app_volume_set", { app: "discord", mic: true, muted: page.localMic }).then(ok => { if (!ok) page.localMic = false })
-                }
+                onClicked: Watch.toggleDcMic()
             }
             DcBtn {
                 off: dcCard.deaf
                 icon: dcCard.deaf ? "headset_off" : "headphones"
                 text: "Son"
                 tip: dcCard.deaf ? "Réactiver le son" : "Couper le son (sourdine)"
-                onClicked: {
-                    if (page.rpc)
-                        return Api.invoke("discord_self", { deaf: !page.dc.deaf })
-                    page.localOut = !page.localOut
-                    Api.invoke("app_volume_set", { app: "discord", muted: page.localOut }).then(ok => { if (!ok) page.localOut = false })
-                }
+                onClicked: Watch.toggleDcDeaf()
             }
             Item {
                 width: parent.width - x
@@ -336,10 +329,23 @@ Item {
     }
 
     // ---------------------------------------------------- cote droit
+    Flickable {
+        id: sideFlick
+        x: parent.width - page.side
+        width: page.side
+        height: parent.height
+        contentHeight: sideCol.height
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
     Column {
-        x: parent.width - 250
-        width: 250
+        id: sideCol
+        width: page.side - 6
         spacing: 10
+        ServicesCard {}
+        HealthCard {
+            id: health
+        }
+        ShutdownCard {}
         Card {
             width: parent.width
             height: hwCol.height + 28
@@ -476,7 +482,10 @@ Item {
                 }
             }
         }
+        SensCard {}
     }
+    }
+    Scroller { flick: sideFlick }
 
     component DcBtn: Btn {
         id: db

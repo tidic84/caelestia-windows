@@ -1,12 +1,15 @@
 import QtQuick
 
 // Gestionnaire des taches : processus regroupes par programme (src/tasks.rs),
+// avec les memes chiffres et sections que l'onglet Processus de Windows,
 // rafraichis toutes les 2 s tant que l'onglet est affiche
 Item {
     id: page
     readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "tasks"
     property var tasks: []
     property var netRate: ({ down: 0, up: 0 })
+    // totaux de l'en-tete (compteurs de Windows)
+    property var tot: ({ cpu: 0, gpu: 0, disk: 0, procs: 0 })
     property string sort: "cpu"
     property string armed: ""
     property bool busy: false
@@ -32,6 +35,7 @@ Item {
         Api.invoke("tasks_get").then(r => {
             page.tasks = r.list
             page.netRate = { down: r.net_down, up: r.net_up }
+            page.tot = { cpu: r.cpu, gpu: r.gpu, disk: r.disk_active, procs: r.procs }
             page.loaded = true
         }).then(() => { page.busy = false }, () => { page.busy = false })
     }
@@ -50,7 +54,7 @@ Item {
     readonly property real diskFull: 100 * Math.pow(1024, 2)
     readonly property real netFull: 12.5 * Math.pow(1024, 2)
     readonly property real connFull: 40
-    readonly property var hues: ({ cpu: 210, mem: 275, disk: 135, net: 30 })
+    readonly property var hues: ({ cpu: 210, mem: 275, disk: 135, gpu: 330, net: 30 })
     readonly property real memTotal: Ilot.sys ? Ilot.sys.mem_total : 16 * Math.pow(1024, 3)
 
     readonly property var list: {
@@ -59,10 +63,19 @@ Item {
             cpu: (x, y) => y.cpu - x.cpu || y.mem - x.mem,
             mem: (x, y) => y.mem - x.mem,
             disk: (x, y) => y.disk - x.disk || y.cpu - x.cpu,
+            gpu: (x, y) => y.gpu - x.gpu || y.cpu - x.cpu,
             net: (x, y) => y.net - x.net || y.cpu - x.cpu,
-            name: (x, y) => x.name.localeCompare(y.name, "fr")
+            name: (x, y) => x.label.localeCompare(y.label, "fr")
         }[sort]
-        return tasks.filter(t => !q || Ilot.norm(t.name).includes(q)).sort(by)
+        const all = tasks.filter(t => !q || Ilot.norm(t.label).includes(q) || Ilot.norm(t.name).includes(q)).sort(by)
+        // memes sections que l'onglet Processus du Gestionnaire des taches
+        let out = []
+        for (const k of [["app", "Applications"], ["bg", "Processus en arrière-plan"], ["win", "Processus Windows"]]) {
+            const part = all.filter(t => t.kind === k[0])
+            if (part.length)
+                out = out.concat([{ header: k[1] + " (" + part.length + ")" }], part)
+        }
+        return out
     }
 
     // ----------------------------------------------------------- en-tete
@@ -74,7 +87,7 @@ Item {
             id: seg
             x: 4
             anchors.verticalCenter: parent.verticalCenter
-            model: [{ id: "cpu", label: "CPU" }, { id: "mem", label: "Mémoire" }, { id: "disk", label: "Disque" }, { id: "net", label: "Réseau" }, { id: "name", label: "Nom" }]
+            model: [{ id: "cpu", label: "CPU" }, { id: "mem", label: "Mémoire" }, { id: "disk", label: "Disque" }, { id: "gpu", label: "GPU" }, { id: "net", label: "Réseau" }, { id: "name", label: "Nom" }]
             current: page.sort
             onPicked: id => page.sort = id
         }
@@ -83,7 +96,7 @@ Item {
             width: right.x - x - 8
             anchors.verticalCenter: parent.verticalCenter
             horizontalAlignment: Text.AlignHCenter
-            text: page.tasks.reduce((n, t) => n + t.count, 0) + " processus"
+            text: (page.tot.procs || page.tasks.reduce((n, t) => n + t.count, 0)) + " processus"
             px: 12
             tnum: true
             color: Theme.inkVariant
@@ -95,7 +108,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 6
             Rectangle {
-                width: 152
+                width: 128
                 height: 32
                 radius: 16
                 color: Theme.surfaceHigh
@@ -129,15 +142,15 @@ Item {
         }
     }
 
-    // colonnes : icone, programme, CPU, memoire, disque, reseau, fin de tache
-    readonly property var cols: [26, 0, 70, 80, 80, 116, 96]
+    // colonnes : icone, programme, CPU, memoire, disque, GPU, reseau, fin de tache
+    readonly property var cols: [26, 0, 62, 74, 74, 58, 118, 36]
     function colX(i) {
         let x = 12
         for (let k = 0; k < i; k++)
             x += (cols[k] || nameW) + 3
         return x
     }
-    readonly property real nameW: width - 4 - 12 - (26 + 70 + 80 + 80 + 116 + 96) - 6 * 3
+    readonly property real nameW: width - 4 - 12 - (26 + 62 + 74 + 74 + 58 + 118 + 36) - 7 * 3
 
     // totaux colores, comme le Gestionnaire des taches
     Item {
@@ -152,8 +165,7 @@ Item {
             px: 11
             color: Theme.inkVariant
         }
-        readonly property real cpu: Math.min(100, page.tasks.reduce((n, t) => n + t.cpu, 0))
-        readonly property real disk: page.tasks.reduce((n, t) => n + t.disk, 0)
+        readonly property real cpu: page.tot.cpu || Math.min(100, page.tasks.reduce((n, t) => n + t.cpu, 0))
         readonly property real memUsed: Ilot.sys ? Ilot.sys.mem_used : page.tasks.reduce((n, t) => n + t.mem, 0)
         HeatCell {
             head: true
@@ -178,14 +190,24 @@ Item {
             x: page.colX(4)
             width: page.cols[4]
             kind: "disk"
-            frac: totals.disk / page.diskFull
-            value: page.loaded ? page.fmtRate(totals.disk) : "–"
+            frac: page.tot.disk / 100
+            value: page.loaded ? Math.round(page.tot.disk) + " %" : "–"
             label: "Disque"
+            tip: "Activité du disque le plus occupé ; par programme : lecture + écriture"
         }
         HeatCell {
             head: true
             x: page.colX(5)
             width: page.cols[5]
+            kind: "gpu"
+            frac: page.tot.gpu / 100
+            value: page.loaded ? Math.round(page.tot.gpu) + " %" : "–"
+            label: "GPU"
+        }
+        HeatCell {
+            head: true
+            x: page.colX(6)
+            width: page.cols[6]
             kind: "net"
             frac: (page.netRate.down + page.netRate.up) / page.netFull
             value: page.loaded ? "↓" + page.fmtNet(page.netRate.down) + " ↑" + page.fmtNet(page.netRate.up) : "–"
@@ -203,15 +225,41 @@ Item {
         spacing: 3
         boundsBehavior: Flickable.StopAtBounds
         model: page.list
-        delegate: Btn {
-            id: row
+        delegate: Item {
+            id: cell
             required property var modelData
+            width: rows.width
+            height: modelData.header ? 30 : 40
+            Txt {
+                visible: !!cell.modelData.header
+                x: 8
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 6
+                text: cell.modelData.header || ""
+                px: 12
+                weight: Font.DemiBold
+                color: Theme.primary
+            }
+            Loader {
+                active: !cell.modelData.header
+                anchors.fill: parent
+                sourceComponent: rowComp
+                property var modelData: cell.modelData
+            }
+        }
+    }
+    Component {
+        id: rowComp
+        Btn {
+            id: row
+            readonly property var modelData: parent ? parent.modelData : ({})
             width: rows.width
             height: 40
             radius: 14
             color: hovered || kill.hovered ? Theme.surfaceHigh : Theme.surfaceC
             active: true
             cursor: Qt.ArrowCursor
+            tip: modelData.label && modelData.label !== modelData.name ? modelData.name + ".exe" : ""
             Item {
                 x: 12
                 width: 22
@@ -240,7 +288,7 @@ Item {
                 Txt {
                     id: taskName
                     width: Math.min(implicitWidth, parent.width - (count.visible ? count.implicitWidth + 4 : 0))
-                    text: row.modelData.name
+                    text: row.modelData.label || row.modelData.name
                     elide: Text.ElideRight
                 }
                 Txt {
@@ -276,6 +324,13 @@ Item {
             HeatCell {
                 x: page.colX(5)
                 width: page.cols[5]
+                kind: "gpu"
+                frac: row.modelData.gpu / 100
+                value: row.modelData.gpu >= 0.05 ? row.modelData.gpu.toFixed(1).replace(".", ",") + " %" : "0 %"
+            }
+            HeatCell {
+                x: page.colX(6)
+                width: page.cols[6]
                 kind: "net"
                 frac: row.modelData.net / page.connFull
                 value: row.modelData.net ? row.modelData.net + " conn." : "–"
@@ -325,7 +380,10 @@ Item {
                 }
             }
         }
+    }
+    Item {
         Empty {
+            y: rows.y
             visible: rows.count === 0
             width: rows.width
             text: page.loaded ? "Aucun processus" : "Chargement…"

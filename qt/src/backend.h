@@ -28,9 +28,13 @@ public:
     Q_INVOKABLE void setIslandOpen(bool open);
     // Fin du minuteur
     Q_INVOKABLE void beep();
+    // Partie trouvee : trois notes montantes
+    Q_INVOKABLE void chime();
     // Panneau agrandi : taille de la fenetre de l'ilot, en pixels logiques
     Q_INVOKABLE void winResize(qreal w, qreal h);
     Q_INVOKABLE void quit();
+    // relance l'ilot (reglages restaures)
+    Q_INVOKABLE void restart();
 
     // appele par le coeur Rust, depuis n'importe quel thread
     static void onEmit(const char *name, const char *json);
@@ -40,7 +44,7 @@ public:
 Q_SIGNALS:
     void reply(int id, const QString &json);
     void event(const QString &name, const QString &json);
-    // evenements internes (@focus, @place, @quit) et taille demandee
+    // evenements internes (@focus, @place, @quit, @restart) et taille demandee
     void internal(const QString &name, const QString &json);
     void resizeRequested(qreal w, qreal h);
 
