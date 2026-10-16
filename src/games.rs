@@ -8,7 +8,7 @@ use std::process::Command;
 use std::sync::Mutex;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use crate::host::{AppHandle, State};
 use windows::core::{Interface, GUID, HSTRING};
 use windows::Win32::System::Com::{
     CoCreateInstance, CoTaskMemFree, IPersistFile, CLSCTX_INPROC_SERVER, STGM_READ,
@@ -26,8 +26,8 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 #[derive(Serialize, Clone)]
 pub struct Game {
-    pub(crate) id: String,
-    pub(crate) name: String,
+    id: String,
+    name: String,
     /// steam, epic, ubisoft, gog
     source: String,
     /// jaquette verticale (data URL) ou vide
@@ -39,7 +39,7 @@ pub struct Game {
     #[serde(skip)]
     launch: String,
     #[serde(skip)]
-    pub(crate) dir: PathBuf,
+    dir: PathBuf,
 }
 
 pub struct Games(pub Mutex<Vec<Game>>);
@@ -49,7 +49,7 @@ pub struct Games(pub Mutex<Vec<Game>>);
 /// Outils Steam qui ne sont pas des jeux.
 const STEAM_SKIP: &[&str] = &["228980", "431960", "1070560", "1391110", "1628350", "1493710", "2180100"];
 
-pub(crate) fn acf_value<'a>(acf: &'a str, key: &str) -> Option<&'a str> {
+fn acf_value<'a>(acf: &'a str, key: &str) -> Option<&'a str> {
     acf.lines().find_map(|l| {
         let parts: Vec<&str> = l.split('"').filter(|s| !s.trim().is_empty()).collect();
         (parts.len() == 2 && parts[0].eq_ignore_ascii_case(key)).then(|| parts[1])
@@ -339,17 +339,14 @@ pub fn load(app: AppHandle) {
     });
 }
 
-#[tauri::command]
 pub fn games_get(st: State<Games>) -> Vec<Game> {
     st.0.lock().unwrap().clone()
 }
 
-#[tauri::command]
 pub fn games_refresh(app: AppHandle) {
     load(app);
 }
 
-#[tauri::command(async)]
 pub fn game_launch(st: State<Games>, id: String) -> bool {
     let Some(g) = st.0.lock().unwrap().iter().find(|g| g.id == id).cloned() else {
         return false;
@@ -362,7 +359,6 @@ pub fn game_launch(st: State<Games>, id: String) -> bool {
     r.is_ok()
 }
 
-#[tauri::command(async)]
 pub fn game_folder(st: State<Games>, id: String) -> bool {
     let dir = st.0.lock().unwrap().iter().find(|g| g.id == id).map(|g| g.dir.clone());
     dir.is_some_and(|d| open_dir(&d))
@@ -375,7 +371,7 @@ fn open_dir(d: &Path) -> bool {
 }
 
 /// Ouvre l'Explorateur sur le fichier, selectionne.
-pub(crate) fn reveal(p: &Path) -> bool {
+fn reveal(p: &Path) -> bool {
     if p.is_dir() {
         return open_dir(p);
     }
@@ -469,7 +465,6 @@ fn locate(st: &Games, id: &str, name: &str) -> bool {
     false
 }
 
-#[tauri::command(async)]
 pub fn app_folder(app: AppHandle, id: String, name: String) -> bool {
     // thread dedie en STA pour les objets COM du shell
     std::thread::spawn(move || {
@@ -483,7 +478,6 @@ pub fn app_folder(app: AppHandle, id: String, name: String) -> bool {
 // ------------------------------------------- dossiers d'apps : emplacement reel
 
 /// Ouvre un dossier dans l'Explorateur.
-#[tauri::command(async)]
 pub fn folder_open(path: String) -> bool {
     open_dir(Path::new(&path))
 }
@@ -497,19 +491,14 @@ pub struct FileInfo {
 }
 
 /// Nom et icone d'un fichier ou dossier depose dans l'ilot (None s'il n'existe plus).
-#[tauri::command(async)]
 pub fn file_info(path: String) -> Option<FileInfo> {
     let p = PathBuf::from(&path);
-    let special = special_name(&path);
-    if special.is_none() && !p.exists() {
+    if !p.exists() {
         return None;
     }
-    let name = match special {
-        Some(n) => n.to_string(),
-        None => if p.is_dir() { p.file_name() } else { p.file_stem() }
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or(path),
-    };
+    let name = if p.is_dir() { p.file_name() } else { p.file_stem() }
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or(path);
     // icone via le Shell, dans un thread STA a part
     let icon = std::thread::spawn(move || unsafe {
         crate::com_init_sta();
@@ -523,26 +512,11 @@ pub fn file_info(path: String) -> Option<FileInfo> {
 }
 
 /// Ouvre un fichier (programme, raccourci, document) ou un dossier.
-#[tauri::command(async)]
 pub fn file_open(path: String) -> bool {
-    (special_name(&path).is_some() || Path::new(&path).exists()) && Command::new("explorer.exe").arg(&path).spawn().is_ok()
-}
-
-/// Emplacements speciaux du Shell (Corbeille, Ce PC...) : pas de vrai chemin,
-/// on les range sous leur nom « shell:... ».
-fn special_name(path: &str) -> Option<&'static str> {
-    Some(match path.to_ascii_lowercase().as_str() {
-        "shell:recyclebinfolder" => "Corbeille",
-        "shell:mycomputerfolder" => "Ce PC",
-        "shell:controlpanelfolder" => "Panneau de configuration",
-        "shell:downloads" => "Téléchargements",
-        "shell:networkplacesfolder" => "Réseau",
-        _ => return None,
-    })
+    Path::new(&path).exists() && Command::new("explorer.exe").arg(&path).spawn().is_ok()
 }
 
 /// Boite « Choisir un dossier » de Windows ; renvoie le chemin choisi.
-#[tauri::command(async)]
 pub fn pick_folder(app: AppHandle, title: Option<String>) -> Option<String> {
     use windows::Win32::UI::Shell::{FileOpenDialog, IFileOpenDialog, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH};
     let owner = app.get_webview_window("island").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize);

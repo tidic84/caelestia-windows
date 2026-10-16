@@ -1,11 +1,11 @@
-﻿//! Onglet PC : mode d'alimentation de Windows 11 (Economie / Equilibre /
+//! Onglet PC : mode d'alimentation de Windows 11 (Economie / Equilibre /
 //! Performances) et etat des logiciels constructeur (MSI, ASUS, Logitech).
 
 use sysinfo::{ProcessesToUpdate, System};
 use windows::core::{s, w, GUID};
 use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 
-/// Modes de Parametres > Systeme > Alimentation (Â« overlays Â» du mode Equilibre).
+/// Modes de Parametres > Systeme > Alimentation (« overlays » du mode Equilibre).
 const MODES: &[(&str, GUID)] = &[
     ("eco", GUID::from_u128(0x961cc777_2547_4f9d_8174_7d86181b8a7a)),
     ("balanced", GUID::zeroed()),
@@ -23,7 +23,6 @@ fn powrprof(name: windows::core::PCSTR) -> Option<unsafe extern "system" fn() ->
     }
 }
 
-#[tauri::command(async)]
 pub fn power_get() -> String {
     let Some(f) = powrprof(s!("PowerGetEffectiveOverlayScheme")) else { return String::new() };
     let f: GetOverlay = unsafe { std::mem::transmute(f) };
@@ -34,7 +33,6 @@ pub fn power_get() -> String {
     MODES.iter().find(|(_, id)| *id == g).map(|(n, _)| n.to_string()).unwrap_or_default()
 }
 
-#[tauri::command(async)]
 pub fn power_set(mode: String) -> bool {
     let Some((_, g)) = MODES.iter().find(|(n, _)| *n == mode) else { return false };
     let Some(f) = powrprof(s!("PowerSetActiveOverlayScheme")) else { return false };
@@ -43,7 +41,6 @@ pub fn power_set(mode: String) -> bool {
 }
 
 /// Pour chaque nom d'executable (sans .exe), vrai s'il tourne.
-#[tauri::command(async)]
 pub fn procs_running(names: Vec<String>) -> Vec<bool> {
     let mut sys = System::new();
     sys.refresh_processes(ProcessesToUpdate::All, true);
@@ -53,24 +50,4 @@ pub fn procs_running(names: Vec<String>) -> Vec<bool> {
         .map(|p| p.name().to_string_lossy().to_lowercase().trim_end_matches(".exe").to_string())
         .collect();
     names.iter().map(|n| running.iter().any(|r| r == &n.to_lowercase())).collect()
-}
-
-/// Extinction programmee (minuteur cote interface) : Â« shutdown Â», Â« restart Â» ou Â« sleep Â».
-#[tauri::command(async)]
-pub fn power_action(action: String) -> bool {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let shutdown = |flag: &str| {
-        std::process::Command::new("shutdown")
-            .args([flag, "/t", "0"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .is_ok()
-    };
-    match action.as_str() {
-        "shutdown" => shutdown("/s"),
-        "restart" => shutdown("/r"),
-        "sleep" => unsafe { windows::Win32::System::Power::SetSuspendState(false, false, false) },
-        _ => false,
-    }
 }

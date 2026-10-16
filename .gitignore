@@ -2,3 +2,4 @@ target/
 gen/
 .shots/
 Ilot.exe
+qt/build/

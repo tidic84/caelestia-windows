@@ -7,21 +7,22 @@ use std::process::Command;
 use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
-use base64::Engine;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
-use windows::core::{Interface, HSTRING};
+use crate::host::{AppHandle, State};
+use windows::core::Interface;
+use windows::Win32::Foundation::{PROPERTYKEY, SIZE};
 use windows::Win32::UI::Shell::IShellItem2;
 use windows::Win32::UI::Shell::PropertiesSystem::PSGetPropertyKeyFromName;
-use windows::Win32::Foundation::{PROPERTYKEY, SIZE};
 use windows::Win32::Graphics::Gdi::{
     DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO,
     BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ,
 };
+use windows::core::{HSTRING, PCWSTR};
+use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::{
     BHID_EnumItems, FOLDERID_AppsFolder, IEnumShellItems, IShellItem, IShellItemImageFactory,
-    SHGetKnownFolderItem, KF_FLAG_DEFAULT, SIGDN, SIGDN_NORMALDISPLAY,
+    SHCreateItemFromParsingName, SHGetKnownFolderItem, KF_FLAG_DEFAULT, SIGDN, SIGDN_NORMALDISPLAY,
     SIGDN_PARENTRELATIVEPARSING, SIIGBF_ICONONLY,
 };
 
@@ -74,7 +75,33 @@ fn name_of(item: &IShellItem, kind: SIGDN) -> Option<String> {
 }
 
 /// HBITMAP 32 bits (alpha premultiplie) -> PNG en data URL.
-fn bitmap_png(hbmp: HBITMAP) -> Option<String> {
+pub(crate) fn bitmap_png(hbmp: HBITMAP) -> Option<String> {
+    let (w, h, mut buf) = bitmap_bgra(hbmp)?;
+    let has_alpha = buf.chunks(4).any(|p| p[3] != 0);
+    for p in buf.chunks_mut(4) {
+        p.swap(0, 2); // BGRA -> RGBA
+        if !has_alpha {
+            p[3] = 255;
+        } else if p[3] > 0 && p[3] < 255 {
+            let a = p[3] as u32;
+            for c in &mut p[..3] {
+                *c = ((*c as u32 * 255) / a).min(255) as u8;
+            }
+        }
+    }
+    rgba_png(w, h, buf)
+}
+
+/// Pixels RGBA -> PNG, servi par le protocole `ilot` (URL).
+pub(crate) fn rgba_png(w: u32, h: u32, buf: Vec<u8>) -> Option<String> {
+    let img = image::RgbaImage::from_raw(w, h, buf)?;
+    let mut out = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut out, image::ImageFormat::Png).ok()?;
+    Some(crate::img::url("image/png", out.into_inner()))
+}
+
+/// Pixels d'un HBITMAP en BGRA 32 bits, de haut en bas.
+pub(crate) fn bitmap_bgra(hbmp: HBITMAP) -> Option<(u32, u32, Vec<u8>)> {
     unsafe {
         let mut bm = BITMAP::default();
         let n = GetObjectW(
@@ -113,29 +140,16 @@ fn bitmap_png(hbmp: HBITMAP) -> Option<String> {
         if lines == 0 {
             return None;
         }
-        let has_alpha = buf.chunks(4).any(|p| p[3] != 0);
-        for p in buf.chunks_mut(4) {
-            p.swap(0, 2); // BGRA -> RGBA
-            if !has_alpha {
-                p[3] = 255;
-            } else if p[3] > 0 && p[3] < 255 {
-                let a = p[3] as u32;
-                for c in &mut p[..3] {
-                    *c = ((*c as u32 * 255) / a).min(255) as u8;
-                }
-            }
-        }
-        let img = image::RgbaImage::from_raw(w as u32, h as u32, buf)?;
-        let mut out = std::io::Cursor::new(Vec::new());
-        img.write_to(&mut out, image::ImageFormat::Png).ok()?;
-        Some(format!(
-            "data:image/png;base64,{}",
-            base64::engine::general_purpose::STANDARD.encode(out.into_inner())
-        ))
+        Some((w as u32, h as u32, buf))
     }
 }
 
+/// Le shell rate des icones (vides ou generiques) quand plusieurs threads en
+/// demandent en meme temps : une seule extraction a la fois.
+static ICON_LOCK: Mutex<()> = Mutex::new(());
+
 pub(crate) fn icon_of(item: &IShellItem) -> String {
+    let _one = ICON_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     unsafe {
         let Ok(f) = item.cast::<IShellItemImageFactory>() else {
             return String::new();
@@ -148,6 +162,45 @@ pub(crate) fn icon_of(item: &IShellItem) -> String {
             }
             Err(_) => String::new(),
         }
+    }
+}
+
+/// Icone d'un fichier (executable...) en data URL.
+pub(crate) fn file_icon(path: &str) -> String {
+    unsafe { SHCreateItemFromParsingName::<_, _, IShellItem>(&HSTRING::from(path), None) }
+        .map(|item| icon_of(&item))
+        .unwrap_or_default()
+}
+
+/// « Description du fichier » d'un executable (ex. « Google Chrome »).
+pub(crate) fn file_description(path: &str) -> Option<String> {
+    if path.is_empty() {
+        return None;
+    }
+    let wide = HSTRING::from(path);
+    unsafe {
+        let size = GetFileVersionInfoSizeW(&wide, None);
+        if size == 0 {
+            return None;
+        }
+        let mut buf = vec![0u8; size as usize];
+        GetFileVersionInfoW(&wide, None, size, buf.as_mut_ptr() as _).ok()?;
+        let mut ptr = std::ptr::null_mut();
+        let mut len = 0u32;
+        let tr = HSTRING::from(r"\VarFileInfo\Translation");
+        let lang = if VerQueryValueW(buf.as_ptr() as _, PCWSTR(tr.as_ptr()), &mut ptr, &mut len).as_bool() && len >= 4 {
+            let p = ptr as *const u16;
+            format!("{:04x}{:04x}", *p, *p.add(1))
+        } else {
+            "040904b0".into()
+        };
+        let key = HSTRING::from(format!(r"\StringFileInfo\{lang}\FileDescription"));
+        if !VerQueryValueW(buf.as_ptr() as _, PCWSTR(key.as_ptr()), &mut ptr, &mut len).as_bool() || len == 0 {
+            return None;
+        }
+        let s = String::from_utf16_lossy(std::slice::from_raw_parts(ptr as *const u16, len as usize));
+        let s = s.trim_end_matches('\0').trim().to_string();
+        (!s.is_empty()).then_some(s)
     }
 }
 
@@ -202,17 +255,14 @@ pub fn load(app: AppHandle) {
     });
 }
 
-#[tauri::command]
 pub fn apps_get(st: State<Apps>) -> Vec<App> {
     st.0.lock().unwrap().clone()
 }
 
-#[tauri::command]
 pub fn apps_refresh(app: AppHandle) {
     load(app);
 }
 
-#[tauri::command(async)]
 pub fn app_launch(id: String) {
     let _ = Command::new("explorer.exe")
         .arg(format!("shell:AppsFolder\\{id}"))
