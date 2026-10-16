@@ -4,6 +4,10 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.2 — 2026-10-17
+
+- Réglages : en changeant d'onglet, le fond de l'onglet précédent s'efface bien (un seul fond, qui glisse vers l'onglet choisi).
+
 ## 0.4.1 — 2026-10-17
 
 - Météo : le choix d'une ville est de nouveau enregistré.
