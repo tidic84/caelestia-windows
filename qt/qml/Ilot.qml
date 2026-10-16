@@ -230,6 +230,8 @@ Item {
         if (save !== false)
             saveLayout()
     }
+    // taille du texte changee : la fenetre suit le panneau normal
+    onOpenSizeChanged: if (!big) Backend.winResize(openSize.w + 60, openSize.h + 60)
     function setLocked(on, save) {
         locked = on
         if (on)

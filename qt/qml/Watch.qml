@@ -121,7 +121,7 @@ Item {
         setLevel(v / 100, true)
         if (Ilot.cfg.osd)
             Ilot.showActivity({ kind: "osd", icon: v === 0 ? "volume_off" : v > 100 ? "campaign" : v < 50 ? "volume_down" : "volume_up",
-                value: v / (boost === null ? 100 : 200), label: String(v), ms: 1600 })
+                value: Math.min(1, v / 100), label: String(v), ms: 1600 })
     }
 
     // ============================================== activites en cours
