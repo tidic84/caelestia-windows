@@ -4,6 +4,11 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.1 — 2026-10-17
+
+- Météo : le choix d'une ville est de nouveau enregistré.
+- Média : visualiseur en miroir, dégradé par barre.
+
 ## 0.4.0 — 2026-10-16
 
 - **Mises à jour automatiques** : l'îlot cherche une nouvelle version au démarrage puis toutes les 6 h. Au choix dans Réglages › Mises à jour : la télécharger et l'installer tout seul (quand vous ne faites rien, ou au lancement suivant), seulement prévenir, ou ne rien vérifier.
