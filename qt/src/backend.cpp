@@ -137,6 +137,16 @@ void Backend::beep()
     }).detach();
 }
 
+void Backend::chime()
+{
+    // comme le carillon de la version web (la, re, sol)
+    std::thread([] {
+        Beep(880, 150);
+        Beep(1175, 150);
+        Beep(1568, 320);
+    }).detach();
+}
+
 void Backend::winResize(qreal w, qreal h)
 {
     Q_EMIT resizeRequested(w, h);
@@ -145,6 +155,11 @@ void Backend::winResize(qreal w, qreal h)
 void Backend::quit()
 {
     QCoreApplication::quit();
+}
+
+void Backend::restart()
+{
+    Q_EMIT internal(QStringLiteral("@restart"), QString());
 }
 
 QImage IlotImages::requestImage(const QString &id, QSize *size, const QSize &requested)

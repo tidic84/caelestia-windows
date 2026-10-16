@@ -13,15 +13,26 @@ Item {
     visible: opacity > 0
     Behavior on opacity { NumberAnimation { duration: pill.closed ? 250 : 100; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std } }
 
-    // clic : ouvre le panneau (ou l'onglet de l'activite)
+    // clic : ouvre le panneau (ou l'onglet de l'activite) ; clic molette :
+    // lecture / pause ; molette : volume (Maj : appli au premier plan)
     MouseArea {
         anchors.fill: parent
         enabled: pill.closed
         cursorShape: Qt.PointingHandCursor
-        onClicked: Ilot.pillClicked()
+        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+        onClicked: m => {
+            if (m.button !== Qt.MiddleButton)
+                return Ilot.pillClicked()
+            if (!Ilot.hasMedia)
+                return
+            const playing = Ilot.media.playing
+            Ilot.mediaAction("toggle")
+            Watch.osd(playing ? "pause" : "play_arrow", null, playing ? "Pause" : "Lecture")
+        }
         onWheel: w => {
-            if (w.angleDelta.y < 0)
-                Ilot.open()
+            const d = w.angleDelta.y || w.angleDelta.x
+            if (d)
+                Watch.wheel(d > 0 ? 1 : -1, !!(w.modifiers & Qt.ShiftModifier))
         }
     }
 
@@ -48,6 +59,13 @@ Item {
             }
         ]
 
+        // compagnon (parti se promener : il n'est plus dans la pilule)
+        Pet {
+            visible: Watch.petShown
+            opacity: Watch.petOut ? 0 : 1
+            Behavior on opacity { NumberAnimation { duration: 400 } }
+            anchors.verticalCenter: parent.verticalCenter
+        }
         RoundArt {
             size: 18
             visible: Ilot.hasMedia && Ilot.art !== ""
@@ -81,12 +99,85 @@ Item {
             color: Theme.tertiary
             anchors.verticalCenter: parent.verticalCenter
         }
-        Txt {
-            text: Ilot.hm(Ilot.now)
-            weight: Font.Medium
-            font.letterSpacing: 0.3
-            tnum: true
+        PillClock {
             anchors.verticalCenter: parent.verticalCenter
+        }
+        // activite : telechargement Steam, jeu en cours, GPU charge
+        Row {
+            visible: Watch.actShown && !!Watch.chip
+            spacing: 3
+            anchors.verticalCenter: parent.verticalCenter
+            readonly property color fg: Watch.chip && Watch.chip.hot ? Theme.bad : Watch.chip && Watch.chip.away ? Theme.inkVariant : Theme.primary
+            Ms {
+                name: Watch.chip ? Watch.chip.icon : ""
+                size: 16
+                color: parent.fg
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Txt {
+                text: Watch.chip ? Watch.chip.text : ""
+                px: 12
+                weight: Font.Medium
+                tnum: true
+                color: parent.fg
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+        // Discord en vocal : micro (sourdine en rouge)
+        Rectangle {
+            visible: Watch.dcShown
+            width: 20
+            height: 20
+            radius: 10
+            anchors.verticalCenter: parent.verticalCenter
+            color: Watch.dcMic || Watch.dcDeaf ? Theme.alpha(Theme.bad, 0.2) : "transparent"
+            border.width: Watch.dcSpeaking ? 1.5 : 0
+            border.color: Theme.ok
+            Ms {
+                anchors.centerIn: parent
+                name: Watch.dcDeaf ? "headset_off" : Watch.dcMic ? "mic_off" : "mic"
+                size: 15
+                color: Watch.dcMic || Watch.dcDeaf ? Theme.bad : Theme.primary
+            }
+        }
+        // extinction programmee : visible dans les 30 dernieres minutes
+        Row {
+            visible: Watch.offShown
+            spacing: 3
+            anchors.verticalCenter: parent.verticalCenter
+            Ms {
+                name: "power_settings_new"
+                size: 15
+                color: Theme.bad
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Txt {
+                text: Watch.off && Watch.off.at ? Watch.fmtLeft(Watch.off.at - Watch.now) : ""
+                px: 12
+                weight: Font.Medium
+                tnum: true
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+        // voyant : une appli utilise la camera (vert) ou le micro (orange)
+        Row {
+            visible: Watch.privShown
+            spacing: 3
+            anchors.verticalCenter: parent.verticalCenter
+            Rectangle {
+                visible: Watch.priv.cam.length > 0
+                width: 7
+                height: 7
+                radius: 4
+                color: Theme.cam
+            }
+            Rectangle {
+                visible: Watch.priv.mic.length > 0
+                width: 7
+                height: 7
+                radius: 4
+                color: Theme.mic
+            }
         }
         Row {
             visible: Ilot.timerShown
@@ -122,10 +213,105 @@ Item {
             Behavior on y { NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
         }
 
+        // raccourcis Discord (micro, sourdine) a droite
+        Row {
+            id: peekDc
+            visible: Watch.dcShown
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 4
+            IconBtn {
+                small: true
+                width: 30
+                height: 30
+                icon: Watch.dcMic ? "mic_off" : "mic"
+                fg: Watch.dcMic ? Theme.inkError : Theme.ink
+                color: Watch.dcMic ? Theme.error : hovered ? Theme.alpha(Theme.ink, 0.1) : Theme.surfaceHigh
+                tip: Watch.dcMic ? "Réactiver le micro (Discord)" : "Couper le micro (Discord)"
+                onClicked: Watch.toggleDcMic()
+            }
+            IconBtn {
+                small: true
+                width: 30
+                height: 30
+                icon: Watch.dcDeaf ? "headset_off" : "headphones"
+                fg: Watch.dcDeaf ? Theme.inkError : Theme.ink
+                color: Watch.dcDeaf ? Theme.error : hovered ? Theme.alpha(Theme.ink, 0.1) : Theme.surfaceHigh
+                tip: Watch.dcDeaf ? "Réactiver le son (Discord)" : "Sourdine (Discord)"
+                onClicked: Watch.toggleDcDeaf()
+            }
+        }
+
+        // activite en cours (telechargement Steam, jeu) quand rien ne joue
+        Row {
+            visible: !Ilot.hasMedia && Watch.actShown && !!Watch.peek
+            anchors.left: parent.left
+            anchors.right: peekDc.visible ? peekDc.left : parent.right
+            anchors.rightMargin: peekDc.visible ? 8 : 0
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
+            readonly property var p: Watch.peek || {}
+            Rectangle {
+                width: 40
+                height: 40
+                radius: 10
+                anchors.verticalCenter: parent.verticalCenter
+                color: Theme.surfaceHigh
+                clip: true
+                RoundImage {
+                    anchors.fill: parent
+                    radius: 10
+                    visible: !!parent.parent.p.pic
+                    source: parent.parent.p.pic || ""
+                }
+                Ms {
+                    anchors.centerIn: parent
+                    visible: !parent.parent.p.pic
+                    name: parent.parent.p.icon || ""
+                    color: Watch.chip && Watch.chip.hot ? Theme.bad : Theme.primary
+                }
+            }
+            Column {
+                width: parent.width - 50
+                spacing: 2
+                anchors.verticalCenter: parent.verticalCenter
+                Txt {
+                    width: parent.width
+                    text: parent.parent.p.title || ""
+                    weight: Font.Medium
+                    elide: Text.ElideRight
+                }
+                Txt {
+                    width: parent.width
+                    text: parent.parent.p.sub || ""
+                    px: 11
+                    color: Watch.chip && Watch.chip.hot ? Theme.bad : Theme.inkVariant
+                    elide: Text.ElideRight
+                }
+                Rectangle {
+                    visible: parent.parent.p.bar !== undefined && parent.parent.p.bar >= 0
+                    width: parent.width
+                    height: 3
+                    radius: 2
+                    color: Theme.surfaceHighest
+                    Rectangle {
+                        width: parent.width * Math.max(0, parent.parent.parent.p.bar || 0)
+                        height: parent.height
+                        radius: 2
+                        color: Theme.primary
+                        Behavior on width { NumberAnimation { duration: 900 } }
+                    }
+                }
+            }
+        }
+
         // titre en cours
         Row {
             visible: Ilot.hasMedia
-            anchors.fill: parent
+            anchors.left: parent.left
+            anchors.right: peekDc.visible ? peekDc.left : parent.right
+            anchors.rightMargin: peekDc.visible ? 8 : 0
+            height: parent.height
             spacing: 12
             Rectangle {
                 width: 46
@@ -189,8 +375,9 @@ Item {
 
         // heure, date, meteo, mails
         Row {
-            visible: !Ilot.hasMedia
+            visible: !Ilot.hasMedia && !Watch.actShown
             anchors.centerIn: parent
+            anchors.horizontalCenterOffset: peekDc.visible ? -35 : 0
             spacing: 10
             Txt {
                 id: peekClock
@@ -362,7 +549,7 @@ Item {
                 Ms {
                     anchors.centerIn: parent
                     visible: !actBox.s.pic
-                    name: "notifications"
+                    name: actBox.s.sym || "notifications"
                     color: Theme.inkPrimaryContainer
                 }
                 RoundImage {
@@ -373,7 +560,7 @@ Item {
                 }
             }
             Column {
-                width: parent.width - 52
+                width: parent.width - 52 - (notifAct.visible ? notifAct.width + 12 : 0)
                 spacing: 1
                 anchors.verticalCenter: parent.verticalCenter
                 Txt {
@@ -390,6 +577,24 @@ Item {
                     color: Theme.inkVariant
                     elide: Text.ElideRight
                     maximumLineCount: 1
+                }
+            }
+            // action (Jouer, Annuler, Y aller...) : un clic sur la pilule la lance
+            Rectangle {
+                id: notifAct
+                visible: !!actBox.s.action
+                width: actText.implicitWidth + 20
+                height: 28
+                radius: 14
+                color: Theme.primary
+                anchors.verticalCenter: parent.verticalCenter
+                Txt {
+                    id: actText
+                    anchors.centerIn: parent
+                    text: actBox.s.action || ""
+                    px: 12
+                    weight: Font.Medium
+                    color: Theme.inkPrimary
                 }
             }
         }

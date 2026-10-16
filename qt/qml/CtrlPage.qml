@@ -273,7 +273,7 @@ Item {
                     x: 8
                     y: outBtn.y + outBtn.height + 6
                     width: parent.width - 18
-                    height: parent.height - y - 8
+                    height: parent.height - y - 8 - profiles.height - 6
                     contentHeight: mixCol.height
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
@@ -384,6 +384,69 @@ Item {
                     }
                 }
                 Scroller { flick: mixFlick }
+                // profils de volume : clic = appliquer, disquette = enregistrer les volumes actuels
+                Row {
+                    id: profiles
+                    x: 8
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 8
+                    spacing: 6
+                    Repeater {
+                        model: Watch.profileList
+                        Rectangle {
+                            id: pf
+                            required property var modelData
+                            readonly property bool has: !!Watch.mixProfiles[modelData[0]] && Object.keys(Watch.mixProfiles[modelData[0]]).length > 0
+                            readonly property bool on: Watch.mixOn === modelData[0]
+                            width: pfRow.implicitWidth + 8
+                            height: 30
+                            radius: 15
+                            color: on ? Theme.secondaryContainer : Theme.surfaceHigh
+                            Row {
+                                id: pfRow
+                                x: 4
+                                anchors.verticalCenter: parent.verticalCenter
+                                Btn {
+                                    width: pfLabel.implicitWidth + 16
+                                    height: 26
+                                    radius: 13
+                                    opacity: pf.has ? 1 : 0.55
+                                    color: hovered ? Theme.alpha(Theme.ink, 0.08) : "transparent"
+                                    tip: pf.has ? "Appliquer le profil « " + pf.modelData[1] + " »" : "Pas encore enregistré : clique sur la disquette"
+                                    onClicked: {
+                                        if (!pf.has)
+                                            return
+                                        Watch.mixOn = pf.modelData[0]
+                                        Watch.applyProfile(Watch.mixProfiles[pf.modelData[0]]).then(() => Ilot.later(300, page.refreshMixer))
+                                    }
+                                    Row {
+                                        id: pfLabel
+                                        anchors.centerIn: parent
+                                        spacing: 4
+                                        Ms {
+                                            name: pf.modelData[2]
+                                            size: 16
+                                            color: pf.on ? Theme.inkSecondaryContainer : Theme.inkVariant
+                                        }
+                                        Txt {
+                                            text: pf.modelData[1]
+                                            px: 12
+                                            color: pf.on ? Theme.inkSecondaryContainer : Theme.ink
+                                            anchors.verticalCenter: parent.verticalCenter
+                                        }
+                                    }
+                                }
+                                IconBtn {
+                                    small: true
+                                    icon: "save"
+                                    iconSize: 16
+                                    tip: "Enregistrer les volumes actuels comme « " + pf.modelData[1] + " »"
+                                    onClicked: Watch.saveProfile(pf.modelData[0], pf.modelData[1])
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 

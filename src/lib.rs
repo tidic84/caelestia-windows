@@ -276,6 +276,7 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "caffeine_set" => json(system::caffeine_set(app, a!("on"))),
         "caffeine_get" => json(system::caffeine_get()),
         "user_info" => json(system::user_info()),
+        "motion_reduced" => json(system::motion_reduced()),
         "http_get" => system::http_get(a!("url")).and_then(json),
         "open_url" => json(system::open_url(a!("url"))),
         // son

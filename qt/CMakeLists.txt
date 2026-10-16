@@ -23,7 +23,7 @@ foreach(f IN LISTS QML_FILES)
     get_filename_component(name ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${name})
 endforeach()
-set_source_files_properties(qml/Theme.qml qml/Ilot.qml qml/Api.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/Theme.qml qml/Ilot.qml qml/Api.qml qml/Watch.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(ilot
     URI Ilot
