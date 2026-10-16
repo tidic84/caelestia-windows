@@ -11,7 +11,9 @@ use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     RegisterHotKey, UnregisterHotKey, HOT_KEY_MODIFIERS, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, MOD_WIN,
 };
-use windows::Win32::UI::WindowsAndMessaging::{GetMessageW, PostThreadMessageW, MSG, WM_APP, WM_HOTKEY};
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetMessageW, PeekMessageW, PostThreadMessageW, MSG, PM_NOREMOVE, WM_APP, WM_HOTKEY, WM_USER,
+};
 
 // ---------------------------------------------------------- raccourcis
 
@@ -83,10 +85,13 @@ const WM_RELOAD: u32 = WM_APP + 7;
 fn start(app: AppHandle) {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || unsafe {
+        // la file de messages du thread n'existe qu'apres un premier appel :
+        // sans elle, PostThreadMessageW (reload) echouerait
+        let mut msg = MSG::default();
+        let _ = PeekMessageW(&mut msg, None, WM_USER, WM_USER, PM_NOREMOVE);
         THREAD.store(GetCurrentThreadId(), Ordering::SeqCst);
         let _ = tx.send(());
         let mut actions: Vec<String> = Vec::new();
-        let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             if msg.message == WM_RELOAD {
                 for i in 0..actions.len() {
