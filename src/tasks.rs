@@ -1,7 +1,8 @@
-//! Onglet Taches : processus regroupes par programme (comme l'onglet
-//! Processus du Gestionnaire des taches), avec CPU, memoire et fin de tache.
+//! Onglet Taches : processus regroupes par programme, avec les memes chiffres
+//! que l'onglet Processus du Gestionnaire des taches (CPU en « utilite »,
+//! memoire privee, GPU, sections Applications / arriere-plan / Windows).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
@@ -11,10 +12,18 @@ use std::time::Instant;
 use serde::Serialize;
 use sysinfo::{Networks, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 use crate::host::State;
-use windows::core::HSTRING;
+use windows::core::{BOOL, HSTRING};
+use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM};
+use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
 use windows::Win32::NetworkManagement::IpHelper::{GetExtendedTcpTable, TCP_TABLE_OWNER_PID_ALL};
 use windows::Win32::Networking::WinSock::{AF_INET, AF_INET6};
+use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX2};
+use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
 use windows::Win32::UI::Shell::{IShellItem, SHCreateItemFromParsingName};
+use windows::Win32::UI::WindowsAndMessaging::{
+    EnumWindows, GetWindow, GetWindowLongW, GetWindowTextLengthW, GetWindowThreadProcessId, IsWindowVisible, GWL_EXSTYLE,
+    GW_OWNER, WS_EX_TOOLWINDOW,
+};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -27,25 +36,36 @@ const PROTECTED: &[&str] = &[
 
 #[derive(Serialize)]
 pub struct Task {
-    /// nom de l'executable sans .exe
+    /// nom de l'executable sans .exe (cle pour la fin de tache)
     name: String,
+    /// nom affiche par le Gestionnaire des taches (description du fichier)
+    label: String,
+    /// « app » (fenetre ouverte), « bg » (arriere-plan) ou « win » (processus Windows)
+    kind: &'static str,
     count: usize,
-    /// % du processeur entier (0-100)
+    /// % du processeur entier (0-100), en « utilite » comme Windows 11
     cpu: f32,
-    /// octets
+    /// memoire privee (jeu de travail prive), comme le Gestionnaire des taches
     mem: u64,
     /// lecture + ecriture disque, octets par seconde
     disk: u64,
+    /// % du moteur GPU le plus charge
+    gpu: f32,
     /// connexions TCP etablies (le debit par processus demanderait ETW / admin)
     net: u32,
     icon: String,
     protected: bool,
 }
 
-/// Garde le `System` entre deux appels : sysinfo calcule le CPU par difference.
 #[derive(Serialize)]
 pub struct TasksReport {
     list: Vec<Task>,
+    /// totaux de l'en-tete, calcules comme le Gestionnaire des taches
+    cpu: f32,
+    gpu: f32,
+    /// % de temps d'activite du disque le plus occupe
+    disk_active: f32,
+    procs: usize,
     /// debit reseau total (toutes cartes), octets par seconde
     net_down: u64,
     net_up: u64,
@@ -81,13 +101,76 @@ fn tcp_by_pid() -> HashMap<u32, u32> {
     out
 }
 
+/// Processus qui ont une vraie fenetre (barre des taches) : la section
+/// « Applications » du Gestionnaire des taches.
+fn pids_with_window() -> HashSet<u32> {
+    unsafe extern "system" fn cb(h: HWND, l: LPARAM) -> BOOL {
+        let set = &mut *(l.0 as *mut HashSet<u32>);
+        if !IsWindowVisible(h).as_bool() || GetWindowTextLengthW(h) == 0 {
+            return true.into();
+        }
+        if GetWindow(h, GW_OWNER).is_ok_and(|o| !o.is_invalid()) {
+            return true.into();
+        }
+        if GetWindowLongW(h, GWL_EXSTYLE) as u32 & WS_EX_TOOLWINDOW.0 != 0 {
+            return true.into();
+        }
+        // fenetres « cachees » des applis du Store en veille
+        let mut cloaked = 0u32;
+        let _ = DwmGetWindowAttribute(h, DWMWA_CLOAKED, &mut cloaked as *mut _ as _, 4);
+        if cloaked != 0 {
+            return true.into();
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(h, Some(&mut pid));
+        set.insert(pid);
+        true.into()
+    }
+    let mut set = HashSet::new();
+    unsafe {
+        let _ = EnumWindows(Some(cb), LPARAM(&mut set as *mut _ as isize));
+    }
+    set
+}
+
+/// Jeu de travail prive (colonne Memoire du Gestionnaire des taches).
+fn private_ws(pid: u32) -> Option<u64> {
+    unsafe {
+        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut c = PROCESS_MEMORY_COUNTERS_EX2 {
+            cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS_EX2>() as u32,
+            ..Default::default()
+        };
+        let ok = GetProcessMemoryInfo(h, &mut c as *mut _ as *mut PROCESS_MEMORY_COUNTERS, c.cb).is_ok();
+        let _ = CloseHandle(h);
+        ok.then_some(c.PrivateWorkingSetSize as u64)
+    }
+}
+
+/// Chemin complet de l'executable d'un processus.
+pub(crate) fn exe_path(pid: u32) -> Option<String> {
+    use windows::core::PWSTR;
+    use windows::Win32::System::Threading::{QueryFullProcessImageNameW, PROCESS_NAME_WIN32};
+    unsafe {
+        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buf = [0u16; 520];
+        let mut len = buf.len() as u32;
+        let r = QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len);
+        let _ = CloseHandle(h);
+        r.ok()?;
+        Some(String::from_utf16_lossy(&buf[..len as usize]))
+    }
+}
+
 /// Le disque aussi : octets lus/ecrits depuis le dernier appel (d'ou `last`).
 #[derive(Default)]
 pub struct Tasks {
     sys: Mutex<Option<System>>,
     nets: Mutex<Option<Networks>>,
+    pdh: Mutex<Option<crate::pdh::Query>>,
     last: Mutex<Option<Instant>>,
     icons: Mutex<HashMap<PathBuf, String>>,
+    labels: Mutex<HashMap<PathBuf, Option<String>>>,
 }
 
 fn base_name(n: &std::ffi::OsStr) -> String {
@@ -116,6 +199,35 @@ pub(crate) fn icons_for(paths: Vec<PathBuf>) -> Vec<(PathBuf, String)> {
 }
 
 pub fn tasks_get(st: State<Tasks>) -> TasksReport {
+    // compteurs Windows : CPU (utilite), frequence, disques, GPU
+    let (cpu_total, perf, disk_active, gpu_vals) = {
+        let mut g = st.pdh.lock().unwrap();
+        if g.is_none() {
+            *g = crate::pdh::Query::new(&[
+                r"\Processor Information(_Total)\% Processor Utility",
+                r"\Processor Information(_Total)\% Processor Performance",
+                r"\PhysicalDisk(*)\% Idle Time",
+                r"\GPU Engine(*)\Utilization Percentage",
+            ]);
+        }
+        match g.as_ref() {
+            Some(q) => {
+                q.collect();
+                let active = q
+                    .values(2)
+                    .iter()
+                    .filter(|(n, _)| n != "_Total")
+                    .map(|(_, v)| (100.0 - v).clamp(0.0, 100.0))
+                    .fold(0.0, f64::max);
+                (q.value(0, "_Total"), q.value(1, "_Total"), active, q.values(3))
+            }
+            None => (None, None, 0.0, Vec::new()),
+        }
+    };
+    let (gpu_pid, gpu_total) = crate::pdh::gpu_by_pid(&gpu_vals);
+    // le CPU par processus suit la frequence reelle (turbo), comme Windows 11
+    let boost = perf.map_or(1.0, |p| (p / 100.0).clamp(0.3, 3.0)) as f32;
+
     let mut guard = st.sys.lock().unwrap();
     let sys = guard.get_or_insert_with(System::new);
     sys.refresh_processes_specifics(
@@ -139,38 +251,67 @@ pub fn tasks_get(st: State<Tasks>) -> TasksReport {
         })
     };
     let tcp = tcp_by_pid();
+    let windowed = pids_with_window();
+    let windir = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into()).to_lowercase();
 
     // regroupement par nom d'executable
     let mut groups: HashMap<String, (Task, Option<PathBuf>)> = HashMap::new();
+    let mut procs = 0;
+    let mut cpu_sum = 0.0f32;
     for (pid, p) in sys.processes() {
-        if pid.as_u32() == 0 {
+        let pid = pid.as_u32();
+        if pid == 0 {
             continue;
         }
+        procs += 1;
         let name = base_name(p.name());
         let key = name.to_lowercase();
         let e = groups.entry(key.clone()).or_insert_with(|| {
             let protected = PROTECTED.contains(&key.as_str());
-            (Task { name, count: 0, cpu: 0.0, mem: 0, disk: 0, net: 0, icon: String::new(), protected }, None)
+            let t = Task {
+                label: String::new(),
+                name,
+                kind: "bg",
+                count: 0,
+                cpu: 0.0,
+                mem: 0,
+                disk: 0,
+                gpu: 0.0,
+                net: 0,
+                icon: String::new(),
+                protected,
+            };
+            (t, None)
         });
-        e.0.net += tcp.get(&pid.as_u32()).copied().unwrap_or(0);
+        e.0.net += tcp.get(&pid).copied().unwrap_or(0);
         e.0.count += 1;
-        e.0.cpu += p.cpu_usage() / cores;
-        e.0.mem += p.memory();
+        let c = p.cpu_usage() / cores * boost;
+        cpu_sum += c;
+        e.0.cpu += c;
+        e.0.mem += private_ws(pid).unwrap_or_else(|| p.memory());
+        e.0.gpu = e.0.gpu.max(gpu_pid.get(&pid).copied().unwrap_or(0.0) as f32);
         let du = p.disk_usage();
         e.0.disk += ((du.read_bytes + du.written_bytes) as f64 / secs) as u64;
+        if windowed.contains(&pid) {
+            e.0.kind = "app";
+        }
         if e.1.is_none() {
             e.1 = p.exe().map(|x| x.to_path_buf());
         }
     }
     drop(guard);
 
-    // icones des executables pas encore vus
+    // icones et noms des executables pas encore vus
     let mut icons = st.icons.lock().unwrap();
+    let mut labels = st.labels.lock().unwrap();
     let missing: Vec<PathBuf> = groups
         .values()
         .filter_map(|(_, p)| p.clone())
         .filter(|p| !icons.contains_key(p))
         .collect();
+    for p in &missing {
+        labels.entry(p.clone()).or_insert_with(|| crate::apps::file_description(&p.to_string_lossy()));
+    }
     if !missing.is_empty() {
         icons.extend(icons_for(missing));
     }
@@ -178,13 +319,30 @@ pub fn tasks_get(st: State<Tasks>) -> TasksReport {
         .into_values()
         .map(|(mut t, p)| {
             t.cpu = t.cpu.min(100.0);
-            if let Some(p) = p {
-                t.icon = icons.get(&p).cloned().unwrap_or_default();
+            t.gpu = t.gpu.min(100.0);
+            match &p {
+                Some(p) => {
+                    t.icon = icons.get(p).cloned().unwrap_or_default();
+                    if t.kind != "app" && p.to_string_lossy().to_lowercase().starts_with(&windir) {
+                        t.kind = "win";
+                    }
+                    t.label = labels.get(p).cloned().flatten().unwrap_or_default();
+                }
+                // pas de chemin lisible : processus systeme protege
+                None if t.kind != "app" => t.kind = "win",
+                None => {}
+            }
+            if t.protected && t.kind != "app" {
+                t.kind = "win";
+            }
+            if t.label.is_empty() {
+                t.label = t.name.clone();
             }
             t
         })
         .collect();
-    TasksReport { list, net_down, net_up }
+    let cpu = cpu_total.map_or(cpu_sum, |v| v as f32).clamp(0.0, 100.0);
+    TasksReport { list, cpu, gpu: gpu_total as f32, disk_active: disk_active as f32, procs, net_down, net_up }
 }
 
 /// Fin de tache pour tous les processus de ce nom ; renvoie combien ont ete arretes.
