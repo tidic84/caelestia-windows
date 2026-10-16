@@ -714,10 +714,12 @@ Item {
                             radius: 12
                             color: hovered ? Theme.surfaceHigh : "transparent"
                             onClicked: {
-                                page.cities = []
+                                // copie avant de vider la liste : elle detruit ce delegue (modelData compris)
+                                const c = { name: modelData.name, lat: modelData.latitude, lon: modelData.longitude }
+                                Ilot.setCfg({ city: c })
+                                Ilot.refreshWeather()
                                 cityField.text = ""
-                                Ilot.setCfg({ city: { name: modelData.name, lat: modelData.latitude, lon: modelData.longitude } })
-                                Ilot.later(300, () => Ilot.refreshWeather())
+                                page.cities = []
                             }
                             Ms {
                                 x: 10
