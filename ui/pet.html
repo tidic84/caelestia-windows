@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Ilot compagnon</title>
+<style>
+  /* compagnon baladeur : il descend de la pilule et se promène au-dessus de la
+     barre des tâches quand le PC est inactif (piloté par app.js, « pet-cfg ») */
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  :root { --primary: #cfbdfe; --on-primary: #36265d; --surface: #141218; --on-surface: #e6e0e9; }
+  .walker { position: absolute; bottom: 4px; left: 0; width: 40px; height: 40px;
+    transform: translateX(var(--x, 0px)); opacity: 0; transition: opacity .5s; }
+  .walker.on { opacity: 1; }
+  .walker.drop { animation: drop .9s cubic-bezier(.3, 1.6, .5, 1); }
+  @keyframes drop { 0% { translate: 0 -90px; } 100% { translate: 0 0; } }
+  .walker.leave { animation: leave .7s ease-in forwards; }
+  @keyframes leave { 30% { translate: 0 6px; } 100% { translate: 0 -100px; opacity: 0; } }
+  .pet { position: absolute; inset: 0; transform: scaleX(var(--dir, 1)); transform-origin: 50% 100%; }
+  .pet-body { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 30px; background: var(--primary);
+    border-radius: 50% 50% 42% 42% / 62% 62% 38% 38%; transform-origin: 50% 100%; animation: breathe 3.2s ease-in-out infinite;
+    filter: drop-shadow(0 3px 6px rgb(0 0 0 / .35)); }
+  @keyframes breathe { 50% { scale: 1.04 .96; } }
+  .walking .pet-body { animation: waddle .4s ease-in-out infinite; }
+  @keyframes waddle { 0%, 100% { rotate: -6deg; translate: 0 0; } 50% { rotate: 6deg; translate: 0 -3px; } }
+  .eye { position: absolute; top: 10px; width: 5px; height: 8px; border-radius: 3px; background: var(--on-primary); transition: height .08s, top .08s; }
+  .eye.l { left: 9px; } .eye.r { right: 9px; }
+  .walking .eye { translate: 2px 0; }
+  .blink .eye, .sleep .eye { height: 2px; top: 14px; }
+  .sleep .pet-body { animation: breathe 5s ease-in-out infinite; filter: saturate(.6) brightness(.85) drop-shadow(0 3px 6px rgb(0 0 0 / .35)); }
+  .hop .pet-body { animation: hop .55s cubic-bezier(.3, 1.6, .5, 1); }
+  @keyframes hop { 40% { translate: 0 -16px; } }
+  .fx { position: absolute; right: -10px; top: -8px; font: 600 14px system-ui; color: var(--primary); opacity: 0; pointer-events: none; }
+  .fx.go { animation: fx 1.8s ease-out; }
+  @keyframes fx { 0% { opacity: 0; transform: translate(0, 6px) scale(.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, -24px) scale(1.2); } }
+  /* espèces (comme dans la pilule) */
+  .cat .pet-body { border-radius: 45% 45% 40% 40%; }
+  .cat .pet-body::after { content: ''; position: absolute; left: 0; right: 0; top: -8px; height: 12px;
+    background: linear-gradient(135deg, var(--primary) 50%, transparent 50%) left / 12px 12px no-repeat,
+      linear-gradient(225deg, var(--primary) 50%, transparent 50%) right / 12px 12px no-repeat; }
+  .ghost .pet-body { border-radius: 50% 50% 0 0 / 60% 60% 0 0; opacity: .85; background: var(--on-surface);
+    -webkit-mask: radial-gradient(circle 5px at 50% 100%, transparent 98%, #000) 0 0 / 12px 100% repeat-x; }
+  .ghost .eye { background: var(--surface); }
+  .ghost .walker, .ghost.walker { bottom: 12px; }
+</style>
+</head>
+<body>
+  <div class="walker"><div class="pet"><i class="pet-body"><b class="eye l"></b><b class="eye r"></b></i></div><em class="fx"></em></div>
+<script>
+const { listen } = window.__TAURI__.event;
+const w = document.querySelector('.walker');
+const pet = w.querySelector('.pet');
+const fx = w.querySelector('.fx');
+let x = innerWidth / 2 - 20, target = x, dir = 1, mode = 'idle', sleepy = false, running = false, last = 0;
+const place = () => w.style.setProperty('--x', x + 'px');
+const say = s => { fx.textContent = s; fx.classList.remove('go'); void fx.offsetWidth; fx.classList.add('go'); };
+function pick() {
+  const r = Math.random();
+  if (sleepy) { mode = 'sleep'; pet.classList.add('sleep'); return; }
+  pet.classList.remove('sleep');
+  if (r < 0.55) {
+    // se promène vers un point au hasard (pas trop loin)
+    target = Math.max(10, Math.min(innerWidth - 50, x + (Math.random() - 0.5) * innerWidth * 0.6));
+    mode = 'walk';
+  } else if (r < 0.7) { mode = 'idle'; pet.classList.add('hop'); setTimeout(() => pet.classList.remove('hop'), 560); }
+  else if (r < 0.8) { mode = 'idle'; say(['♥', '♪', '!', '?'][Math.floor(Math.random() * 4)]); }
+  else mode = 'idle';
+}
+let next = 0;
+function frame(t) {
+  if (!running) return;
+  const dt = Math.min(0.05, (t - last) / 1000 || 0);
+  last = t;
+  if (mode === 'walk') {
+    const d = target - x;
+    dir = Math.sign(d) || dir;
+    pet.style.setProperty('--dir', dir);
+    x += Math.sign(d) * Math.min(Math.abs(d), 55 * dt);
+    if (Math.abs(target - x) < 1) { mode = 'idle'; next = t + 1500 + Math.random() * 2500; }
+    place();
+  } else if (t > next) { pick(); next = t + (mode === 'sleep' ? 6000 : 2500 + Math.random() * 3500); }
+  if (mode === 'sleep' && Math.random() < 0.006) say('z');
+  if (mode !== 'sleep' && Math.random() < 0.004) { pet.classList.add('blink'); setTimeout(() => pet.classList.remove('blink'), 150); }
+  pet.classList.toggle('walking', mode === 'walk');
+  requestAnimationFrame(frame);
+}
+listen('pet-cfg', ({ payload: c }) => {
+  const r = document.documentElement.style;
+  ['primary', 'on-primary', 'surface', 'on-surface'].forEach(k => c[k] && r.setProperty('--' + k, c[k]));
+  pet.className = 'pet ' + (c.species || 'blob');
+  w.classList.toggle('ghost', c.species === 'ghost');
+  sleepy = !!c.sleepy;
+  if (c.on && !running) {
+    // arrive depuis la pilule (centre de l'écran) en tombant
+    running = true;
+    x = (c.fromX ?? innerWidth / 2) - 20; place();
+    w.classList.remove('leave');
+    w.classList.add('on', 'drop');
+    setTimeout(() => w.classList.remove('drop'), 950);
+    mode = 'idle'; next = performance.now() + 1500;
+    requestAnimationFrame(t => { last = t; frame(t); });
+  } else if (!c.on && running) {
+    w.classList.add('leave');
+    setTimeout(() => { running = false; w.classList.remove('on', 'leave'); }, 700);
+  }
+});
+</script>
+</body>
+</html>

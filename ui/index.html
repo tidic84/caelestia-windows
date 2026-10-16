@@ -8,13 +8,25 @@
 <body>
   <div id="island" class="collapsed">
   <div class="island-clip">
+    <div class="island-wall"></div>
+    <!-- Apparence > Fond de l'îlot > Aurore boréale -->
+    <div class="island-aurora"><i></i><i></i><i></i><i></i></div>
+    <!-- météo animée derrière la pilule (pluie, neige, soleil...) -->
+    <div class="wx-fx"></div>
     <!-- état replié / survol -->
     <div id="pill">
       <div class="pill-mini">
+        <!-- compagnon : réagit à la musique, aux jeux, à l'heure (Apparence > Compagnon) -->
+        <span class="pet" hidden><i class="pet-body"><b class="eye l"></b><b class="eye r"></b></i><em class="pet-fx"></em></span>
         <img class="mini-art" alt="">
         <span class="eq"><i></i><i></i><i></i></span>
         <span class="mini-clock">--:--</span>
         <span class="mini-mail" hidden></span>
+        <span class="mini-act" hidden></span>
+        <span class="mini-dc" hidden><span class="ms">mic</span></span>
+        <!-- voyant : une appli utilise la caméra (vert) ou le micro (orange) -->
+        <span class="mini-off" hidden><span class="ms">power_settings_new</span><b></b></span>
+        <span class="mini-priv" hidden><i class="cam"></i><i class="mic"></i></span>
       </div>
       <div class="pill-peek">
         <div class="peek-media">
@@ -31,6 +43,23 @@
           <span class="peek-date"></span>
           <span class="peek-mail" hidden><span class="ms">mail</span><b></b></span>
         </div>
+        <div class="peek-act" hidden></div>
+        <div class="peek-dc" hidden>
+          <button class="icon-btn small" data-dc="mic"><span class="ms">mic</span></button>
+          <button class="icon-btn small" data-dc="deaf"><span class="ms">headphones</span></button>
+        </div>
+      </div>
+      <!-- affichage éphémère : volume à la molette, lecture, sortie audio -->
+      <div class="pill-osd"><span class="ms"></span><span class="osd-bar"><i></i></span><b></b></div>
+      <!-- notification (Windows ou nouveau mail) -->
+      <div class="pill-notif">
+        <span class="pn-icon"><img alt=""><span class="ms pn-sym">notifications</span></span>
+        <div class="pn-text">
+          <div class="pn-top"><span class="pn-app"></span><span class="pn-now">maintenant</span></div>
+          <div class="pn-title"></div>
+          <div class="pn-body"></div>
+        </div>
+        <span class="pn-act" hidden></span>
       </div>
     </div>
 
@@ -43,17 +72,52 @@
         <button data-tab="apps"><span class="ms">apps</span><span>Apps</span></button>
         <button data-tab="mail"><span class="ms">mail</span><span>Mail</span><b class="badge" hidden></b></button>
         <button data-tab="pc"><span class="ms">sports_esports</span><span>PC</span></button>
+        <button data-tab="sounds"><span class="ms">graphic_eq</span><span>Soundboard</span></button>
+        <button data-tab="tasks"><span class="ms">monitoring</span><span>Tâches</span></button>
         <button data-tab="clips"><span class="ms">content_paste</span><span>Presse-papiers</span></button>
+        <button data-tab="claude"><span class="ms">auto_awesome</span><span>Claude</span></button>
+        <button data-tab="translate"><span class="ms">translate</span><span>Traduction</span></button>
         <button data-tab="walls"><span class="ms">wallpaper</span><span>Fonds</span></button>
       </nav>
+      <div class="panel-tools left">
+        <button class="icon-btn" data-tool="share" title="Partager avec le téléphone (QR code)"><span class="ms">phonelink</span></button>
+      </div>
+      <div class="panel-tools">
+        <button class="icon-btn" data-tool="lock" title="Verrouiller : l'îlot reste ouvert"><span class="ms">lock_open</span></button>
+        <button class="icon-btn" data-tool="big" title="Agrandir"><span class="ms">open_in_full</span></button>
+      </div>
 
       <div id="pages">
+        <!-- partage avec le téléphone (src/share.rs) -->
+        <div class="share-pop" hidden>
+          <div class="card share-card">
+            <div class="share-qr"></div>
+            <div class="share-info">
+              <div class="sp-head"><b>Partage avec le téléphone</b><button class="icon-btn small" id="share-close" title="Fermer"><span class="ms">close</span></button></div>
+              <p class="sp-hint">Scanne le QR code avec l'appareil photo du téléphone (même Wi-Fi que le PC). Dépose d'autres fichiers sur l'îlot pour les ajouter.</p>
+              <div class="share-url"></div>
+              <div class="sp-sec">Fichiers partagés</div>
+              <div class="share-files"></div>
+              <div class="sp-sec">Reçus du téléphone (Téléchargements)</div>
+              <div class="share-recv"></div>
+              <div class="acc-actions">
+                <span class="share-err"></span>
+                <button class="text-btn" id="share-stop"><span class="ms">link_off</span>Arrêter le partage</button>
+              </div>
+            </div>
+          </div>
+        </div>
         <!-- ACCUEIL -->
         <section class="page" data-page="home">
           <div class="home-grid">
             <div class="card clock-card">
               <div class="big-clock"><span class="hh">--</span><span class="mm">--</span></div>
               <div class="big-date"></div>
+              <button class="weather" title="Météo : clic pour changer de ville">
+                <span class="ms w-icon">cloud</span><b class="w-temp">--°</b>
+                <small class="w-city">Météo…</small>
+              </button>
+              <input class="w-input" placeholder="Ville (vide = auto)" spellcheck="false" hidden>
             </div>
             <div class="card cal-card">
               <div class="cal-head">
@@ -62,11 +126,25 @@
                 <button class="icon-btn small" data-cal="1">›</button>
               </div>
               <div class="cal-grid"></div>
+              <div class="cal-note" hidden>
+                <div class="cal-head">
+                  <span class="cal-note-date"></span>
+                  <span>
+                    <button class="icon-btn small" data-note="del" title="Supprimer la note"><span class="ms">delete</span></button>
+                    <button class="icon-btn small" data-note="close" title="Fermer"><span class="ms">close</span></button>
+                  </span>
+                </div>
+                <textarea placeholder="Note pour ce jour…" spellcheck="false"></textarea>
+              </div>
             </div>
             <div class="card home-media">
-              <div class="disc"><img class="disc-art" alt=""><span class="ms disc-ph">music_note</span></div>
+              <div class="disc-wrap">
+                <canvas class="disc-viz"></canvas>
+                <div class="disc"><img class="disc-art" alt=""><span class="ms disc-ph">music_note</span></div>
+              </div>
               <div class="hm-title">Rien en lecture</div>
               <div class="hm-artist"></div>
+              <canvas class="viz viz-home"></canvas>
               <div class="controls">
                 <button class="icon-btn" data-media="prev"><span class="ms">skip_previous</span></button>
                 <button class="icon-btn filled" data-media="toggle"><span class="ms play-icon">play_arrow</span></button>
@@ -76,8 +154,8 @@
             <div class="card res-card">
               <div class="gauge" data-g="cpu"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">memory</span><b>CPU</b><em>-</em></div>
               <div class="gauge" data-g="mem"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">developer_board</span><b>RAM</b><em>-</em></div>
-              <div class="gauge" data-g="disk"><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">hard_drive</span><b>C:</b><em>-</em></div>
               <div class="gauge" data-g="bat" hidden><svg viewBox="0 0 44 44"><circle class="trk" cx="22" cy="22" r="18"/><circle class="val" cx="22" cy="22" r="18"/></svg><span class="ms">battery_full</span><b>Batt.</b><em>-</em></div>
+              <div class="disks"></div>
             </div>
             <div class="card vol-card">
               <button class="icon-btn" id="mute"><span class="ms vol-icon">volume_up</span></button>
@@ -97,6 +175,7 @@
         <!-- MÉDIA -->
         <section class="page" data-page="media">
           <div class="mp-bg"></div>
+          <canvas class="viz viz-mp"></canvas>
           <div class="mp">
             <div class="mp-art"><img alt=""><span class="ms">music_note</span></div>
             <div class="mp-info">
@@ -120,10 +199,13 @@
               </div>
             </div>
           </div>
+          <!-- paroles synchronisées (lrclib.net), en bas de la page -->
+          <div class="ly-bar"><div class="ly-lines"></div></div>
           <div class="mp-tools">
+            <button class="icon-btn" id="mp-lyrics" title="Paroles"><span class="ms">lyrics</span></button>
             <button class="icon-btn" id="mp-lists" title="Playlists"><span class="ms">queue_music</span></button>
-            <button class="icon-btn" id="mp-style" title="Apparence"><span class="ms">palette</span></button>
           </div>
+
 
           <!-- playlists favorites -->
           <div class="side-panel" id="pl-panel" hidden>
@@ -136,19 +218,6 @@
             </form>
             <p class="sp-hint">Dans Spotify : clic droit sur une playlist › Partager › Copier le lien.</p>
           </div>
-
-          <!-- apparence -->
-          <div class="side-panel" id="st-panel" hidden>
-            <div class="sp-head"><b>Apparence</b><button class="icon-btn small" data-close><span class="ms">close</span></button></div>
-            <div class="sp-sec">Couleur</div>
-            <div class="swatches"></div>
-            <div class="sp-sec">Style</div>
-            <div class="chips" data-opt="scheme"></div>
-            <div class="sp-sec">Thème</div>
-            <div class="chips" data-opt="dark"></div>
-            <div class="sp-sec">Fond de l'onglet Média</div>
-            <div class="chips" data-opt="mediaBg"></div>
-          </div>
         </section>
 
         <!-- APPS -->
@@ -156,10 +225,10 @@
           <label class="search">
             <span class="ms">search</span>
             <input id="q" placeholder="Rechercher une application…" autocomplete="off" spellcheck="false">
+            <button class="sort-btn" title="Trier les applications"><span class="ms">sort_by_alpha</span><span class="sort-lbl">Nom</span></button>
           </label>
           <div class="folder-bar"></div>
           <div class="app-grid"></div>
-          <div class="ctx" hidden></div>
         </section>
 
         <!-- MAIL -->
@@ -215,6 +284,7 @@
         <!-- PC : Discord, matériel, alimentation -->
         <section class="page" data-page="pc">
           <div class="pc-grid">
+            <div class="pc-main">
             <div class="card dc-card">
               <div class="dc-head">
                 <span class="ms dc-logo">headset_mic</span>
@@ -248,10 +318,64 @@
                 </div>
               </form>
             </div>
+            <div class="card mix-card">
+              <div class="mix-head">
+                <div class="sp-sec">Volume des applis et jeux</div>
+                <div class="mix-prof" title="Clic : appliquer · icône disquette : enregistrer les volumes actuels"></div>
+              </div>
+              <div class="mix-list"><div class="sp-hint">Chargement…</div></div>
+            </div>
+            </div>
             <div class="pc-side">
+              <div class="card sv-card">
+                <div class="sv-head">
+                  <div class="sp-sec">État des services</div>
+                  <button class="icon-btn small" id="sv-refresh" title="Tester maintenant"><span class="ms">refresh</span></button>
+                </div>
+                <div class="sv-list"><div class="sp-hint">Test en cours…</div></div>
+                <div class="sv-note"></div>
+              </div>
+              <div class="card out-card">
+                <div class="sp-sec">Sortie audio</div>
+                <div class="out-list"></div>
+              </div>
               <div class="card hw-card">
                 <div class="sp-sec">Logiciels du PC</div>
                 <div class="hw-list"></div>
+              </div>
+              <div class="card hl-card">
+                <div class="sp-sec">Santé du PC</div>
+                <div class="hl-disks"><div class="sp-hint">Chargement…</div></div>
+                <div class="hl-drv" hidden></div>
+                <div class="hl-clean"></div>
+                <button class="text-btn primary hl-go" disabled><span class="ms">cleaning_services</span><span>Nettoyer</span></button>
+              </div>
+              <div class="card off-card">
+                <div class="sp-sec">Extinction programmée</div>
+                <div class="off-acts">
+                  <button data-a="shutdown" class="on"><span class="ms">power_settings_new</span>Éteindre</button>
+                  <button data-a="sleep"><span class="ms">bedtime</span>Veille</button>
+                  <button data-a="restart"><span class="ms">restart_alt</span>Redémarrer</button>
+                </div>
+                <div class="off-presets">
+                  <button data-m="30">30 min</button>
+                  <button data-m="60">1 h</button>
+                  <button data-m="120">2 h</button>
+                  <label title="À une heure précise"><span class="ms">schedule</span><input type="time" id="off-time"></label>
+                  <button data-w="media" title="Quand la musique ou la vidéo s'arrête"><span class="ms">movie</span>Fin du média</button>
+                  <button data-w="steam" title="Quand les téléchargements Steam sont finis"><span class="ms">download</span>Fin MAJ Steam</button>
+                </div>
+                <div class="off-state" hidden><span class="ms">timer</span><b></b><button class="text-btn" id="off-cancel">Annuler</button></div>
+              </div>
+              <div class="card sens-card">
+                <div class="sp-sec">Convertisseur de sensibilité</div>
+                <div class="sens-in">
+                  <select id="sens-game" title="Jeu de départ"></select>
+                  <input id="sens-val" type="number" step="0.001" min="0" placeholder="Sensi" title="Ta sensibilité dans ce jeu">
+                  <input id="sens-dpi" type="number" step="50" min="100" placeholder="DPI" title="DPI de la souris">
+                </div>
+                <div class="sens-cm"></div>
+                <div class="sens-out"></div>
               </div>
               <div class="card pw-card">
                 <div class="sp-sec">Mode d'alimentation</div>
@@ -267,6 +391,34 @@
         </section>
 
         <!-- PRESSE-PAPIERS -->
+        <!-- GESTIONNAIRE DES TÂCHES -->
+        <section class="page" data-page="tasks">
+          <div class="page-head">
+            <span class="seg task-seg">
+              <button data-s="cpu" class="on">CPU</button>
+              <button data-s="mem">Mémoire</button>
+              <button data-s="disk">Disque</button>
+              <button data-s="gpu">GPU</button>
+              <button data-s="net">Réseau</button>
+              <button data-s="name">Nom</button>
+            </span>
+            <span class="task-sum"></span>
+            <span>
+              <label class="task-search"><span class="ms">search</span><input id="task-q" placeholder="Filtrer…" autocomplete="off" spellcheck="false"></label>
+              <button class="text-btn" id="taskmgr" title="Ouvrir le Gestionnaire des tâches de Windows"><span class="ms">open_in_new</span>Windows</button>
+            </span>
+          </div>
+          <div class="task-list"><div class="task-row task-headrow">
+            <span></span><span>Programme</span>
+            <span class="task-cell" data-h="cpu"><b>–</b>CPU</span>
+            <span class="task-cell" data-h="mem"><b>–</b>Mémoire</span>
+            <span class="task-cell" data-h="disk"><b>–</b>Disque</span>
+            <span class="task-cell" data-h="gpu"><b>–</b>GPU</span>
+            <span class="task-cell" data-h="net" title="Débit total ↓ réception / ↑ envoi ; par programme : connexions actives"><b>–</b>Réseau (bit/s)</span>
+            <span></span>
+          </div><div class="empty">Chargement…</div></div>
+        </section>
+
         <section class="page" data-page="clips">
           <div class="page-head">
             <span class="seg clip-seg">
@@ -283,6 +435,100 @@
           <textarea class="notes" hidden spellcheck="true" placeholder="Écrivez vos notes ici… Elles sont enregistrées automatiquement."></textarea>
         </section>
 
+        <!-- SOUNDBOARD (vocal Discord) -->
+        <section class="page" data-page="sounds">
+          <div class="page-head">
+            <span class="sb-state">
+              <button class="sb-toggle" id="sb-on"><span class="ms">mic_off</span><span>Désactivée</span></button>
+              <small class="sb-hint"></small>
+            </span>
+            <span>
+              <button class="text-btn" id="sb-stop" title="Couper tous les sons"><span class="ms">stop_circle</span>Stop</button>
+              <button class="icon-btn" id="sb-setup" title="Réglages"><span class="ms">tune</span></button>
+              <button class="text-btn primary" id="sb-add"><span class="ms">add</span>Ajouter</button>
+            </span>
+          </div>
+          <div class="sb-grid"></div>
+          <input type="file" id="sb-file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.opus" multiple hidden>
+
+          <div class="side-panel" id="sb-panel" hidden>
+            <div class="sp-head"><b>Réglages de la soundboard</b><button class="icon-btn small" data-close><span class="ms">close</span></button></div>
+            <div class="sp-sec">Micro virtuel (sortie où l'îlot envoie ta voix + les sons)</div>
+            <select class="tr-sel sb-sel" id="sb-cable"></select>
+            <div class="sp-sec">Ton vrai micro</div>
+            <select class="tr-sel sb-sel" id="sb-mic"></select>
+            <div class="sp-sec">Volume de ton micro <b class="sb-gain-val">100 %</b></div>
+            <input type="range" class="slider" id="sb-gain" min="0" max="200" value="100">
+            <div class="sp-sec">Entendre les sons dans mon casque</div>
+            <div class="chips" data-sb="monitor"></div>
+            <div class="sp-sec">Plusieurs sons</div>
+            <div class="chips" data-sb="exclusive"></div>
+            <div class="sb-help">
+              <b>Dans Discord</b> : Paramètres › Voix et vidéo › Périphérique d'entrée :
+              <em class="sb-in-name">le micro du câble virtuel</em>.<br>
+              Mets aussi la <b>suppression de bruit</b> sur « Standard » ou « Aucune » : Krisp coupe tout ce qui n'est pas une voix, sons compris.<br>
+              Soundboard désactivée = Discord n'entend plus ton micro : remets ton micro HyperX dans Discord si tu fermes l'îlot.
+            </div>
+          </div>
+        </section>
+
+        <!-- menu contextuel, commun à toutes les pages -->
+        <div class="ctx" hidden></div>
+
+        <!-- TRADUCTION -->
+        <!-- CLAUDE : envoie la question à l'application Claude (claude://) -->
+        <section class="page" data-page="claude">
+          <div class="page-head">
+            <span class="seg cl-seg">
+              <button data-m="chat" class="on">Discussion</button>
+              <button data-m="cowork">Cowork</button>
+            </span>
+            <span class="cl-note"></span>
+            <span>
+              <button class="text-btn" id="cl-code" title="Nouvelle session Claude Code"><span class="ms">terminal</span>Code</button>
+              <button class="text-btn" id="cl-open" title="Ouvrir l'application Claude"><span class="ms">open_in_new</span>Ouvrir</button>
+            </span>
+          </div>
+          <div class="cl-grid">
+            <div class="card cl-box">
+              <textarea class="cl-in" placeholder="Demande quelque chose à Claude…" spellcheck="false" maxlength="6000"></textarea>
+              <div class="cl-quick"></div>
+              <div class="tr-foot">
+                <small class="cl-hint">Entrée : envoyer · Maj+Entrée : nouvelle ligne</small>
+                <button class="text-btn primary" id="cl-send"><span class="ms">send</span>Demander</button>
+              </div>
+            </div>
+            <div class="card cl-side">
+              <div class="sp-sec">Dernières questions</div>
+              <div class="cl-hist"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" data-page="translate">
+          <div class="page-head tr-head">
+            <span class="tr-langs">
+              <select class="tr-sel" id="tr-from" title="Langue du texte"></select>
+              <button class="icon-btn small" id="tr-swap" title="Inverser les langues"><span class="ms">swap_horiz</span></button>
+              <select class="tr-sel" id="tr-to" title="Traduire en"></select>
+            </span>
+            <span>
+              <button class="text-btn" id="tr-live" title="Sous-titres en direct de tout le son du PC, traduits en français"><span class="ms">closed_caption</span>Sous-titres en direct</button>
+              <button class="text-btn" id="tr-paste" title="Coller le dernier texte copié"><span class="ms">content_paste</span>Coller</button>
+            </span>
+          </div>
+          <div class="tr-grid">
+            <div class="card tr-box">
+              <textarea class="tr-in" placeholder="Tape ou colle un texte à traduire…" spellcheck="false" maxlength="4500"></textarea>
+              <div class="tr-foot"><small class="tr-count">0 / 4500</small><button class="icon-btn small" id="tr-clear" title="Effacer"><span class="ms">close</span></button></div>
+            </div>
+            <div class="card tr-box tr-res">
+              <div class="tr-out"></div>
+              <div class="tr-foot"><small class="tr-det"></small><button class="icon-btn small" id="tr-copy" title="Copier la traduction"><span class="ms">content_copy</span></button></div>
+            </div>
+          </div>
+        </section>
+
         <!-- FONDS D'ÉCRAN -->
         <section class="page" data-page="walls">
           <div class="page-head">
@@ -294,9 +540,79 @@
             <span>
               <button class="text-btn" id="wall-refresh"><span class="ms">refresh</span>Actualiser</button>
               <button class="text-btn" id="wall-folder"><span class="ms">folder_open</span>Dossier</button>
+              <button class="text-btn" id="wall-style"><span class="ms">palette</span>Apparence</button>
             </span>
           </div>
           <div class="wall-grid"><div class="empty">Chargement…</div></div>
+
+          <!-- apparence -->
+          <div class="side-panel" id="st-panel" hidden>
+            <div class="sp-head"><b>Apparence</b><button class="icon-btn small" data-close><span class="ms">close</span></button></div>
+            <div class="sp-sec">Thèmes prêts</div>
+            <div class="chips presets"></div>
+            <div class="sp-sec">Couleur</div>
+            <div class="swatches"></div>
+            <div class="sp-sec">Style</div>
+            <div class="chips" data-opt="scheme"></div>
+            <div class="sp-sec">Thème</div>
+            <div class="chips" data-opt="dark"></div>
+            <div class="sp-times" hidden>Clair de <input type="time" name="day"> à <input type="time" name="night"></div>
+            <div class="sp-sec">Fond de l'îlot</div>
+            <div class="chips" data-opt="islandBg"></div>
+            <div class="sp-sec">Contour de l'îlot</div>
+            <div class="chips" data-opt="border"></div>
+            <div class="sp-sec">Forme de l'îlot</div>
+            <div class="chips" data-opt="shape"></div>
+            <div class="sp-sec">Animations</div>
+            <div class="chips" data-opt="anim"></div>
+            <div class="sp-sec">Notifications dans l'îlot</div>
+            <div class="chips" data-opt="notif"></div>
+            <div class="sp-sec">Activités en cours (téléchargement Steam, jeu)</div>
+            <div class="chips" data-opt="activity"></div>
+            <div class="sp-sec">Mode jeu (quand un jeu du Launcher tourne)</div>
+            <div class="chips" data-opt="gamemode"></div>
+            <div class="chips" data-opt="gamePerf"></div>
+            <div class="chips" data-opt="gameNotif"></div>
+            <div class="chips" data-opt="matchAlert"></div>
+            <div class="chips" data-opt="mixAuto"></div>
+            <div class="sp-sec">Mode absent (10 min sans clavier ni souris)</div>
+            <div class="chips" data-opt="away"></div>
+            <div class="sp-sec">Compagnon dans la pilule</div>
+            <div class="chips" data-opt="pet"></div>
+            <div class="chips" data-opt="petWalk"></div>
+            <div class="sp-sec">Horloge de la pilule</div>
+            <div class="chips" data-opt="clock"></div>
+            <div class="sp-sec">Voyant caméra / micro</div>
+            <div class="chips" data-opt="privacy"></div>
+            <div class="sp-sec">Météo animée dans la pilule</div>
+            <div class="chips" data-opt="wxfx"></div>
+            <div class="sp-sec">Raccourcis Discord dans la pilule</div>
+            <div class="chips" data-opt="dcPill"></div>
+            <div class="sp-sec">Fond de l'onglet Média</div>
+            <div class="chips" data-opt="mediaBg"></div>
+            <div class="sp-sec">Taille de la pilule</div>
+            <div class="chips" data-opt="pillSize"></div>
+            <div class="sp-sec">Position de l'îlot</div>
+            <div class="chips" data-opt="pillPos"></div>
+            <div class="chips" data-opt="screen"></div>
+            <div class="sp-sec">Accessibilité</div>
+            <div class="sp-sub">Taille du texte du panneau</div>
+            <div class="chips" data-opt="textSize"></div>
+            <div class="sp-sub">Contraste</div>
+            <div class="chips" data-opt="contrast"></div>
+            <div class="sp-sub">Mouvements et animations</div>
+            <div class="chips" data-opt="motion"></div>
+            <div class="sp-sub">Couleurs des voyants (vert / orange / rouge)</div>
+            <div class="chips" data-opt="cvd"></div>
+            <div class="sp-sec">Raccourcis clavier (partout dans Windows)</div>
+            <div class="keys"></div>
+            <div class="sp-sec">Sauvegarde des réglages</div>
+            <div class="backup">
+              <button class="text-btn" id="bk-export"><span class="ms">download</span>Exporter</button>
+              <label class="text-btn" id="bk-import"><span class="ms">upload</span>Importer<input type="file" accept=".json" hidden></label>
+              <span class="bk-note">Thème, dossiers, profils, notes, soundboard… (sans les mots de passe)</span>
+            </div>
+          </div>
         </section>
       </div>
     </div>

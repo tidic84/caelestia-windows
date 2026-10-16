@@ -26,18 +26,20 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 #[derive(Serialize, Clone)]
 pub struct Game {
-    id: String,
-    name: String,
+    pub(crate) id: String,
+    pub(crate) name: String,
     /// steam, epic, ubisoft, gog
     source: String,
     /// jaquette verticale (data URL) ou vide
     cover: String,
     /// icone de l'executable (data URL) ou vide
     icon: String,
+    /// date d'installation (creation du dossier du jeu, ms depuis 1970), 0 si inconnue
+    added: i64,
     #[serde(skip)]
     launch: String,
     #[serde(skip)]
-    dir: PathBuf,
+    pub(crate) dir: PathBuf,
 }
 
 pub struct Games(pub Mutex<Vec<Game>>);
@@ -47,7 +49,7 @@ pub struct Games(pub Mutex<Vec<Game>>);
 /// Outils Steam qui ne sont pas des jeux.
 const STEAM_SKIP: &[&str] = &["228980", "431960", "1070560", "1391110", "1628350", "1493710", "2180100"];
 
-fn acf_value<'a>(acf: &'a str, key: &str) -> Option<&'a str> {
+pub(crate) fn acf_value<'a>(acf: &'a str, key: &str) -> Option<&'a str> {
     acf.lines().find_map(|l| {
         let parts: Vec<&str> = l.split('"').filter(|s| !s.trim().is_empty()).collect();
         (parts.len() == 2 && parts[0].eq_ignore_ascii_case(key)).then(|| parts[1])
@@ -115,6 +117,7 @@ fn steam_games() -> Vec<Game> {
                 icon,
                 launch: format!("steam://rungameid/{appid}"),
                 dir,
+                added: 0,
             });
         }
     }
@@ -159,6 +162,7 @@ fn epic_games() -> Vec<Game> {
                 get("AppName")
             ),
             dir: PathBuf::from(dir),
+            added: 0,
         });
     }
     out
@@ -254,6 +258,7 @@ fn ubisoft_games() -> Vec<Game> {
                 icon: main_exe(&dir).map(|e| file_icon(&e)).unwrap_or_default(),
                 launch: format!("uplay://launch/{id}/0"),
                 dir,
+                added: 0,
             })
         })
         .collect()
@@ -276,6 +281,7 @@ fn gog_games() -> Vec<Game> {
                 icon: file_icon(&exe),
                 launch: exe.to_string_lossy().into_owned(),
                 dir,
+                added: 0,
             })
         })
         .collect()
@@ -304,6 +310,13 @@ fn scan() -> Vec<Game> {
     all.extend(gog_games());
     all.sort_by_key(|g| g.name.to_lowercase());
     all.dedup_by(|a, b| a.id == b.id);
+    for g in &mut all {
+        g.added = std::fs::metadata(&g.dir)
+            .and_then(|m| m.created())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map_or(0, |d| d.as_millis() as i64);
+    }
     all
 }
 
@@ -362,7 +375,7 @@ fn open_dir(d: &Path) -> bool {
 }
 
 /// Ouvre l'Explorateur sur le fichier, selectionne.
-fn reveal(p: &Path) -> bool {
+pub(crate) fn reveal(p: &Path) -> bool {
     if p.is_dir() {
         return open_dir(p);
     }
@@ -473,6 +486,59 @@ pub fn app_folder(app: AppHandle, id: String, name: String) -> bool {
 #[tauri::command(async)]
 pub fn folder_open(path: String) -> bool {
     open_dir(Path::new(&path))
+}
+
+// ------------------------------- fichiers glisses dans un dossier d'apps
+
+#[derive(Serialize)]
+pub struct FileInfo {
+    name: String,
+    icon: String,
+}
+
+/// Nom et icone d'un fichier ou dossier depose dans l'ilot (None s'il n'existe plus).
+#[tauri::command(async)]
+pub fn file_info(path: String) -> Option<FileInfo> {
+    let p = PathBuf::from(&path);
+    let special = special_name(&path);
+    if special.is_none() && !p.exists() {
+        return None;
+    }
+    let name = match special {
+        Some(n) => n.to_string(),
+        None => if p.is_dir() { p.file_name() } else { p.file_stem() }
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or(path),
+    };
+    // icone via le Shell, dans un thread STA a part
+    let icon = std::thread::spawn(move || unsafe {
+        crate::com_init_sta();
+        SHCreateItemFromParsingName::<_, _, IShellItem>(&HSTRING::from(p.as_os_str()), None)
+            .map(|it| crate::apps::icon_of(&it))
+            .unwrap_or_default()
+    })
+    .join()
+    .unwrap_or_default();
+    Some(FileInfo { name, icon })
+}
+
+/// Ouvre un fichier (programme, raccourci, document) ou un dossier.
+#[tauri::command(async)]
+pub fn file_open(path: String) -> bool {
+    (special_name(&path).is_some() || Path::new(&path).exists()) && Command::new("explorer.exe").arg(&path).spawn().is_ok()
+}
+
+/// Emplacements speciaux du Shell (Corbeille, Ce PC...) : pas de vrai chemin,
+/// on les range sous leur nom « shell:... ».
+fn special_name(path: &str) -> Option<&'static str> {
+    Some(match path.to_ascii_lowercase().as_str() {
+        "shell:recyclebinfolder" => "Corbeille",
+        "shell:mycomputerfolder" => "Ce PC",
+        "shell:controlpanelfolder" => "Panneau de configuration",
+        "shell:downloads" => "Téléchargements",
+        "shell:networkplacesfolder" => "Réseau",
+        _ => return None,
+    })
 }
 
 /// Boite « Choisir un dossier » de Windows ; renvoie le chemin choisi.

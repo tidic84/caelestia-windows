@@ -52,6 +52,10 @@ pub struct DiscordState {
     status: String,
     error: String,
     me: String,
+    /// id de l'utilisateur connecte (sa ligne du salon regle le micro)
+    me_id: String,
+    /// volume du micro dans Discord (0-100)
+    mic_volume: f64,
     mute: bool,
     deaf: bool,
     channel: String,
@@ -282,6 +286,7 @@ impl Session<'_> {
                 let mut s = self.st.lock().unwrap();
                 s.mute = data["mute"].as_bool().unwrap_or(s.mute);
                 s.deaf = data["deaf"].as_bool().unwrap_or(s.deaf);
+                s.mic_volume = data["input"]["volume"].as_f64().unwrap_or(s.mic_volume);
             }
             "VOICE_STATE_CREATE" | "VOICE_STATE_UPDATE" => {
                 let p = person(data);
@@ -340,6 +345,7 @@ impl Session<'_> {
         {
             let mut s = self.st.lock().unwrap();
             s.me = auth["user"]["global_name"].as_str().or(auth["user"]["username"].as_str()).unwrap_or_default().into();
+            s.me_id = auth["user"]["id"].as_str().unwrap_or_default().into();
         }
 
         let vs = self.pipe.call("GET_VOICE_SETTINGS", json!({}), &mut |_| {})?;
@@ -347,6 +353,7 @@ impl Session<'_> {
             let mut s = self.st.lock().unwrap();
             s.mute = vs["mute"].as_bool().unwrap_or(false);
             s.deaf = vs["deaf"].as_bool().unwrap_or(false);
+            s.mic_volume = vs["input"]["volume"].as_f64().unwrap_or(100.0);
         }
         self.pipe.command("SUBSCRIBE", json!({}), Some("VOICE_SETTINGS_UPDATE"))?;
         self.pipe.command("SUBSCRIBE", json!({}), Some("VOICE_CHANNEL_SELECT"))?;
@@ -459,6 +466,15 @@ pub fn discord_self(st: State<Discord>, mute: Option<bool>, deaf: Option<bool>) 
         args["deaf"] = json!(d);
     }
     st.queue.lock().unwrap().push_back(("SET_VOICE_SETTINGS".into(), args));
+}
+
+/// Volume du micro dans Discord (0-100) : Discord ignore le volume
+/// « utilisateur » applique a soi-meme, d'ou ce reglage pour sa propre ligne.
+#[tauri::command]
+pub fn discord_mic(st: State<Discord>, volume: f64) {
+    let v = volume.clamp(0.0, 100.0);
+    st.state.lock().unwrap().mic_volume = v;
+    st.queue.lock().unwrap().push_back(("SET_VOICE_SETTINGS".into(), json!({ "input": { "volume": v } })));
 }
 
 /// Volume (0-200) ou sourdine locale d'une personne.

@@ -1,6 +1,6 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "windows": ["island"],
+  "windows": ["island", "pet", "captions"],
   "permissions": ["core:default"]
 }
