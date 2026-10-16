@@ -1,7 +1,7 @@
 # Interface Qt Quick / QML de l'îlot
 
-L'îlot complet : pilule (repliée, survol, activités), panneau et ses douze
-onglets, barre façon Waybar sur l'écran de l'îlot et sur les autres écrans,
+L'îlot complet : pilule (repliée, survol, activités), panneau et ses
+onglets (essentiels + addons, `Ilot.catalog`), barre façon Waybar sur l'écran de l'îlot et sur les autres écrans,
 info-bulles, bandeau des sous-titres, compagnon baladeur, icône de la zone
 de notification, Ctrl+Alt+Espace. Tout ce qui
 parle à Windows reste dans le cœur Rust (`../src`, `ilot_core.dll`).
@@ -19,10 +19,12 @@ parle à Windows reste dans le cœur Rust (`../src`, `ilot_core.dll`).
 - `qml/`
   - singletons : `Theme` (palette Material You, polices, courbes,
     accessibilité), `Api` (`invoke` et `listen`, comme Tauri), `Ilot` (état
-    et logique communs, ce que faisait `app.js`), `Watch` (ce qui est
+    et logique communs, ce que faisait `app.js`, dont le catalogue des
+    onglets : essentiels et addons), `Watch` (ce qui est
     surveillé hors des pages : file des notifications, activités en cours,
     mode jeu, mode absent, partie trouvée, extinction programmée, voyant
-    caméra / micro, services, partage, sous-titres, raccourcis, compagnon) ;
+    caméra / micro, services, partage, sous-titres, raccourcis, mises à
+    jour, compagnon) ;
   - fenêtres : `Main` (îlot), `Bar` (autres écrans), `TipWindow`,
     `Captions` (sous-titres en direct), `PetWindow` (promenade du compagnon) ;
   - îlot : `Island` (avec `Aurora`, `WxFx`), `Pill` (avec `Pet`,
@@ -47,8 +49,10 @@ Les ajouts de la branche `ilot-ajouts-romain` (santé du PC, services,
 soundboard, sous-titres, compagnon, accessibilité…) ont été portés depuis
 l'ancienne interface web ; quelques choix diffèrent :
 
-- Traduction et Claude partagent l'onglet **Assistant** (douze onglets
-  tiennent dans le panneau, treize non).
+- Traduction et Claude partagent l'onglet **Assistant**.
+- **Ajouter un addon** : une entrée dans `Ilot.catalog` (id, icône, nom,
+  description, page QML) ; il apparaît dans Réglages › Addons. Ses relevés en
+  arrière-plan côté Rust se règlent sur `settings::addon_on(app, "<id>")`.
 - Les sons de la soundboard sont décodés par le cœur Rust (symphonia) et non
   plus par le navigateur : mp3, wav, ogg (Vorbis), flac et m4a ; l'Opus n'est
   pas pris en charge.

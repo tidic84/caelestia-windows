@@ -1,5 +1,5 @@
 //! Reglages : lancement au demarrage, ecran de l'ilot, apparence, meteo,
-//! calendriers, fonds, notifications, barre.
+//! calendriers, fonds, notifications, barre, addons, mises a jour.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -63,6 +63,13 @@ pub struct Config {
     /// Remappage de la touche Windows modifie depuis le demarrage de Windows
     /// (un redemarrage est alors necessaire)
     pub win_key_boot: Option<crate::winkey::BootRemap>,
+    /// Addons actives (onglets facultatifs : mail, pc, sounds...) ; les
+    /// onglets essentiels (accueil, media, controles, apps, reglages) sont
+    /// toujours la
+    pub addons: Vec<String>,
+    /// Mises a jour : auto (telechargees et installees), notify (prevenir
+    /// seulement), off
+    pub update_mode: String,
     /// Reglages de l'interface seule (apparence de la pilule, compagnon,
     /// accessibilite, mode jeu...) : gardes tels quels, l'interface les lit
     #[serde(flatten)]
@@ -101,6 +108,8 @@ impl Default for Config {
             taskbar_autohide: None,
             win_key: false,
             win_key_boot: None,
+            addons: Vec::new(),
+            update_mode: "notify".into(),
             extra: serde_json::Map::new(),
         }
     }
@@ -269,6 +278,12 @@ pub fn settings_set(app: AppHandle, patch: serde_json::Value) -> Config {
         crate::winkey::set(&app, cfg.win_key);
     }
     cfg
+}
+
+/// Addon (onglet facultatif) active dans Reglages > Addons : ses releves en
+/// arriere-plan (mail, etat des services...) ne tournent que dans ce cas.
+pub fn addon_on(app: &AppHandle, id: &str) -> bool {
+    app.state::<Settings>().0.lock().unwrap().addons.iter().any(|a| a == id)
 }
 
 pub fn init(app: &AppHandle) {
