@@ -8,9 +8,12 @@ Rectangle {
     property alias cursor: ma.cursorShape
     property bool active: true
     property string tip: ""
+    // double clic gauche (sinon le second clic reste un clic)
+    property bool doubleClick: false
     signal clicked(var mouse)
     signal rightClicked(var mouse)
     signal middleClicked(var mouse)
+    signal doubleClicked(var mouse)
     signal wheel(var wheel)
     color: "transparent"
     Behavior on color { ColorAnimation { duration: 200 } }
@@ -29,6 +32,11 @@ Rectangle {
                 b.middleClicked(m)
             else
                 b.clicked(m)
+        }
+        onDoubleClicked: m => {
+            m.accepted = b.doubleClick && m.button === Qt.LeftButton
+            if (m.accepted)
+                b.doubleClicked(m)
         }
         onWheel: w => {
             w.accepted = false

@@ -1,6 +1,7 @@
 #include "backend.h"
 #include "core.h"
 #include "shell.h"
+#include "tray.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -62,6 +63,7 @@ int main(int argc, char *argv[])
     Backend backend;
     qmlRegisterSingletonInstance("IlotCore", 1, 0, "Backend", &backend);
 
+    Tray tray;
     Shell shell;
     if (!shell.start())
         return 1;

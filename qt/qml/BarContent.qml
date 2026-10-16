@@ -219,6 +219,63 @@ Item {
             layoutDirection: Qt.LeftToRight
             onWidthChanged: bar.layoutChanged()
 
+            // zone de notification : applis en arriere-plan, depliees par la fleche
+            Group {
+                id: tray
+                property bool open: false
+                visible: Tray.icons.length > 0
+                width: trayRow.implicitWidth + 6
+                Row {
+                    id: trayRow
+                    x: 3
+                    height: parent.height
+                    Item {
+                        height: parent.height
+                        width: tray.open ? trayIcons.implicitWidth : 0
+                        clip: true
+                        Behavior on width { NumberAnimation { duration: 350; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
+                        Row {
+                            id: trayIcons
+                            anchors.right: parent.right
+                            height: parent.height
+                            Repeater {
+                                model: Tray.icons
+                                Btn {
+                                    required property var modelData
+                                    width: 24
+                                    height: 22
+                                    radius: 11
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    color: hovered ? Theme.surfaceHigh : "transparent"
+                                    tip: modelData.tip
+                                    onHoveredChanged: if (hovered) Tray.click(modelData.id, "hover")
+                                    onClicked: Tray.click(modelData.id, "left")
+                                    onRightClicked: Tray.click(modelData.id, "right")
+                                    doubleClick: true
+                                    onDoubleClicked: Tray.click(modelData.id, "double")
+                                    Image {
+                                        anchors.centerIn: parent
+                                        width: 16
+                                        height: 16
+                                        source: "image://tray/" + modelData.id + "-" + modelData.rev
+                                        sourceSize.width: Math.ceil(16 * Screen.devicePixelRatio)
+                                        sourceSize.height: Math.ceil(16 * Screen.devicePixelRatio)
+                                        cache: false
+                                        smooth: true
+                                        mipmap: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    StatusBtn {
+                        icon: tray.open ? "chevron_right" : "chevron_left"
+                        tip: tray.open ? "Masquer les applications en arrière-plan" : "Applications en arrière-plan"
+                        onClicked: tray.open = !tray.open
+                    }
+                }
+            }
+
             // processeur, memoire
             Group {
                 button: true

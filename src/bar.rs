@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 use crate::host::{AppHandle, WebviewWindow};
-use windows::core::{w, BOOL, GUID, HSTRING, PCWSTR, PWSTR};
+use windows::core::{BOOL, GUID, HSTRING, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, PROPERTYKEY, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows::Win32::Graphics::Gdi::{
@@ -36,7 +36,7 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     GetClassLongPtrW, GetIconInfo, SendMessageTimeoutW, GCLP_HICON, GCLP_HICONSM, HICON, ICONINFO, ICON_BIG,
     ICON_SMALL, ICON_SMALL2, SMTO_ABORTIFHUNG, WM_GETICON,
-    EnumWindows, FindWindowW, GetClassNameW, GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowRect,
+    EnumWindows, GetClassNameW, GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowRect,
     GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
     PostMessageW, SetForegroundWindow, ShowWindow, GWL_EXSTYLE, GW_OWNER, SW_HIDE, SW_MINIMIZE,
     SW_RESTORE, SW_SHOWNA, WM_APP, WM_CLOSE, WS_EX_APPWINDOW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
@@ -502,7 +502,7 @@ fn autohide_get() -> bool {
 
 fn autohide_set(on: bool) {
     unsafe {
-        let Ok(tray) = FindWindowW(w!("Shell_TrayWnd"), PCWSTR::null()) else { return };
+        let Some(tray) = trays().into_iter().find(|&h| class_of(h) == "Shell_TrayWnd") else { return };
         let mut d = APPBARDATA {
             cbSize: std::mem::size_of::<APPBARDATA>() as u32,
             hWnd: tray,
@@ -514,11 +514,18 @@ fn autohide_set(on: bool) {
 }
 
 /// Barres des taches de tous les ecrans (principale et secondaires) : les
-/// autres ecrans ont chacun leur barre (voir `screens`).
+/// autres ecrans ont chacun leur barre (voir `screens`). Sans le
+/// `Shell_TrayWnd` invisible de l'interface (hote de la zone de notification).
 fn trays() -> Vec<HWND> {
+    let me = unsafe { GetCurrentProcessId() };
     top_windows()
         .into_iter()
         .filter(|&h| matches!(class_of(h).as_str(), "Shell_TrayWnd" | "Shell_SecondaryTrayWnd"))
+        .filter(|&h| {
+            let mut pid = 0;
+            unsafe { GetWindowThreadProcessId(h, Some(&mut pid)) };
+            pid != me
+        })
         .collect()
 }
 

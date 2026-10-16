@@ -1,6 +1,7 @@
 #include "shell.h"
 #include "backend.h"
 #include "core.h"
+#include "tray.h"
 #include "winctl.h"
 
 #include <QCoreApplication>
@@ -66,6 +67,7 @@ bool Shell::start()
 {
     Backend *b = Backend::instance();
     m_engine.addImageProvider(QStringLiteral("ilot"), new IlotImages);
+    m_engine.addImageProvider(QStringLiteral("tray"), new TrayImages);
     m_engine.loadFromModule("Ilot", "Main");
     if (m_engine.rootObjects().isEmpty())
         return false;
@@ -95,6 +97,7 @@ bool Shell::start()
         QJsonObject c = parse(json);
         bool barChanged = c.value("bar") != m_cfg.value("bar") || c.value("bar_autohide") != m_cfg.value("bar_autohide");
         m_cfg = c;
+        Tray::instance()->setEnabled(c.value("bar").toBool());
         if (barChanged)
             place();
     });
@@ -117,6 +120,7 @@ bool Shell::start()
     connect(qGuiApp, &QCoreApplication::aboutToQuit, this, [] { ilot_shutdown(); });
 
     m_cfg = ok(b->invokeSync(QStringLiteral("island"), QStringLiteral("settings_get"))).toObject();
+    Tray::instance()->setEnabled(m_cfg.value("bar").toBool());
     place();
     m_island->show();
     QMetaObject::invokeMethod(m_island, "start");

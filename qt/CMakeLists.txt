@@ -29,7 +29,7 @@ qt_add_qml_module(ilot
     URI Ilot
     VERSION 1.0
     QML_FILES ${QML_FILES}
-    SOURCES src/winctl.h src/winctl.cpp
+    SOURCES src/winctl.h src/winctl.cpp src/tray.h src/tray.cpp
 )
 
 # Rubik et Material Symbols Rounded (fonts/README.md)
