@@ -136,8 +136,9 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: 120
-        opacity: Theme.light ? 0.22 : 0.3
+        height: parent.height * 0.38
+        opacity: 0.5
+        mirror: true
         active: page.shown
     }
 
