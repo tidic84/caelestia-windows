@@ -102,8 +102,12 @@ listen('settings', ({ payload }) => { Object.assign(cfg, payload); applySettings
 
 // ============================================================== horloge
 const fmtBar = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+let clockKey = '';
 function tickClock() {
   const d = new Date();
+  const key = `${d.getHours()}:${d.getMinutes()}:${d.getDate()}`;
+  if (key === clockKey) return;
+  clockKey = key;
   $('.bar-clock').textContent = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   const day = fmtBar.format(d);
   $('.bar-date').textContent = day[0].toUpperCase() + day.slice(1);

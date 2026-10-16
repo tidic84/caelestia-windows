@@ -3,7 +3,6 @@
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
-use base64::Engine;
 use serde::Serialize;
 use windows::core::{HSTRING, PCWSTR};
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
@@ -82,22 +81,17 @@ pub(crate) fn thumb_sized(p: &Path, size: u32) -> Option<String> {
     meta.modified().ok().hash(&mut h);
     size.hash(&mut h);
     let cached = cache_dir().join(format!("{:016x}.jpg", h.finish()));
-    let bytes = match std::fs::read(&cached) {
-        Ok(b) => b,
-        Err(_) => {
-            let img = image::ImageReader::open(p).ok()?.with_guessed_format().ok()?.decode().ok()?;
-            let t = img.thumbnail(size, size).to_rgb8();
-            let mut out = std::io::Cursor::new(Vec::new());
-            t.write_to(&mut out, image::ImageFormat::Jpeg).ok()?;
-            let b = out.into_inner();
-            let _ = std::fs::write(&cached, &b);
-            b
+    if !cached.is_file() {
+        let img = image::ImageReader::open(p).ok()?.with_guessed_format().ok()?.decode().ok()?;
+        let t = img.thumbnail(size, size).to_rgb8();
+        let mut out = std::io::Cursor::new(Vec::new());
+        t.write_to(&mut out, image::ImageFormat::Jpeg).ok()?;
+        let b = out.into_inner();
+        if std::fs::write(&cached, &b).is_err() {
+            return Some(crate::img::url("image/jpeg", b));
         }
-    };
-    Some(format!(
-        "data:image/jpeg;base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(bytes)
-    ))
+    }
+    Some(crate::img::file_url("image/jpeg", cached))
 }
 
 fn current_path() -> String {

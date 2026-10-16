@@ -1,7 +1,9 @@
 //! Lecteur multimedia via GSMTC (GlobalSystemMediaTransportControls) :
 //! le meme service que le panneau media de Windows (Spotify, navigateurs...).
 
-use base64::Engine;
+use std::sync::{mpsc, Mutex};
+use std::time::{Duration, Instant};
+
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use windows::Media::Control::{
@@ -9,6 +11,7 @@ use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSessionManager as Manager,
     GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
 };
+use windows::Foundation::TypedEventHandler;
 use windows::Storage::Streams::DataReader;
 
 #[derive(Serialize, Clone, Default, PartialEq)]
@@ -29,8 +32,21 @@ const TICKS: f64 = 10_000_000.0;
 /// Ecart entre l'epoque WinRT (1601) et l'epoque Unix, en ticks.
 const EPOCH_DIFF: i64 = 116_444_736_000_000_000;
 
+/// Le gestionnaire GSMTC, cree une fois : le redemander a chaque releve
+/// coutait un appel inter-processus asynchrone toutes les 500 ms.
+fn manager() -> windows::core::Result<Manager> {
+    static M: Mutex<Option<Manager>> = Mutex::new(None);
+    let mut m = M.lock().unwrap();
+    if let Some(m) = m.as_ref() {
+        return Ok(m.clone());
+    }
+    let got = Manager::RequestAsync()?.get()?;
+    *m = Some(got.clone());
+    Ok(got)
+}
+
 fn session() -> windows::core::Result<Session> {
-    Manager::RequestAsync()?.get()?.GetCurrentSession()
+    manager()?.GetCurrentSession()
 }
 
 fn now_ticks() -> i64 {
@@ -85,35 +101,86 @@ fn art(s: &Session) -> windows::core::Result<String> {
     reader.LoadAsync(size)?.get()?;
     let mut buf = vec![0u8; size as usize];
     reader.ReadBytes(&mut buf)?;
-    let ctype = if ctype.is_empty() { "image/png".into() } else { ctype };
-    Ok(format!(
-        "data:{ctype};base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(buf)
-    ))
+    Ok(crate::img::url(crate::img::mime(&ctype), buf))
+}
+
+/// Meme piece, meme etat : seule la position differe (elle avance toute seule
+/// et l'interface l'extrapole).
+fn same_but_position(a: &MediaInfo, b: &MediaInfo) -> bool {
+    MediaInfo { position: 0.0, ..a.clone() } == MediaInfo { position: 0.0, ..b.clone() }
+}
+
+/// Gestionnaire d'evenement qui reveille la boucle de `watch`
+fn ping<A: windows::core::RuntimeType + 'static>(tx: mpsc::Sender<()>) -> TypedEventHandler<Session, A> {
+    TypedEventHandler::new(move |_, _| {
+        let _ = tx.send(());
+        Ok(())
+    })
+}
+
+/// Abonnements aux evenements de la session suivie
+struct Subs {
+    session: Session,
+    tokens: [i64; 3],
+}
+
+impl Subs {
+    fn new(session: Session, tx: &mpsc::Sender<()>) -> Self {
+        let tokens = [
+            session.PlaybackInfoChanged(&ping(tx.clone())).unwrap_or_default(),
+            session.MediaPropertiesChanged(&ping(tx.clone())).unwrap_or_default(),
+            session.TimelinePropertiesChanged(&ping(tx.clone())).unwrap_or_default(),
+        ];
+        Subs { session, tokens }
+    }
+}
+
+impl Drop for Subs {
+    fn drop(&mut self) {
+        let _ = self.session.RemovePlaybackInfoChanged(self.tokens[0]);
+        let _ = self.session.RemoveMediaPropertiesChanged(self.tokens[1]);
+        let _ = self.session.RemoveTimelinePropertiesChanged(self.tokens[2]);
+    }
 }
 
 /// Boucle de surveillance : emet `media` a chaque changement et `media-art`
-/// quand la piece change (la pochette n'est relue qu'a ce moment-la).
+/// quand la piece change (la pochette n'est relue qu'a ce moment-la). Elle
+/// est reveillee par les evenements GSMTC ; un releve toutes les 1 s en
+/// lecture (5 s sinon) rattrape les applis qui ne les envoient pas.
 pub fn watch(app: AppHandle) {
     std::thread::spawn(move || {
         crate::com_init_mta();
+        let (tx, rx) = mpsc::channel::<()>();
+        if let Ok(m) = manager() {
+            let tx = tx.clone();
+            let _ = m.CurrentSessionChanged(&TypedEventHandler::new(move |_, _| {
+                let _ = tx.send(());
+                Ok(())
+            }));
+        }
+        let mut subs: Option<Subs> = None;
         let mut last = MediaInfo::default();
+        let mut last_at = Instant::now();
         let mut last_key = String::new();
-        let mut tick = 0u32;
+        let mut first = true;
         loop {
-            let info = session().and_then(|s| read(&s).map(|i| (s, i)));
+            let cur = session().ok();
+            if cur.as_ref() != subs.as_ref().map(|s| &s.session) {
+                subs = cur.clone().map(|s| Subs::new(s, &tx));
+            }
+            let info = cur.as_ref().map(|s| read(s).map(|i| (s, i)));
             let info = match info {
-                Ok((s, i)) => {
+                Some(Ok((s, i))) => {
                     let key = format!("{}\u{1}{}\u{1}{}", i.title, i.artist, i.album);
                     if key != last_key {
                         // certaines applis publient la pochette avec un temps de retard
-                        std::thread::sleep(std::time::Duration::from_millis(300));
-                        let _ = app.emit("media-art", art(&s).unwrap_or_default());
+                        std::thread::sleep(Duration::from_millis(300));
+                        let _ = app.emit("media-art", art(s).unwrap_or_default());
                         last_key = key;
                     }
                     i
                 }
-                Err(_) => {
+                _ => {
                     if !last_key.is_empty() {
                         let _ = app.emit("media-art", String::new());
                         last_key.clear();
@@ -121,13 +188,20 @@ pub fn watch(app: AppHandle) {
                     MediaInfo::default()
                 }
             };
-            // la position avance toute seule : on renvoie quand meme toutes les 2 s
-            if info != last || tick % 4 == 0 {
+            // position attendue si la lecture a simplement continue
+            let expected = last.position + if last.playing { last_at.elapsed().as_secs_f64() } else { 0.0 };
+            if first || !same_but_position(&info, &last) || (info.position - expected).abs() > 1.5 {
                 let _ = app.emit("media", &info);
                 last = info;
+                last_at = Instant::now();
+                first = false;
             }
-            tick = tick.wrapping_add(1);
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            let wait = Duration::from_secs(if last.playing { 1 } else { 5 });
+            if rx.recv_timeout(wait).is_ok() {
+                // plusieurs evenements arrivent souvent ensemble
+                std::thread::sleep(Duration::from_millis(50));
+                while rx.try_recv().is_ok() {}
+            }
         }
     });
 }

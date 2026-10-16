@@ -333,6 +333,21 @@ pub fn viz_set(app: AppHandle, on: bool) {
     if on && !VIZ_RUNNING.swap(true, Ordering::SeqCst) {
         std::thread::spawn(move || {
             crate::com_init_mta();
+            // `ILOT_SIM_VIZ=1` : bandes aleatoires a 30 trames/s au lieu du son
+            // (mesures de consommation sans musique)
+            let mut seed = 0x2545_F491_4F6C_DD1Du64;
+            while VIZ_ON.load(Ordering::SeqCst) && std::env::var_os("ILOT_SIM_VIZ").is_some() {
+                let b: Vec<u8> = (0..BANDS)
+                    .map(|_| {
+                        seed ^= seed << 13;
+                        seed ^= seed >> 7;
+                        seed ^= seed << 17;
+                        (seed % 101) as u8
+                    })
+                    .collect();
+                let _ = app.emit("viz", b);
+                std::thread::sleep(Duration::from_millis(33));
+            }
             while VIZ_ON.load(Ordering::SeqCst) {
                 // la sortie a pu changer ou disparaitre : on recommence
                 let _ = capture(&|b: Vec<u8>| {

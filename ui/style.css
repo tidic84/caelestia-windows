@@ -124,16 +124,21 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .ind-timer b { font-weight: 500; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--on-surface); }
 .mini-clock { font-weight: 500; font-size: 13px; letter-spacing: .3px; font-variant-numeric: tabular-nums; }
 .mini-art { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; display: none; }
-#island.media .mini-art[src^="data"] { display: block; }
+#island.media .mini-art[src] { display: block; }
 #island.playing .mini-art { animation: spin 8s linear infinite; }
 .eq { display: none; align-items: flex-end; gap: 2px; height: 12px; }
 #island.media .eq { display: flex; }
-.eq i { width: 3px; height: 4px; border-radius: 2px; background: var(--primary); }
+/* hauteur animee par transform : animer `height` relancait la mise en page a chaque image */
+.eq i { width: 3px; height: 12px; border-radius: 2px; background: var(--primary); transform: scaleY(.33); transform-origin: bottom; }
 #island.playing .eq i { animation: eq 1s var(--std) infinite alternate; }
-#island.live .eq i { animation: none; transition: height .05s linear; }
+#island.live .eq i { animation: none; transition: transform .05s linear; }
 .eq i:nth-child(2) { animation-delay: -.35s !important; }
 .eq i:nth-child(3) { animation-delay: -.7s !important; }
-@keyframes eq { 0% { height: 3px } 50% { height: 12px } 100% { height: 6px } }
+@keyframes eq { 0% { transform: scaleY(.25) } 50% { transform: scaleY(1) } 100% { transform: scaleY(.5) } }
+/* animations en pause dans ce qui ne se voit pas (panneau replie, pilule
+   cachee par le panneau, ilot masque) : sinon le compositeur continue de
+   produire 60 images par seconde pour une zone transparente */
+#island:not(.open) #panel *, #island.open #pill *, #island.hidden *, body.idle * { animation-play-state: paused !important; }
 @keyframes spin { to { transform: rotate(360deg) } }
 
 .peek-media { display: none; align-items: center; gap: 12px; width: 100%; }
@@ -150,7 +155,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .peek-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .peek-artist { color: var(--on-surface-variant); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 .peek-bar { height: 3px; border-radius: 2px; background: var(--surface-c-highest); margin-top: 7px; overflow: hidden; }
-.peek-bar div { height: 100%; width: 0; background: var(--primary); border-radius: 2px; transition: width .5s linear; }
+/* largeur par transform : une transition de `width` relancait la mise en page a chaque image pendant toute la lecture */
+.peek-bar div { height: 100%; width: 100%; transform: scaleX(0); transform-origin: left; background: var(--primary); border-radius: 2px; transition: transform .5s linear; }
 
 /* ------------------------------------------------------------------ barre */
 #bar {
@@ -353,7 +359,7 @@ button.bar-pill:hover { background: var(--surface-c-high); }
 .viz-media { height: 120px; opacity: .3; }
 .disc { width: 138px; height: 138px; border-radius: 50%; background: var(--surface-c-highest); display: grid; place-items: center; margin-bottom: 10px; position: relative; overflow: hidden; box-shadow: 0 0 0 5px var(--surface-c-high); }
 .disc img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .4s; }
-.disc img[src^="data"] { opacity: 1; }
+.disc img[src] { opacity: 1; }
 .disc-ph { font-size: 44px; color: var(--on-surface-variant); }
 #island.playing .disc img { animation: spin 14s linear infinite; }
 .hm-title { font-weight: 500; font-size: 14px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -395,7 +401,7 @@ button.bar-pill:hover { background: var(--surface-c-high); }
 .mp { position: relative; height: 100%; display: flex; align-items: center; gap: 28px; padding: 24px 32px; }
 .mp-art { width: 260px; height: 260px; flex: none; border-radius: 28px; background: var(--surface-c-highest); display: grid; place-items: center; overflow: hidden; position: relative; box-shadow: 0 12px 40px rgb(0 0 0 / .35); }
 .mp-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .4s; }
-.mp-art img[src^="data"] { opacity: 1; }
+.mp-art img[src] { opacity: 1; }
 .mp-art .ms { font-size: 64px; color: var(--on-surface-variant); }
 .mp-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .mp-app:empty { display: none; }

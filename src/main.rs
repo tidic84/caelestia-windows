@@ -5,7 +5,9 @@ mod audio;
 mod bar;
 mod discord;
 mod display;
+mod events;
 mod games;
+mod img;
 mod mail;
 mod media;
 mod net;
@@ -22,17 +24,21 @@ mod we;
 mod winkey;
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicIsize, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, RunEvent, State, WebviewWindow, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use windows::core::w;
-use windows::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS, HWND, POINT, RECT};
-use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+use windows::core::BOOL;
+use windows::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS, HWND, LPARAM, POINT, RECT};
+use windows::Win32::Graphics::Gdi::{
+    EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow, HDC, HMONITOR, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+};
+use windows::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow, MDT_EFFECTIVE_DPI};
 use windows::Win32::System::Threading::CreateMutexW;
 use windows::Win32::System::Com::{
     CoInitializeEx, COINIT_APARTMENTTHREADED, COINIT_MULTITHREADED,
@@ -95,8 +101,12 @@ pub(crate) type HitMap = Arc<Mutex<HashMap<String, Hits>>>;
 
 struct HitState(HitMap);
 
+/// Change a chaque `set_hit` : le suivi du curseur refait alors son test.
+pub(crate) static HIT_GEN: AtomicU64 = AtomicU64::new(0);
+
 #[tauri::command]
 fn set_hit(win: WebviewWindow, st: State<HitState>, rects: Vec<Hit>, top: Option<f64>) {
+    HIT_GEN.fetch_add(1, Ordering::Relaxed);
     st.0.lock().unwrap().insert(win.label().to_string(), Hits { rects, top: top.unwrap_or(0.0) });
 }
 
@@ -182,22 +192,56 @@ pub fn place(win: &WebviewWindow) {
     );
 }
 
+/// Position, largeur (pixels physiques) et echelle d'une fenetre, lues par
+/// Win32 : les accesseurs de Tauri (`outer_position`, `outer_size`,
+/// `scale_factor`) passent par la boucle principale et la reveillent a
+/// chaque appel, soit 120 fois par seconde pour le seul suivi du curseur.
+pub(crate) fn geom(h: HWND) -> Option<(i32, i32, i32, f64)> {
+    let mut r = RECT::default();
+    unsafe { GetWindowRect(h, &mut r) }.ok()?;
+    let dpi = unsafe { GetDpiForWindow(h) };
+    Some((r.left, r.top, r.right - r.left, if dpi == 0 { 1.0 } else { dpi as f64 / 96.0 }))
+}
+
+unsafe extern "system" fn add_monitor(m: HMONITOR, _: HDC, r: *mut RECT, lp: LPARAM) -> BOOL {
+    let v = &mut *(lp.0 as *mut Vec<(RECT, u32)>);
+    let (mut x, mut y) = (0u32, 0u32);
+    let _ = GetDpiForMonitor(m, MDT_EFFECTIVE_DPI, &mut x, &mut y);
+    v.push((*r, x));
+    true.into()
+}
+
+/// Empreinte des ecrans branches (position, taille, DPI) : la fenetre n'est
+/// replacee que quand elle change, au lieu de toutes les deux secondes.
+pub(crate) fn monitors_sig() -> Vec<(RECT, u32)> {
+    let mut v: Vec<(RECT, u32)> = Vec::new();
+    unsafe {
+        let _ = EnumDisplayMonitors(None, None, Some(add_monitor), LPARAM(&mut v as *mut _ as isize));
+    }
+    v
+}
+
 /// Suit le curseur : active/desactive le passage des clics selon qu'il est
 /// dans une zone interactive, et previent l'interface quand il entre dans
 /// l'ilot ou en sort (`hover`), ou dans la bande du haut (`top-hover`).
+/// Le test n'est refait que si le curseur, la fenetre ou les zones ont bouge.
 fn track_cursor(win: WebviewWindow, hit: HitMap) {
     std::thread::spawn(move || {
         let mut inside = false;
         let mut over = false;
         let mut at_top = false;
         let mut hidden = false;
-        let mut tick = 0u32;
         let mut last_fg = HWND::default();
+        let mut last_test = None;
+        let mut screens = monitors_sig();
+        let mut next_fs = Instant::now();
+        let mut next_screens = Instant::now();
         let own = win.hwnd().unwrap_or_default();
         let _ = win.set_ignore_cursor_events(true);
         loop {
-            std::thread::sleep(Duration::from_millis(25));
-            tick = tick.wrapping_add(1);
+            // masque (jeu en plein ecran) : rien a suivre, on ralentit
+            std::thread::sleep(Duration::from_millis(if hidden { 250 } else { 25 }));
+            let now = Instant::now();
             let fg = unsafe { GetForegroundWindow() };
             if fg != last_fg {
                 last_fg = fg;
@@ -207,13 +251,21 @@ fn track_cursor(win: WebviewWindow, hit: HitMap) {
                 }
             }
             // ecran branche / debranche, resolution modifiee : on se recale
-            if tick % 80 == 0 && !hidden {
-                place(&win);
+            if now >= next_screens {
+                next_screens = now + Duration::from_secs(1);
+                let sig = monitors_sig();
+                if sig != screens {
+                    screens = sig;
+                    place(&win);
+                    last_test = None;
+                }
             }
-            if tick % 20 == 0 {
+            if now >= next_fs {
+                next_fs = now + Duration::from_millis(500);
                 let fs = fullscreen_foreground(own);
                 if fs != hidden {
                     hidden = fs;
+                    last_test = None;
                     let _ = win.emit("fullscreen", fs);
                     // la fenetre est reellement masquee pour ne pas gener le jeu
                     if fs {
@@ -243,17 +295,19 @@ fn track_cursor(win: WebviewWindow, hit: HitMap) {
             if unsafe { GetCursorPos(&mut pt) }.is_err() {
                 continue;
             }
-            let (Ok(pos), Ok(size), Ok(scale)) = (win.outer_position(), win.outer_size(), win.scale_factor())
-            else {
+            let Some((x, y, w, scale)) = geom(own) else { continue };
+            let key = (pt.x, pt.y, x, y, w, HIT_GEN.load(Ordering::Relaxed));
+            if last_test == Some(key) {
                 continue;
-            };
-            let cx = (pt.x - pos.x) as f64 / scale;
-            let cy = (pt.y - pos.y) as f64 / scale;
+            }
+            last_test = Some(key);
+            let cx = (pt.x - x) as f64 / scale;
+            let cy = (pt.y - y) as f64 / scale;
             let (now, island, top) = hit
                 .lock()
                 .unwrap()
                 .get("island")
-                .map_or((false, false, false), |h| h.test(cx, cy, size.width as f64 / scale));
+                .map_or((false, false, false), |h| h.test(cx, cy, w as f64 / scale));
             if top != at_top {
                 at_top = top;
                 let _ = win.emit("top-hover", top);
@@ -402,6 +456,7 @@ fn main() {
                 })
                 .build(),
         )
+        .register_uri_scheme_protocol("ilot", |_ctx, req| img::serve(req.uri().path()))
         .manage(HitState(hit.clone()))
         .manage(system::Clips(Mutex::new(VecDeque::new())))
         .manage(apps::Apps(Mutex::new(Vec::new())))
@@ -416,6 +471,7 @@ fn main() {
             let win = app.get_webview_window("island").expect("fenetre island");
             place(&win);
             let _ = win.show();
+            events::start();
             track_cursor(win.clone(), hit.clone());
             bar::sync(app.handle());
             bar::watch(win.clone());
