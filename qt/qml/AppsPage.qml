@@ -547,6 +547,8 @@ Item {
                 // donnees du Shell : on les accepte pour proposer l'emplacement
                 if (!d.hasUrls && !d.formats.some(f => /Shell IDList/i.test(f)))
                     d.accepted = false
+                else if (d.hasUrls)
+                    Ilot.dragIn()
             }
             onPositionChanged: d => {
                 const p = mapToItem(page, d.x, d.y)
@@ -554,13 +556,12 @@ Item {
             }
             onExited: {
                 page.dropChip = null
-                if (Ilot.fileDragOpened) {
-                    Ilot.fileDragOpened = false
-                    Ilot.close()
-                }
+                // l'ilot ouvert par le glisser se referme si on ressort (pas
+                // si l'on passe sur le bouton Quick Share)
+                Ilot.dragLeft()
             }
             onDropped: d => {
-                Ilot.fileDragOpened = false
+                Ilot.dragDone()
                 const chip = page.dropChip
                 page.dropChip = null
                 const paths = d.urls.map(u => decodeURIComponent(String(u).replace(/^file:\/\/\//, "")).replace(/\//g, "\\"))
@@ -615,7 +616,7 @@ Item {
         }
         out.push({ icon: "folder_zip", label: "Compresser (.zip)", run: () => run("Compressé", () => Api.invoke("zip_files", { paths: paths }).then(z => [z])) })
         out.push({ icon: "send", label: "Envoyer sur Discord", run: () => page.sendToDiscord(paths, p) })
-        out.push({ icon: "phonelink", label: "Envoyer sur le téléphone (QR)", run: () => { ctx.hide(); Watch.openShare(paths) } })
+        out.push({ icon: "nearby", label: "Envoyer avec Quick Share", run: () => { ctx.hide(); Watch.openShare(paths) } })
         return out
     }
     function doneCtx(p, label, outs) {

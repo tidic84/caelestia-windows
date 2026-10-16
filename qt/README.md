@@ -28,7 +28,7 @@ parle à Windows reste dans le cœur Rust (`../src`, `ilot_core.dll`).
   - fenêtres : `Main` (îlot), `Bar` (autres écrans), `TipWindow`,
     `Captions` (sous-titres en direct), `PetWindow` (promenade du compagnon) ;
   - îlot : `Island` (avec `Aurora`, `WxFx`), `Pill` (avec `Pet`,
-    `PillClock`), `Panel`, `SharePop` et une page par onglet (`HomePage`,
+    `PillClock`), `Panel`, `QuickShare` et une page par onglet (`HomePage`,
     `MediaPage`, `CtrlPage`, `AppsPage`, `MailPage`, `PcPage` et ses cartes
     `ServicesCard`, `HealthCard`, `ShutdownCard`, `SensCard`, `SoundsPage`,
     `TasksPage`, `ClipsPage`, `AssistPage`, `WallsPage`, `SettingsPage`) ;

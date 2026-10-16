@@ -127,6 +127,36 @@ Item {
     property bool previewOpen: false
     // fichiers glisses sur l'ilot replie : il se referme si on ressort
     property bool fileDragOpened: false
+    // fichiers glisses au-dessus de l'ilot (le bouton Quick Share s'allume).
+    // Passer d'une zone de depot a l'autre fait sortir puis entrer : la
+    // sortie n'est prise en compte qu'apres un court delai.
+    property bool fileDrag: false
+    function dragIn() {
+        fileDrag = true
+        dragOut.stop()
+    }
+    function dragLeft() {
+        dragOut.restart()
+    }
+    function dragDone() {
+        dragOut.stop()
+        fileDrag = false
+        fileDragOpened = false
+    }
+    property Timer dragOut: Timer {
+        interval: 250
+        onTriggered: {
+            root.fileDrag = false
+            if (root.fileDragOpened) {
+                root.fileDragOpened = false
+                root.close()
+            }
+        }
+    }
+    // chemins Windows des fichiers deposes depuis l'Explorateur
+    function dropPaths(urls) {
+        return (urls || []).map(u => decodeURIComponent(String(u).replace(/^file:\/\/\//, "")).replace(/\//g, "\\"))
+    }
     // info-bulle affichee : { text, x, y, owner } (TipWindow)
     property var tip: null
 
@@ -303,7 +333,7 @@ Item {
     }
 
     // ================================================== activites
-    readonly property var actSize: ({ osd: { w: 300, h: 40 }, small: { w: 290, h: 40 }, notif: { w: 420, h: 66 }, shot: { w: 300, h: 62 } })
+    readonly property var actSize: ({ osd: { w: 300, h: 40 }, small: { w: 290, h: 40 }, notif: { w: 420, h: 66 }, shot: { w: 300, h: 62 }, qs: { w: 470, h: 66 } })
     // change a chaque nouvelle activite (l'OSD se met a jour sans rejouer l'animation)
     property int actSerial: 0
     property Timer actTimer: Timer { onTriggered: root.endActivity() }

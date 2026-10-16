@@ -46,7 +46,7 @@ La pilule s'agrandit aussi un instant pour signaler :
 - un changement de volume ou de luminosité (OSD) ;
 - une notification Windows, un nouveau mail ;
 - une mise à jour Steam terminée (bouton Jouer), une **partie trouvée** pendant que vous attendez hors du jeu (carillon, îlot qui clignote, clic pour y retourner), le bilan de la session de jeu ;
-- une appli qui allume la caméra, un service en panne ou de retour, un disque presque plein, un fichier reçu du téléphone, l'extinction programmée dans une minute ;
+- une appli qui allume la caméra, un service en panne ou de retour, un disque presque plein, une demande **Quick Share** (Accepter / Refuser directement dans la pilule, avec le code de vérification), un fichier reçu, l'extinction programmée dans une minute ;
 - un appareil Bluetooth connecté ou déconnecté ;
 - une image copiée (capture d'écran) ;
 - le chargeur branché ou débranché ;
@@ -54,8 +54,9 @@ La pilule s'agrandit aussi un instant pour signaler :
 - la fin du minuteur.
 
 Autres comportements :
-- en haut à droite du panneau : **agrandir** (presque tout l'écran), **verrouiller** (l'îlot reste ouvert quand la souris sort) et **quitter l'îlot** (second clic pour confirmer ; aussi la commande `>quitter` du lanceur) ; en haut à gauche : **partage avec le téléphone** (QR code : le téléphone, sur le même Wi-Fi, télécharge les fichiers déposés sur l'îlot ou envoie les siens dans Téléchargements) ;
-- fichiers déposés sur l'onglet Apps : conversion PNG ↔ JPG, réduction à 1920 px, compression .zip, copie pour Discord, envoi au téléphone, ou rangement dans un dossier ; la Corbeille, Ce PC… s'ajoutent comme emplacements ;
+- en haut à droite du panneau : **agrandir** (presque tout l'écran), **verrouiller** (l'îlot reste ouvert quand la souris sort) et **quitter l'îlot** (second clic pour confirmer ; aussi la commande `>quitter` du lanceur) ; en haut à gauche : **Quick Share** (voir plus bas) ;
+- fichiers déposés sur l'onglet Apps : conversion PNG ↔ JPG, réduction à 1920 px, compression .zip, copie pour Discord, envoi avec Quick Share, ou rangement dans un dossier ; la Corbeille, Ce PC… s'ajoutent comme emplacements ;
+- **Quick Share** (le partage de Google des téléphones Android) : glisser des fichiers sur l'îlot allume le bouton Quick Share en haut à gauche ; les garder 200 ms dessus (ou les y lâcher) ouvre Quick Share. Appareils à proximité (clic, ou fichiers lâchés directement sur l'appareil), texte ou lien à envoyer, progression et annulation, **QR code** à scanner avec l'appareil photo du téléphone (envoi sans confirmation), réception avec code de vérification (fichiers dans Téléchargements, texte dans le presse-papiers, liens, mots de passe Wi-Fi), nom du PC et visibilité (visible, 10 minutes, masqué) ;
 - **mode jeu** (jeu du Launcher lancé) : mode Performances, notifications en silence, profil de volume « Jeu », rétablis à la fermeture ;
 - **mode absent** (10 min sans clavier ni souris) : la musique se met en pause et les notifications attendent votre retour (récapitulatif) ;
 - calendrier : une **note** par jour (clic sur un jour) ;
@@ -83,6 +84,7 @@ Autres comportements :
 - **Volume au-delà de 100 %** : préampli d'Equalizer APO (`config.txt` géré par l'îlot, l'ancien est gardé dans `config.ilot-backup.txt`).
 - **Raccourcis clavier** : `RegisterHotKey` ; les actions de lecture ne prennent pas le clavier du jeu en cours.
 - **Dossiers, notes, playlists** : petits fichiers JSON dans `%LOCALAPPDATA%\Ilot`.
+- **Quick Share** : protocole de Google (non documenté) réimplémenté en Rust d'après [NearDrop](https://github.com/grishka/NearDrop) (domaine public) et les définitions protobuf de [google/nearby](https://github.com/google/nearby) (Apache 2.0) : annonce et recherche mDNS (`_FC9F5ED42C8A._tcp`), échange de clés UKEY2 (P-256), messages chiffrés AES-256-CBC + HMAC-SHA256. Wi-Fi local uniquement (le PC et le téléphone sur le même réseau) : pas de Bluetooth classique ni de Wi-Fi Direct. Une annonce Bluetooth LE (service `0xFE2C`) réveille les téléphones Android pour qu'ils apparaissent ; sans Bluetooth, ouvrir Quick Share sur le téléphone ou scanner le QR code. Windows demande d'autoriser l'îlot dans le pare-feu au premier lancement (réseaux privés).
 - **Accent Windows** : écrit dans le registre (`AccentPalette`, `AccentColor`…) et désactive la couleur automatique de Windows.
 
 ## Wallpaper Engine

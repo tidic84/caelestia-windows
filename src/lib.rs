@@ -30,7 +30,7 @@ mod pdh;
 mod prefs;
 mod privacy;
 mod settings;
-mod share;
+mod quickshare;
 mod soundboard;
 mod status;
 mod store;
@@ -333,9 +333,16 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "img_shrink" => files::img_shrink(a!("path")).and_then(json),
         "zip_files" => files::zip_files(a!("paths")).and_then(json),
         "files_copy" => json(files::files_copy(a!("paths"))),
-        // partage avec le telephone
-        "share_start" => share::share_start(app, app.state(), a!("paths")).and_then(json),
-        "share_stop" => json(share::share_stop(app.state())),
+        // Quick Share
+        "qs_get" => json(quickshare::qs_get(app.state())),
+        "qs_config" => json(quickshare::qs_config(app.state(), a!("name"), a!("visibility"))),
+        "qs_discover" => json(quickshare::qs_discover(app.state(), a!("on"))),
+        "qs_send" => quickshare::qs_send(app.state(), a!("device"), a!("paths"), a!("text")).and_then(json),
+        "qs_answer" => json(quickshare::qs_answer(app.state(), a!("id"), a!("accept"))),
+        "qs_cancel" => json(quickshare::qs_cancel(app.state(), a!("id"))),
+        "qs_clear" => json(quickshare::qs_clear(app.state(), a!("id"))),
+        "qs_pending" => json(quickshare::qs_pending(app.state(), a!("paths"))),
+        "qs_qr" => json(quickshare::qs_qr(app.state(), a!("on"))),
         // reglages
         "settings_get" => json(settings::settings_get(app.state())),
         "settings_autostart" => json(settings::settings_autostart(a!("on"))),
@@ -448,7 +455,7 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
     app.manage(tasks::Tasks::default());
     app.manage(discord::Discord::default());
     app.manage(mail::MailState(Mutex::new(Default::default())));
-    app.manage(share::Share::default());
+    app.manage(quickshare::Qs::default());
     settings::init(&app);
     prefs::init(&app);
     winkey::init(&app);
@@ -477,6 +484,7 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
     status::watch(app);
     privacy::watch(app);
     update::watch(app);
+    quickshare::init(app.state());
 }
 
 /// Au moment de quitter : barre des taches Windows et ecran rendus.

@@ -522,17 +522,23 @@ Item {
             Ilot.saveUi({ seenVersion: cur })
     }
 
-    // ================================================ partage (QR code)
+    // ================================================ Quick Share
+    // (src/quickshare) : etat envoye par le coeur, fichiers en attente
+    // d'envoi, demandes de reception a accepter
     property bool shareOpen: false
-    property var share: null
-    property string shareErr: ""
-    property var shareSent: ({})
-    property var shareRecv: []
+    property var qs: ({ name: "", visibility: "on", temp_left: 0, ready: false, ip: "", devices: [], discovering: false,
+        ble: "", transfers: [], qr: null, error: "" })
+    property var qsFiles: []
+    // transferts deja signales (demande, fin)
+    property var qsSeen: ({})
     onShareOpenChanged: {
         if (shareOpen)
             Ilot.overlay = "share"
         else if (Ilot.overlay === "share")
             Ilot.overlay = ""
+        Api.invoke("qs_discover", { on: shareOpen })
+        if (!shareOpen)
+            clearShareFiles()
     }
     Connections {
         target: Ilot
@@ -540,23 +546,91 @@ Item {
             if (what === "share")
                 w.shareOpen = false
         }
+        // un onglet choisi referme Quick Share
+        function onTabShown(tab) {
+            w.shareOpen = false
+        }
+        function onModeChanged() {
+            if (Ilot.mode !== "open")
+                w.shareOpen = false
+        }
     }
     function openShare(paths) {
-        shareOpen = true
-        shareErr = ""
+        if (paths && paths.length)
+            addShareFiles(paths)
         Ilot.pinned = true
         if (Ilot.mode !== "open")
             Ilot.open()
-        Api.invoke("share_start", { paths: paths || [] }).then(r => { w.share = r }).catch(e => {
-            w.share = null
-            w.shareErr = String(e)
-        })
+        shareOpen = true
     }
-    function stopShare() {
-        Api.invoke("share_stop")
-        share = null
-        shareSent = {}
-        shareOpen = false
+    function addShareFiles(paths) {
+        qsFiles = qsFiles.concat(paths.filter(p => qsFiles.indexOf(p) < 0))
+        Api.invoke("qs_pending", { paths: qsFiles })
+    }
+    function clearShareFiles() {
+        qsFiles = []
+        Api.invoke("qs_pending", { paths: [] })
+    }
+    function removeShareFile(p) {
+        qsFiles = qsFiles.filter(x => x !== p)
+        Api.invoke("qs_pending", { paths: qsFiles })
+    }
+    function qsSend(device, text) {
+        Api.invoke("qs_send", { device: device, paths: qsFiles, text: text || null }).catch(e => w.osd("error", null, String(e)))
+    }
+    function qsAnswer(id, accept) {
+        Api.invoke("qs_answer", { id: id, accept: accept })
+        if (Ilot.act && Ilot.act.kind === "qs" && Ilot.act.qsId === id)
+            Ilot.endActivity()
+    }
+    function qsKindIcon(k) {
+        return k === 1 ? "smartphone" : k === 2 ? "tablet_android" : k === 3 ? "laptop_windows" : "devices"
+    }
+    // « 2 photos », « rapport.pdf », « un lien »...
+    function qsSummary(t) {
+        const it = t.items || []
+        if (!it.length)
+            return ""
+        if (it.length === 1)
+            return it[0].kind === "url" ? "un lien" : it[0].kind === "text" ? "un texte" : it[0].kind === "wifi" ? "le Wi-Fi « " + it[0].name + " »" : it[0].name
+        return it.length + " éléments"
+    }
+    function onQs(s) {
+        const seen = Object.assign({}, qsSeen)
+        for (const t of s.transfers) {
+            const key = t.id + ":" + t.status
+            if (seen[key])
+                continue
+            seen[key] = true
+            if (t.status === "ask")
+                qsAsk(t)
+            else if (t.status === "done" && !t.out) {
+                const one = t.items.length === 1 ? t.items[0] : null
+                const body = one && one.kind === "url" ? "Lien reçu" : one && one.kind === "text" ? "Copié dans le presse-papiers"
+                    : one && one.kind === "wifi" ? "Mot de passe Wi-Fi reçu" : "Rangé dans Téléchargements"
+                notify({ app: "Quick Share", sym: "nearby", title: "Reçu de " + t.peer + " : " + qsSummary(t), body: body,
+                    action: one && one.kind === "file" ? "Ouvrir" : "Voir",
+                    fn: () => one && one.kind === "file" ? Api.invoke("file_open", { path: one.path }) : w.openShare([]), ms: 8000 })
+            } else if (t.status === "done" && t.out && !shareOpen)
+                notify({ app: "Quick Share", sym: "nearby", title: "Envoyé à " + t.peer, body: qsSummary(t), ms: 5000 })
+            else if (t.status === "rejected" && t.out)
+                notify({ app: "Quick Share", sym: "nearby", title: t.peer + " a refusé", body: t.error && t.error !== "Refusé" ? t.error : qsSummary(t), ms: 6000 })
+            else if (t.status === "failed")
+                notify({ app: "Quick Share", sym: "nearby_error", title: (t.out ? "Envoi à " : "Réception de ") + t.peer + " impossible", body: t.error, ms: 7000 })
+        }
+        // la demande n'attend plus : on retire l'activite
+        if (Ilot.act && Ilot.act.kind === "qs" && !s.transfers.some(t => t.id === Ilot.act.qsId && t.status === "ask"))
+            Ilot.endActivity()
+        qsSeen = seen
+        qs = s
+    }
+    // demande de reception : dans la pilule (Refuser / Accepter), ou dans
+    // Quick Share si l'ilot est deja ouvert
+    function qsAsk(t) {
+        if (Ilot.mode === "collapsed" && !Ilot.fullscreen)
+            return Ilot.showActivity({ kind: "qs", qsId: t.id, ms: 120000, sym: qsKindIcon(t.kind), title: t.peer + " veut te partager",
+                sub: qsSummary(t) + (t.pin ? " · code " + t.pin : ""), onClick: () => w.openShare([]) })
+        openShare([])
     }
 
     // ================================================ sous-titres en direct
@@ -714,17 +788,8 @@ Item {
         Api.listen("services", l => w.applyServices(l))
         Api.listen("disk-low", d => w.notify({ app: "Santé du PC", sym: "hard_drive", title: "Disque " + d.mount + " presque plein",
             body: "Plus que " + w.fmtSize(d.free) + " libres sur " + w.fmtSize(d.total), action: "Voir", tab: "pc", ms: 12000 }))
-        Api.listen("share", e => {
-            if (e.kind === "sent") {
-                const s = Object.assign({}, w.shareSent)
-                s[e.name] = true
-                w.shareSent = s
-            } else {
-                w.shareRecv = [e].concat(w.shareRecv)
-                w.notify({ app: "Téléphone", sym: "phonelink", title: "Reçu : " + e.name, body: "Rangé dans Téléchargements",
-                    action: "Afficher", cmd: ["file_reveal", { path: e.path }], ms: 8000 })
-            }
-        })
+        Api.listen("qs", s => w.onQs(s))
+        Api.invoke("qs_get").then(s => w.onQs(s))
         Api.listen("captions", c => { w.caption = c })
         Api.listen("mail", ib => w.onInbox(ib))
         Api.listen("update", u => w.applyUpdate(u))
