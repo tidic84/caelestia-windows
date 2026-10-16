@@ -1,14 +1,32 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod activity;
 mod apps;
 mod audio;
+mod boost;
+mod captions;
 mod discord;
+mod files;
 mod games;
+mod health;
 mod mail;
+mod lyrics;
 mod media;
+mod notify;
+mod outputs;
+mod soundboard;
 mod pc;
+mod dropfix;
+mod pdh;
+mod prefs;
+mod privacy;
+mod share;
+mod status;
 mod store;
 mod system;
+mod tasks;
+mod translate;
+mod viz;
 mod wall;
 mod we;
 
@@ -18,15 +36,17 @@ use std::time::Duration;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, Emitter, LogicalSize, Manager, State, WebviewWindow, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
 use windows::Win32::System::Com::{
     CoInitializeEx, COINIT_APARTMENTTHREADED, COINIT_MULTITHREADED,
 };
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowRect, IsZoomed,
+    GetAncestor, GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongW, GetWindowRect,
+    GetWindowThreadProcessId, IsZoomed, WindowFromPoint, GA_ROOT, GWL_EXSTYLE,
 };
 
 pub fn com_init_mta() {
@@ -39,6 +59,15 @@ pub fn com_init_sta() {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
     }
+}
+
+/// Client HTTPS (TLS de Windows) : ureq n'en configure aucun tout seul.
+pub fn http() -> ureq::Agent {
+    let mut b = ureq::AgentBuilder::new().timeout_connect(std::time::Duration::from_secs(6));
+    if let Ok(tls) = native_tls::TlsConnector::new() {
+        b = b.tls_connector(std::sync::Arc::new(tls));
+    }
+    b.build()
 }
 
 /// Zone interactive de l'ilot, en pixels CSS relatifs a la fenetre.
@@ -72,14 +101,16 @@ fn grab_focus(win: WebviewWindow) {
     let _ = win.set_focus();
 }
 
-/// Place la fenetre en haut, au centre de l'ecran principal.
+/// Taille de la fenetre (pixels CSS) pour le panneau agrandi, puis recentrage.
+#[tauri::command]
+fn win_resize(win: WebviewWindow, w: f64, h: f64) {
+    let _ = win.set_size(LogicalSize::new(w, h));
+    place(&win);
+}
+
+/// Place la fenetre (haut ou bas, ecran choisi : voir prefs.rs).
 fn place(win: &WebviewWindow) {
-    let Ok(Some(mon)) = win.primary_monitor() else { return };
-    let Ok(size) = win.outer_size() else { return };
-    let mpos = mon.position();
-    let msize = mon.size();
-    let x = mpos.x + (msize.width as i32 - size.width as i32) / 2;
-    let _ = win.set_position(PhysicalPosition::new(x, mpos.y));
+    prefs::place(win);
 }
 
 /// Suit le curseur : active/desactive le passage des clics selon qu'il est
@@ -89,6 +120,7 @@ fn track_cursor(win: WebviewWindow, hit: Arc<Mutex<Hit>>) {
         let mut inside = false;
         let mut hidden = false;
         let mut tick = 0u32;
+        let mut drag_logged = false;
         let own = win.hwnd().unwrap_or_default();
         let _ = win.set_ignore_cursor_events(true);
         loop {
@@ -125,14 +157,61 @@ fn track_cursor(win: WebviewWindow, hit: Arc<Mutex<Hit>>) {
             let h = *hit.lock().unwrap();
             let cx = (pt.x - pos.x) as f64 / scale;
             let cy = (pt.y - pos.y) as f64 / scale;
-            let now = cx >= h.x && cx <= h.x + h.w && cy >= h.y && cy <= h.y + h.h;
+            // bouton gauche enfonce (fichier tire depuis l'Explorateur) : zone
+            // elargie pour que le depot soit facile a viser
+            let down = unsafe { GetAsyncKeyState(VK_LBUTTON.0 as i32) } as u16 & 0x8000 != 0;
+            let m = if down { 30.0 } else { 0.0 };
+            let now = cx >= h.x - m && cx <= h.x + h.w + m && cy >= h.y && cy <= h.y + h.h + m;
             if now != inside {
                 inside = now;
                 let _ = win.set_ignore_cursor_events(!now);
                 let _ = win.emit("hover", now);
+                drag_logged = false;
+            } else if !inside && !down && tick % 20 == 0 {
+                // un raccourci clavier a pu rendre la fenetre cliquable : hors de
+                // l'ilot, elle doit laisser passer la souris
+                let _ = win.set_ignore_cursor_events(true);
+            }
+            // diagnostic du glisser-deposer : fenetre que Windows voit sous le curseur
+            if down && inside && !drag_logged {
+                drag_logged = true;
+                std::thread::sleep(Duration::from_millis(150));
+                drop_log(&format!("drag-in {}", window_under(pt, own)));
+            }
+            if !down {
+                drag_logged = false;
             }
         }
     });
+}
+
+/// Ajoute une ligne a %LOCALAPPDATA%\Ilot\drop.log (50 dernieres gardees).
+pub fn drop_log(line: &str) {
+    let path = store::data_dir().join("drop.log");
+    let old = std::fs::read_to_string(&path).unwrap_or_default();
+    let lines: Vec<&str> = old.lines().collect();
+    let mut out: String = lines[lines.len().saturating_sub(50)..].iter().map(|l| format!("{l}\n")).collect();
+    let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    out += &format!("{t} {line}\n");
+    let _ = std::fs::write(path, out);
+}
+
+/// Fenetre que Windows trouve sous le curseur (classe, processus), pour le journal.
+fn window_under(pt: POINT, own: HWND) -> String {
+    unsafe {
+        let h = WindowFromPoint(pt);
+        let mut cls = [0u16; 64];
+        let n = GetClassNameW(h, &mut cls) as usize;
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(h, Some(&mut pid));
+        let root = GetAncestor(h, GA_ROOT);
+        format!(
+            "{} pid={pid} racine_ilot={} exstyle_ilot=0x{:X}",
+            String::from_utf16_lossy(&cls[..n]),
+            root == own,
+            GetWindowLongW(own, GWL_EXSTYLE) as u32
+        )
+    }
 }
 
 /// Vrai si la fenetre au premier plan est en plein ecran (jeu, video...) sur
@@ -178,6 +257,39 @@ fn toggle_launcher(app: &AppHandle) {
 fn main() {
     // `ilot.exe --check-we <fichier>` : diagnostic Wallpaper Engine, sans interface
     let args: Vec<String> = std::env::args().collect();
+    // `ilot.exe --check-audio <fichier>` : sessions audio par appli
+    // `ilot.exe --set-audio <appli> <0..1>` : regle le volume d'une appli (test)
+    if let Some(i) = args.iter().position(|a| a == "--set-audio") {
+        let level = args.get(i + 2).and_then(|s| s.parse().ok());
+        let ok = audio::app_volume_set(args.get(i + 1).cloned().unwrap_or_default(), None, level, None);
+        std::process::exit(if ok { 0 } else { 1 });
+    }
+    // `ilot.exe --check-lyrics <fichier> <artiste> <titre>` : essai de recherche de paroles
+    if let Some(i) = args.iter().position(|a| a == "--check-lyrics") {
+        let g = |k: usize| args.get(i + k).cloned().unwrap_or_default();
+        let r = match lyrics::lyrics_get(g(2), g(3), String::new(), 0.0) {
+            Ok(l) => serde_json::to_string(&l).unwrap_or_default(),
+            Err(e) => format!("ERR {e}"),
+        };
+        let _ = std::fs::write(g(1), r);
+        return;
+    }
+    // `ilot.exe --check-outputs <fichier> [id]` : sorties audio, et essai de bascule vers [id]
+    if let Some(i) = args.iter().position(|a| a == "--check-outputs") {
+        let mut r = String::new();
+        for o in outputs::audio_outputs() {
+            r += &format!("{}\n", serde_json::to_string(&o).unwrap_or_default());
+        }
+        if let Some(id) = args.get(i + 2) {
+            r += &format!("set {id} -> {}\n", outputs::audio_output_set(id.clone()));
+        }
+        let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("outputs-check.txt"), r);
+        return;
+    }
+    if let Some(i) = args.iter().position(|a| a == "--check-audio") {
+        let _ = std::fs::write(args.get(i + 1).map(String::as_str).unwrap_or("audio-check.txt"), audio::report());
+        return;
+    }
     if let Some(i) = args.iter().position(|a| a == "--check-we") {
         let walls = we::we_walls();
         let st = we::we_state();
@@ -223,8 +335,8 @@ son spotify: {:?}",
     tauri::Builder::default()
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _sc, ev| {
-                    if ev.state() == ShortcutState::Pressed {
+                .with_handler(|app, sc, ev| {
+                    if ev.state() == ShortcutState::Pressed && !prefs::on_shortcut(app, sc) {
                         toggle_launcher(app);
                     }
                 })
@@ -234,6 +346,8 @@ son spotify: {:?}",
         .manage(system::Clips(Mutex::new(VecDeque::new())))
         .manage(apps::Apps(Mutex::new(Vec::new())))
         .manage(games::Games(Mutex::new(Vec::new())))
+        .manage(tasks::Tasks::default())
+        .manage(share::Share::default())
         .manage(discord::Discord::default())
         .manage(mail::MailState(Mutex::new(Default::default())))
         .setup(move |app| {
@@ -253,6 +367,12 @@ son spotify: {:?}",
 
             let h = app.handle().clone();
             media::watch(h.clone());
+            notify::watch(h.clone());
+            activity::watch(h.clone());
+            dropfix::start(h.clone());
+            health::watch(h.clone());
+            status::watch(h.clone());
+            privacy::watch(h.clone());
             system::watch(h.clone());
             system::watch_clipboard(h.clone());
             we::watch(h.clone());
@@ -266,6 +386,7 @@ son spotify: {:?}",
                 Some(Modifiers::CONTROL | Modifiers::ALT),
                 Code::Space,
             ));
+            prefs::load_shortcuts(app.handle());
 
             let reload = MenuItem::with_id(app, "reload", "Recharger", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quitter Ilot", true, None::<&str>)?;
@@ -291,11 +412,33 @@ son spotify: {:?}",
             set_hit,
             startup_tab,
             grab_focus,
+            win_resize,
             media::media_get,
             media::media_art,
             media::media_action,
             system::volume_get,
             system::volume_set,
+            outputs::audio_outputs,
+            outputs::audio_output_set,
+            files::img_convert,
+            files::img_shrink,
+            files::zip_files,
+            files::files_copy,
+            files::file_reveal,
+            translate::translate,
+            lyrics::lyrics_get,
+            share::share_start,
+            share::share_stop,
+            activity::game_focus,
+            soundboard::sb_devices,
+            soundboard::sb_config,
+            soundboard::sb_save,
+            soundboard::sb_delete,
+            soundboard::sb_read,
+            soundboard::sb_play,
+            soundboard::sb_stop,
+            boost::boost_get,
+            boost::boost_set,
             system::clips_get,
             system::clip_copy,
             system::clips_clear,
@@ -310,16 +453,40 @@ son spotify: {:?}",
             games::app_folder,
             games::folder_open,
             games::pick_folder,
+            games::file_info,
+            games::file_open,
             audio::app_volume_get,
             audio::app_volume_set,
+            audio::mixer_get,
+            viz::viz_set,
+            audio::mixer_set,
+            audio::fg_volume,
+            health::health_get,
+            health::health_clean,
+            health::idle_secs,
+            status::services_get,
+            prefs::set_placement,
+            captions::captions_set,
+            captions::captions_on,
+            pc::power_action,
+            prefs::pet_walk,
+            prefs::monitors_list,
+            prefs::shortcuts_set,
+            prefs::shortcuts_get,
+            prefs::settings_export,
+            prefs::settings_import,
             pc::power_get,
             pc::power_set,
             pc::procs_running,
+            tasks::tasks_get,
+            tasks::task_kill,
+            tasks::taskmgr_open,
             discord::discord_get,
             discord::discord_setup,
             discord::discord_forget,
             discord::discord_self,
             discord::discord_user,
+            discord::discord_mic,
             wall::walls_get,
             wall::wall_current,
             wall::wall_set,

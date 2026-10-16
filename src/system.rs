@@ -69,10 +69,23 @@ pub struct Resources {
     mem_total: u64,
     disk_used: u64,
     disk_total: u64,
+    /// tous les disques (C:, D:...), par lettre
+    disks: Vec<DiskInfo>,
     /// -1 = pas de batterie
     battery: i32,
     charging: bool,
     uptime: u64,
+}
+
+#[derive(Serialize, Clone)]
+pub struct DiskInfo {
+    /// « C: »
+    mount: String,
+    /// nom du volume (« Jeux »), peut etre vide
+    label: String,
+    used: u64,
+    total: u64,
+    removable: bool,
 }
 
 /// Emet `sys` toutes les deux secondes.
@@ -80,26 +93,55 @@ pub fn watch(app: AppHandle) {
     std::thread::spawn(move || {
         let mut sys = System::new();
         let mut disks = Disks::new_with_refreshed_list();
+        let mut n = 0u32;
+        // CPU en « utilite », comme le Gestionnaire des taches
+        let pdh = crate::pdh::Query::new(&[r"\Processor Information(_Total)\% Processor Utility"]);
         loop {
+            // nouveaux disques / disques retires : liste relue toutes les 30 s
+            if n % 15 == 0 {
+                disks = Disks::new_with_refreshed_list();
+            }
+            n = n.wrapping_add(1);
             sys.refresh_cpu_usage();
             sys.refresh_memory();
             disks.refresh(true);
             let (mut du, mut dt) = (0, 0);
+            let mut all: Vec<DiskInfo> = Vec::new();
             for d in disks.list() {
-                if d.mount_point().to_string_lossy().starts_with("C:") {
-                    dt = d.total_space();
-                    du = dt - d.available_space();
+                let mount = d.mount_point().to_string_lossy().trim_end_matches('\\').to_string();
+                let total = d.total_space();
+                let used = total.saturating_sub(d.available_space());
+                if mount.starts_with("C:") {
+                    (dt, du) = (total, used);
                 }
+                if total == 0 || all.iter().any(|x| x.mount == mount) {
+                    continue;
+                }
+                all.push(DiskInfo {
+                    mount,
+                    label: d.name().to_string_lossy().to_string(),
+                    used,
+                    total,
+                    removable: d.is_removable(),
+                });
             }
+            all.sort_by(|a, b| a.mount.cmp(&b.mount));
             let mut ps = SYSTEM_POWER_STATUS::default();
             let ok = unsafe { GetSystemPowerStatus(&mut ps) }.is_ok();
             let no_batt = !ok || ps.BatteryFlag & 128 != 0 || ps.BatteryLifePercent == 255;
             let r = Resources {
-                cpu: sys.global_cpu_usage(),
+                cpu: pdh
+                    .as_ref()
+                    .and_then(|q| {
+                        q.collect();
+                        q.value(0, "_Total")
+                    })
+                    .map_or(sys.global_cpu_usage(), |v| (v as f32).clamp(0.0, 100.0)),
                 mem_used: sys.used_memory(),
                 mem_total: sys.total_memory(),
                 disk_used: du,
                 disk_total: dt,
+                disks: all,
                 battery: if no_batt { -1 } else { ps.BatteryLifePercent as i32 },
                 charging: ps.ACLineStatus == 1,
                 uptime: System::uptime(),

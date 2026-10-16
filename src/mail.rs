@@ -420,7 +420,7 @@ pub fn mail_read(app: AppHandle, account: String, uid: u32) -> Result<Body, Stri
 /// Ouvre un lien web, ou un lien d'appli musicale (spotify:, deezer:).
 #[tauri::command(async)]
 pub fn open_url(url: String) {
-    const OK: &[&str] = &["https://", "http://", "spotify:", "deezer://"];
+    const OK: &[&str] = &["https://", "http://", "spotify:", "deezer://", "discord://", "claude://", "steam://"];
     if OK.iter().any(|p| url.starts_with(p)) {
         let _ = Command::new("explorer.exe").arg(url).creation_flags(CREATE_NO_WINDOW).spawn();
     }

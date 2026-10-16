@@ -1,11 +1,11 @@
-//! Onglet PC : mode d'alimentation de Windows 11 (Economie / Equilibre /
+﻿//! Onglet PC : mode d'alimentation de Windows 11 (Economie / Equilibre /
 //! Performances) et etat des logiciels constructeur (MSI, ASUS, Logitech).
 
 use sysinfo::{ProcessesToUpdate, System};
 use windows::core::{s, w, GUID};
 use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 
-/// Modes de Parametres > Systeme > Alimentation (« overlays » du mode Equilibre).
+/// Modes de Parametres > Systeme > Alimentation (Â« overlays Â» du mode Equilibre).
 const MODES: &[(&str, GUID)] = &[
     ("eco", GUID::from_u128(0x961cc777_2547_4f9d_8174_7d86181b8a7a)),
     ("balanced", GUID::zeroed()),
@@ -53,4 +53,24 @@ pub fn procs_running(names: Vec<String>) -> Vec<bool> {
         .map(|p| p.name().to_string_lossy().to_lowercase().trim_end_matches(".exe").to_string())
         .collect();
     names.iter().map(|n| running.iter().any(|r| r == &n.to_lowercase())).collect()
+}
+
+/// Extinction programmee (minuteur cote interface) : Â« shutdown Â», Â« restart Â» ou Â« sleep Â».
+#[tauri::command(async)]
+pub fn power_action(action: String) -> bool {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let shutdown = |flag: &str| {
+        std::process::Command::new("shutdown")
+            .args([flag, "/t", "0"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .is_ok()
+    };
+    match action.as_str() {
+        "shutdown" => shutdown("/s"),
+        "restart" => shutdown("/r"),
+        "sleep" => unsafe { windows::Win32::System::Power::SetSuspendState(false, false, false) },
+        _ => false,
+    }
 }
