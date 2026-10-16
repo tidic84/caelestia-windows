@@ -14,7 +14,7 @@ Item {
     property var cfg: ({
         variant: "tonalspot", mode: "dark", win_accent: false, win_mode: false, island_bg: "solid", city: null, icals: [],
         rotate_min: 0, notif_popups: true, dnd: false, osd: true, bar: false, hide_taskbar: true,
-        bar_islands: true, bar_tasks: false, bar_autohide: true, win_key: false,
+        bar_islands: true, bar_tasks: false, bar_autohide: true, win_key: false, addons: [], update_mode: "notify",
         // apparence de la pilule, compagnon, accessibilite, mode jeu... (gardes
         // tels quels par le coeur dans settings.json)
         color: "auto", day: "07:00", night: "20:00", border: "none", shape: "round", anim: "normal",
@@ -63,7 +63,63 @@ Item {
     property var act: null
     property string currentTab: "home"
     property int tabDir: 1
-    readonly property var tabs: ["home", "media", "ctrl", "apps", "mail", "pc", "sounds", "tasks", "clips", "assist", "walls", "settings"]
+
+    // ================================================== onglets, addons
+    // Tous les onglets, dans l'ordre du panneau. Les essentiels (`core`) sont
+    // toujours la ; les autres sont des addons a activer dans Reglages >
+    // Addons (cfg.addons). Un addon desactive n'a ni onglet, ni page, ni
+    // releve en arriere-plan (mail, etat des services, soundboard).
+    readonly property var catalog: [
+        { id: "home", icon: "dashboard", label: "Accueil", page: "HomePage", core: true },
+        { id: "media", icon: "music_note", label: "Média", page: "MediaPage", core: true },
+        { id: "ctrl", icon: "tune", label: "Contrôles", page: "CtrlPage", core: true },
+        { id: "apps", icon: "apps", label: "Apps", page: "AppsPage", core: true },
+        { id: "mail", icon: "mail", label: "Mail", page: "MailPage",
+          desc: "Boîtes de réception IMAP (Gmail, Outlook, iCloud…), non lus dans la pilule et notification à chaque nouveau mail" },
+        { id: "pc", icon: "sports_esports", label: "PC", page: "PcPage",
+          desc: "Discord (micro, volumes du salon), état des services, santé du PC, extinction programmée, mode d'alimentation, sensibilité entre jeux" },
+        { id: "sounds", icon: "graphic_eq", label: "Soundboard", page: "SoundsPage",
+          desc: "Sons joués dans le vocal Discord par un micro virtuel, avec votre vrai micro" },
+        { id: "tasks", icon: "monitoring", label: "Tâches", page: "TasksPage",
+          desc: "Gestionnaire des tâches : CPU, mémoire, disque, GPU et réseau par programme, fin de tâche" },
+        { id: "clips", icon: "content_paste", label: "Presse-papiers", page: "ClipsPage",
+          desc: "Les 40 derniers textes et images copiés, et un bloc-notes" },
+        { id: "assist", icon: "translate", label: "Assistant", page: "AssistPage", tip: "Traduction, sous-titres en direct et Claude",
+          desc: "Traduction, sous-titres en direct traduits, questions envoyées à Claude" },
+        { id: "walls", icon: "wallpaper", label: "Fonds", page: "WallsPage",
+          desc: "Vos fonds d'écran et ceux de Wallpaper Engine ; choisir un fond recalcule les couleurs" },
+        { id: "settings", icon: "settings", label: "", tip: "Réglages", page: "SettingsPage", core: true }
+    ]
+    readonly property var addons: catalog.filter(t => !t.core)
+    // onglets affiches : essentiels + addons actives
+    readonly property var tabItems: catalog.filter(t => t.core || (cfg.addons || []).indexOf(t.id) >= 0)
+    readonly property var tabs: tabItems.map(t => t.id)
+    function hasTab(id) {
+        return tabs.indexOf(id) >= 0
+    }
+    function setAddon(id, on) {
+        const list = (cfg.addons || []).filter(a => a !== id)
+        if (on)
+            list.push(id)
+        setCfg({ addons: catalog.filter(t => list.indexOf(t.id) >= 0).map(t => t.id) })
+        // soundboard coupee : le moteur audio s'arrete (micro rendu)
+        if (id === "sounds" && !on)
+            Api.invoke("sb_config", { cfg: { on: false, cable: "", mic: "", monitor: false, mic_gain: 1 } })
+        if (id === "mail" && on)
+            Api.invoke("mail_refresh")
+    }
+    // un addon desactive alors que son onglet est ouvert : retour a l'accueil
+    onTabsChanged: if (!hasTab(currentTab)) currentTab = "home"
+
+    // section ouverte dans Reglages (general, bar, look, pill, game, access,
+    // weather, keys, addons, updates)
+    property string settingsSection: "general"
+    function openSettings(section) {
+        if (section)
+            settingsSection = section
+        pinned = true
+        open("settings")
+    }
     // taille de l'ecran de l'ilot (pixels logiques), pour le panneau agrandi
     property real screenW: 1920
     property real screenH: 1080
@@ -103,7 +159,7 @@ Item {
     })
 
     // indicateurs de la pilule repliee
-    readonly property int unread: inbox.accounts.reduce((n, a) => n + a.unread, 0)
+    readonly property int unread: hasTab("mail") ? inbox.accounts.reduce((n, a) => n + a.unread, 0) : 0
     readonly property int indCount: (caffeine ? 1 : 0) + (cfg.dnd ? 1 : 0) + (unread > 0 ? 1 : 0)
     readonly property bool timerShown: tmr.running
     // Apparence > Taille de la pilule (replie / survol ; pas le panneau ouvert)
@@ -178,6 +234,9 @@ Item {
     }
 
     function showTab(tab) {
+        // onglet d'un addon desactive (raccourci, notification...) : accueil
+        if (!hasTab(tab))
+            tab = "home"
         tabDir = tabs.indexOf(tab) > tabs.indexOf(currentTab) ? 1 : -1
         if (tab !== currentTab)
             closeSheets()
