@@ -26,8 +26,8 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 #[derive(Serialize, Clone)]
 pub struct Game {
-    id: String,
-    name: String,
+    pub(crate) id: String,
+    pub(crate) name: String,
     /// steam, epic, ubisoft, gog
     source: String,
     /// jaquette verticale (data URL) ou vide
@@ -39,7 +39,7 @@ pub struct Game {
     #[serde(skip)]
     launch: String,
     #[serde(skip)]
-    dir: PathBuf,
+    pub(crate) dir: PathBuf,
 }
 
 pub struct Games(pub Mutex<Vec<Game>>);
@@ -49,7 +49,7 @@ pub struct Games(pub Mutex<Vec<Game>>);
 /// Outils Steam qui ne sont pas des jeux.
 const STEAM_SKIP: &[&str] = &["228980", "431960", "1070560", "1391110", "1628350", "1493710", "2180100"];
 
-fn acf_value<'a>(acf: &'a str, key: &str) -> Option<&'a str> {
+pub(crate) fn acf_value<'a>(acf: &'a str, key: &str) -> Option<&'a str> {
     acf.lines().find_map(|l| {
         let parts: Vec<&str> = l.split('"').filter(|s| !s.trim().is_empty()).collect();
         (parts.len() == 2 && parts[0].eq_ignore_ascii_case(key)).then(|| parts[1])
@@ -371,7 +371,7 @@ fn open_dir(d: &Path) -> bool {
 }
 
 /// Ouvre l'Explorateur sur le fichier, selectionne.
-fn reveal(p: &Path) -> bool {
+pub(crate) fn reveal(p: &Path) -> bool {
     if p.is_dir() {
         return open_dir(p);
     }
@@ -493,12 +493,16 @@ pub struct FileInfo {
 /// Nom et icone d'un fichier ou dossier depose dans l'ilot (None s'il n'existe plus).
 pub fn file_info(path: String) -> Option<FileInfo> {
     let p = PathBuf::from(&path);
-    if !p.exists() {
+    let special = special_name(&path);
+    if special.is_none() && !p.exists() {
         return None;
     }
-    let name = if p.is_dir() { p.file_name() } else { p.file_stem() }
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or(path);
+    let name = match special {
+        Some(n) => n.to_string(),
+        None => if p.is_dir() { p.file_name() } else { p.file_stem() }
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or(path),
+    };
     // icone via le Shell, dans un thread STA a part
     let icon = std::thread::spawn(move || unsafe {
         crate::com_init_sta();
@@ -513,7 +517,57 @@ pub fn file_info(path: String) -> Option<FileInfo> {
 
 /// Ouvre un fichier (programme, raccourci, document) ou un dossier.
 pub fn file_open(path: String) -> bool {
-    Path::new(&path).exists() && Command::new("explorer.exe").arg(&path).spawn().is_ok()
+    (special_name(&path).is_some() || Path::new(&path).exists()) && Command::new("explorer.exe").arg(&path).spawn().is_ok()
+}
+
+/// Emplacements speciaux du Shell (Corbeille, Ce PC...) : pas de vrai chemin,
+/// on les range sous leur nom « shell:... ».
+fn special_name(path: &str) -> Option<&'static str> {
+    Some(match path.to_ascii_lowercase().as_str() {
+        "shell:recyclebinfolder" => "Corbeille",
+        "shell:mycomputerfolder" => "Ce PC",
+        "shell:controlpanelfolder" => "Panneau de configuration",
+        "shell:downloads" => "Téléchargements",
+        "shell:networkplacesfolder" => "Réseau",
+        _ => return None,
+    })
+}
+
+/// Boite « Ouvrir » de Windows (plusieurs fichiers) ; `spec` : « *.mp3;*.wav ».
+pub fn pick_files(app: AppHandle, title: &str, kind: &str, spec: &str) -> Vec<String> {
+    use windows::core::PCWSTR;
+    use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
+    use windows::Win32::UI::Shell::{FileOpenDialog, IFileOpenDialog, FOS_ALLOWMULTISELECT, FOS_FORCEFILESYSTEM, SIGDN_FILESYSPATH};
+    let owner = app.get_webview_window("island").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize);
+    let (title, kind, spec) = (title.to_string(), kind.to_string(), spec.to_string());
+    std::thread::spawn(move || unsafe {
+        crate::com_init_sta();
+        let mut out = Vec::new();
+        let Ok(dlg) = CoCreateInstance::<_, IFileOpenDialog>(&FileOpenDialog, None, CLSCTX_INPROC_SERVER) else { return out };
+        let Ok(opts) = dlg.GetOptions() else { return out };
+        let _ = dlg.SetOptions(opts | FOS_ALLOWMULTISELECT | FOS_FORCEFILESYSTEM);
+        let _ = dlg.SetTitle(&HSTRING::from(title));
+        let (k, sp) = (HSTRING::from(kind), HSTRING::from(spec));
+        let filters = [COMDLG_FILTERSPEC { pszName: PCWSTR(k.as_ptr()), pszSpec: PCWSTR(sp.as_ptr()) }];
+        let _ = dlg.SetFileTypes(&filters);
+        let owner = owner.map(|h| windows::Win32::Foundation::HWND(h as _));
+        if dlg.Show(owner).is_err() {
+            return out;
+        }
+        let Ok(items) = dlg.GetResults() else { return out };
+        for i in 0..items.GetCount().unwrap_or(0) {
+            let Ok(item) = items.GetItemAt(i) else { continue };
+            if let Ok(p) = item.GetDisplayName(SIGDN_FILESYSPATH) {
+                if let Ok(s) = p.to_string() {
+                    out.push(s);
+                }
+                CoTaskMemFree(Some(p.0 as _));
+            }
+        }
+        out
+    })
+    .join()
+    .unwrap_or_default()
 }
 
 /// Boite « Choisir un dossier » de Windows ; renvoie le chemin choisi.
