@@ -341,10 +341,10 @@ Item {
                 SetRow {
                     subRow: true
                     title: "Fond de l'îlot"
-                    sub: "Opaque, translucide, ou fond d'écran flouté derrière l'îlot"
+                    sub: "Opaque, translucide, ou flou acrylique de Windows derrière l'îlot et la barre"
                 }
                 Chips {
-                    model: [["solid", "Opaque"], ["glass", "Translucide"], ["clear", "Très transparent"], ["wall", "Fond d'écran flouté"]]
+                    model: [["solid", "Opaque"], ["glass", "Translucide"], ["clear", "Très transparent"], ["wall", "Acrylique"]]
                     current: page.cfg.island_bg || "solid"
                     onPicked: v => Ilot.setCfg({ island_bg: v })
                 }

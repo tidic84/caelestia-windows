@@ -29,7 +29,7 @@ qt_add_qml_module(ilot
     URI Ilot
     VERSION 1.0
     QML_FILES ${QML_FILES}
-    SOURCES src/winctl.h src/winctl.cpp src/tray.h src/tray.cpp
+    SOURCES src/winctl.h src/winctl.cpp src/backdrop.h src/backdrop.cpp src/tray.h src/tray.cpp
 )
 
 # Rubik et Material Symbols Rounded (fonts/README.md)
@@ -51,7 +51,7 @@ set_target_properties(ilot_core PROPERTIES
 target_include_directories(ilot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(ilot PRIVATE QT_NO_KEYWORDS WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 target_compile_options(ilot PRIVATE /permissive- /EHsc /utf-8)
-target_link_libraries(ilot PRIVATE Qt6::Gui Qt6::Quick ilot_core user32 shell32)
+target_link_libraries(ilot PRIVATE Qt6::Gui Qt6::Quick ilot_core user32 shell32 dwmapi d2d1 windowsapp CoreMessaging)
 
 add_custom_command(TARGET ilot POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CORE_DIR}/ilot_core.dll $<TARGET_FILE_DIR:ilot>)

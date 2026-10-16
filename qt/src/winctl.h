@@ -6,6 +6,10 @@
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
 
+#include <memory>
+
+class Backdrop;
+
 // Ce que la fenetre transparente de l'ilot (ou d'une barre) demande a
 // Windows : zones qui recoivent la souris (le reste laisse passer les clics),
 // bande du haut de l'ecran (barre masquee automatiquement), plein ecran,
@@ -37,6 +41,11 @@ public:
 
     // zones {x, y, w, h} en pixels logiques de la fenetre
     Q_INVOKABLE void setHit(const QVariantList &rects);
+    // flou de ce qu'il y a derriere la fenetre, dans la forme donnee :
+    // {kind, x, y, w, h, r} en pixels logiques de la fenetre, kind valant
+    // "rect", "round" (coins arrondis de rayon r), "island" (coins bas arrondis), "earLeft" / "earRight"
+    // (coin concave de rayon r) ; liste vide : pas de flou
+    Q_INVOKABLE void setBackdrop(const QVariantList &shapes);
     Q_INVOKABLE void grabFocus();
     Q_INVOKABLE void releaseFocus();
 
@@ -60,6 +69,8 @@ private:
     bool m_topHover = false;
     bool m_fullscreen = false;
     QRegion m_mask;
+    std::unique_ptr<Backdrop> m_backdrop;
+    QVariantList m_shapes;
     QTimer m_fsTimer;
     QTimer m_topTimer;
     QTimer m_hideTimer;

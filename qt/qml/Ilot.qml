@@ -789,16 +789,16 @@ Item {
             return
         quantId++
         quant.sendMessage({ id: quantId, pixels: px })
-        applyIslandBg(src)
     }
 
-    // --- fond de l'ilot : opacite de la couleur de surface, ou fond d'ecran flouté
+    // --- fond de l'ilot : opacite de la couleur de surface, ou flou acrylique
+    // de Windows derriere (WinCtl.setBackdrop)
     readonly property var islandAlpha: ({ solid: 1, glass: 0.8, clear: 0.55, wall: 0.5 })
-    property string wallBg: ""
-    function applyIslandBg(src) {
+    property bool acrylic: false
+    function applyIslandBg() {
         const m = cfg.island_bg || "solid"
         Theme.islandAlpha = islandAlpha[m] !== undefined ? islandAlpha[m] : 1
-        wallBg = m === "wall" ? (src || currentThumb) : ""
+        acrylic = m === "wall"
     }
 
     // les reglages ont change (ici ou par une commande)

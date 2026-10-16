@@ -1,4 +1,5 @@
 #include "winctl.h"
+#include "backdrop.h"
 #include "core.h"
 
 #include <QCursor>
@@ -109,6 +110,21 @@ void WinCtl::setHit(const QVariantList &rects)
     m_win->setMask(r);
 }
 
+void WinCtl::setBackdrop(const QVariantList &shapes)
+{
+    if (!m_win || shapes == m_shapes)
+        return;
+    m_shapes = shapes;
+    if (shapes.isEmpty()) {
+        if (m_backdrop)
+            m_backdrop->hide();
+        return;
+    }
+    if (!m_backdrop)
+        m_backdrop = std::make_unique<Backdrop>();
+    m_backdrop->setShapes(reinterpret_cast<void *>(m_win->winId()), shapes, m_win->devicePixelRatio());
+}
+
 // Windows ne laisse prendre le premier plan qu'a l'appli qui a recu la
 // derniere saisie : sinon, un appui (vide) sur Alt l'autorise, comme le fait
 // Tauri (tao)
@@ -163,6 +179,9 @@ void WinCtl::checkFullscreen()
     if (!m_win)
         return;
     HWND own = HWND(m_win->winId());
+    // la fenetre a pu bouger, ou passer devant le flou
+    if (m_backdrop)
+        m_backdrop->place(own, m_win->isVisible());
     HWND fg = GetForegroundWindow();
     bool fs = false;
     if (fg && fg != own && !IsZoomed(fg)) {
@@ -191,6 +210,8 @@ void WinCtl::checkFullscreen()
     } else {
         m_hideTimer.stop();
         m_win->show();
+        if (m_backdrop)
+            m_backdrop->place(own, true);
         if (m_topBand > 0)
             m_topTimer.start();
     }

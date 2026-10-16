@@ -94,6 +94,9 @@ Window {
             onXChanged: Qt.callLater(win.updateHit)
             onWidthChanged: Qt.callLater(win.updateHit)
             onHeightChanged: Qt.callLater(win.updateHit)
+            onRChanged: Qt.callLater(win.updateBackdrop)
+            onEarChanged: Qt.callLater(win.updateBackdrop)
+            onEarTopChanged: Qt.callLater(win.updateBackdrop)
         }
 
         // survol : l'ilot (et ses coins) d'apres sa taille cible, avec un peu
@@ -121,6 +124,28 @@ Window {
             for (const r of bar.hitRects())
                 rects.push(r)
         ctl.setHit(rects)
+        updateBackdrop()
+    }
+
+    // flou acrylique : la forme de l'ilot (coins concaves compris) et de la
+    // barre, dessinee par Windows sous la fenetre
+    function updateBackdrop() {
+        if (!Ilot.acrylic || Ilot.fullscreen)
+            return ctl.setBackdrop([])
+        const ix = island.x, w = island.width, h = island.height
+        const shapes = [{ kind: "island", x: ix, y: 0, w: w, h: h, r: island.r }]
+        const e = island.ear
+        const eh = Math.min(e, h - island.r - island.earTop)
+        if (e > 0.5 && eh > 0.5) {
+            shapes.push({ kind: "earLeft", x: ix - e, y: island.earTop, w: e, h: eh, r: e })
+            shapes.push({ kind: "earRight", x: ix + w, y: island.earTop, w: e, h: eh, r: e })
+        }
+        ctl.setBackdrop(shapes.concat(bar.backdropShapes()))
+    }
+    Connections {
+        target: bar
+        function onVisChanged() { Qt.callLater(win.updateBackdrop) }
+        function onIslandsChanged() { Qt.callLater(win.updateBackdrop) }
     }
     Connections {
         target: Ilot
@@ -128,6 +153,8 @@ Window {
         function onEarChanged() { Qt.callLater(win.updateHit) }
         function onModeChanged() { Qt.callLater(win.updateHit) }
         function onBarVisibleChanged() { Qt.callLater(win.updateHit) }
+        function onAcrylicChanged() { Qt.callLater(win.updateBackdrop) }
+        function onFullscreenChanged() { Qt.callLater(win.updateBackdrop) }
     }
     onWidthChanged: Qt.callLater(updateHit)
 }

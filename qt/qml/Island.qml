@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import IlotCore
 
 // L'ilot : fond aux coins bas arrondis, coins concaves en haut, pilule
@@ -29,85 +28,41 @@ Item {
     opacity: Ilot.fullscreen ? 0 : 1
     Behavior on opacity { NumberAnimation { duration: Ilot.fullscreen ? 250 : 300 } }
 
-    Ear {
+    // fond et coins concaves en une seule couche : opaques dedans, la
+    // transparence s'applique a l'ensemble (sinon les bords qui se
+    // chevauchent ressortent plus sombres). Sous la barre pleine, c'est elle
+    // qui fait le fond.
+    Item {
+        id: bg
         x: -island.ear
         y: island.earTop
-        r: island.ear
-        visibleH: island.height - island.r - island.earTop
-    }
-    Ear {
-        x: island.width - 1
-        y: island.earTop
-        r: island.ear
-        visibleH: island.height - island.r - island.earTop
-        mirrored: true
-    }
+        width: island.width + island.ear * 2 + 1
+        height: Math.max(0, island.height - island.earTop)
+        opacity: Theme.islandAlpha
+        layer.enabled: opacity < 1
+        layer.smooth: true
 
-    // fond d'ecran floute derriere l'ilot (Reglages > Fond de l'ilot)
-    Item {
-        id: wallLayer
-        anchors.fill: parent
-        visible: Ilot.wallBg !== ""
-        layer.enabled: visible
-        layer.effect: MultiEffect {
-            maskEnabled: true
-            maskSource: shapeMask
-            maskThresholdMin: 0.5
-            maskSpreadAtMin: 1
+        Ear {
+            x: 0
+            r: island.ear
+            visibleH: island.height - island.r - island.earTop
+            color: Theme.surface
         }
-        Item {
-            id: wallSrc
-            // le fond, cale comme a l'ecran (« remplir ») : l'ilot est centre en haut
-            readonly property size natural: Ilot.wallBg ? Backend.imageSize(Ilot.wallBg) : Qt.size(1, 1)
-            readonly property real k: Math.max(Ilot.screenW / Math.max(1, natural.width), Ilot.screenH / Math.max(1, natural.height))
-            width: natural.width * k
-            height: natural.height * k
-            x: (island.width - width) / 2
-            y: -(height - Ilot.screenH) / 2
-            visible: false
-            Image {
-                anchors.fill: parent
-                source: Ilot.wallBg
-                fillMode: Image.Stretch
-                asynchronous: true
-                sourceSize.width: 960
-            }
-        }
-        MultiEffect {
-            source: wallSrc
-            x: wallSrc.x
-            y: wallSrc.y
-            width: wallSrc.width
-            height: wallSrc.height
-            blurEnabled: true
-            blurMax: 48
-            blur: 0.7
-            saturation: 0.4
+        Ear {
+            x: island.ear + island.width - 1
+            r: island.ear
+            visibleH: island.height - island.r - island.earTop
+            mirrored: true
+            color: Theme.surface
         }
         Rectangle {
-            anchors.fill: parent
-            color: Theme.alpha(Theme.surface, 0.5)
+            x: island.ear
+            width: island.width
+            height: parent.height
+            color: Theme.surface
+            bottomLeftRadius: island.r
+            bottomRightRadius: island.r
         }
-    }
-    Rectangle {
-        id: shapeMask
-        anchors.fill: parent
-        visible: false
-        layer.enabled: Ilot.wallBg !== ""
-        bottomLeftRadius: island.r
-        bottomRightRadius: island.r
-        color: "black"
-    }
-
-    Rectangle {
-        id: bg
-        anchors.fill: parent
-        visible: Ilot.wallBg === ""
-        color: Theme.islandBg
-        topLeftRadius: 0
-        topRightRadius: 0
-        bottomLeftRadius: island.r
-        bottomRightRadius: island.r
     }
 
     Item {

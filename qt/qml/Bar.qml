@@ -56,6 +56,24 @@ Window {
 
     function updateHit() {
         ctl.setHit(bar.hitRects())
+        updateBackdrop()
+    }
+    // flou acrylique sous la barre (Reglages > Fond de l'ilot)
+    function updateBackdrop() {
+        ctl.setBackdrop(Ilot.acrylic && !ctl.fullscreen ? bar.backdropShapes() : [])
+    }
+    Connections {
+        target: bar
+        function onVisChanged() { Qt.callLater(w.updateBackdrop) }
+        function onIslandsChanged() { Qt.callLater(w.updateBackdrop) }
+    }
+    Connections {
+        target: Ilot
+        function onAcrylicChanged() { Qt.callLater(w.updateBackdrop) }
+    }
+    Connections {
+        target: ctl
+        function onFullscreenChanged() { Qt.callLater(w.updateBackdrop) }
     }
     onWidthChanged: Qt.callLater(updateHit)
     Component.onCompleted: Qt.callLater(updateHit)

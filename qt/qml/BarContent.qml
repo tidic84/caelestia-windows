@@ -32,7 +32,9 @@ Item {
     // zones cliquables, en coordonnees de la fenetre
     function hitRects() {
         const out = []
-        if (vis <= 0.01 || !visible)
+        // des qu'elle commence a entrer : le masque de la fenetre coupe aussi
+        // l'affichage, la barre n'apparaitrait qu'a la fin de l'animation
+        if ((!shown && vis <= 0.01) || !visible)
             return out
         if (!islands)
             out.push({ x: 0, y: 0, w: width, h: Ilot.barH })
@@ -52,6 +54,30 @@ Item {
         }
         if (preview.open)
             out.push(preview.rect())
+        return out
+    }
+
+    // flou acrylique (WinCtl.setBackdrop) : la barre pleine, ou chaque ilot
+    // separe, en coordonnees de la fenetre
+    function backdropShapes() {
+        const out = []
+        if (vis <= 0.01 || !visible)
+            return out
+        if (!islands) {
+            out.push({ kind: "rect", x: 0, y: slide.y, w: width, h: Ilot.barH })
+            return out
+        }
+        for (const side of [left, right, center]) {
+            if (!side.visible)
+                continue
+            for (let i = 0; i < side.children.length; i++) {
+                const c = side.children[i]
+                if (!c.visible || c.width <= 0 || c.isRepeater || c.bare)
+                    continue
+                const p = c.mapToItem(bar, 0, 0)
+                out.push({ kind: "round", x: p.x, y: p.y, w: c.width, h: c.height, r: c.radius })
+            }
+        }
         return out
     }
 

@@ -3,7 +3,6 @@
 
 #include <QCoreApplication>
 #include <QImage>
-#include <QImageReader>
 #include <QThreadPool>
 #include <QUrl>
 
@@ -107,15 +106,6 @@ QVariantList Backend::imagePixels(const QString &url, int maxSide) const
         }
     }
     return out;
-}
-
-QSize Backend::imageSize(const QString &url) const
-{
-    QByteArray b = imageBytes(url);
-    if (!b.isEmpty())
-        return QImage::fromData(b).size();
-    QUrl u(url);
-    return QImageReader(u.isLocalFile() ? u.toLocalFile() : url).size();
 }
 
 QString Backend::startupTab() const

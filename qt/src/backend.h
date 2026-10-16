@@ -22,8 +22,6 @@ public:
 
     // Pixels ARGB opaques d'une image reduite a `maxSide` (couleur source du theme)
     Q_INVOKABLE QVariantList imagePixels(const QString &url, int maxSide = 128) const;
-    // Taille d'origine d'une image (fond d'ecran flouté de l'ilot)
-    Q_INVOKABLE QSize imageSize(const QString &url) const;
 
     // `--open <onglet>` : panneau ouvert au demarrage (tests, captures)
     Q_INVOKABLE QString startupTab() const;
