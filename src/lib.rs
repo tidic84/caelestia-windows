@@ -39,6 +39,7 @@ mod tasks;
 mod theme;
 mod translate;
 mod update;
+mod valorant;
 mod wall;
 mod we;
 mod winkey;
@@ -381,6 +382,7 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "idle_secs" => json(health::idle_secs()),
         "services_get" => json(status::services_get(app, a!("fresh"))),
         "game_focus" => json(activity::game_focus()),
+        "valorant_focus" => json(valorant::valorant_focus()),
         // soundboard
         "sb_devices" => json(soundboard::sb_devices()),
         "sb_config" => json(soundboard::sb_config(app, a!("cfg"))),
@@ -481,6 +483,7 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
     games::load(app);
     apps::load(app);
     activity::watch(app);
+    valorant::watch(app);
     health::watch(app);
     status::watch(app);
     privacy::watch(app);

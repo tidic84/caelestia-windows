@@ -378,7 +378,11 @@ fn flash_hook() {
 
 /// Ramene la fenetre du jeu au premier plan (clic sur « Partie trouvee »).
 pub fn game_focus() -> bool {
-    let pid = GAME_PID.load(Ordering::Relaxed);
+    focus_pid(GAME_PID.load(Ordering::Relaxed))
+}
+
+/// Ramene au premier plan la fenetre principale d'un processus.
+pub fn focus_pid(pid: u32) -> bool {
     if pid == 0 {
         return false;
     }

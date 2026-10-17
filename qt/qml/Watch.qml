@@ -3,7 +3,8 @@ import QtQuick
 import IlotCore
 
 // Ce que l'ilot surveille en dehors des pages : activites en cours (mise a
-// jour Steam, jeu, GPU), mode jeu, mode absent, partie trouvee, extinction
+// jour Steam, jeu, GPU), mode jeu, mode absent, partie trouvee (et Valorant :
+// selection des agents), extinction
 // programmee, voyant camera / micro, etat des services, sante des disques,
 // partage avec le telephone, sous-titres en direct, raccourcis clavier,
 // mises a jour, compagnon de la pilule et file des notifications de l'ilot.
@@ -132,12 +133,12 @@ Item {
     readonly property var dl: cfg.activity ? (gaming.downloads || []).find(x => x.active) || null : null
     readonly property var game: cfg.activity ? gaming.game : null
     readonly property var gpu: cfg.activity && (gaming.game || (gaming.gpu && gaming.gpu.load >= gamingLoad)) ? gaming.gpu : null
-    readonly property bool actShown: !!(dl || game || gpu)
+    readonly property bool actShown: !!(valoLive || dl || game || gpu)
     // relu pour faire avancer le temps de jeu affiche
     property real tick: Date.now()
     Timer {
-        interval: w.game && w.game.away ? 1000 : 30000
-        running: !!w.game
+        interval: (w.game && w.game.away) || w.valoLive ? 1000 : 30000
+        running: !!w.game || w.valoLive
         repeat: true
         onTriggered: w.tick = Date.now()
     }
@@ -167,6 +168,17 @@ Item {
     // pastille de la pilule repliee et ligne du survol
     readonly property var chip: {
         tick
+        if (valoLive) {
+            const v = valo
+            if (v.phase === "pregame") {
+                if (v.done)
+                    return { icon: "check_circle", text: "Prêt", hot: false, away: false }
+                return { icon: v.locked ? "lock" : "timer", text: (v.exact ? "" : "≈") + valoLeft() + " s", hot: !v.locked && valoLeft() <= 10, away: false }
+            }
+            if (v.phase === "found")
+                return { icon: "sports_esports", text: "Trouvée", hot: false, away: false }
+            return { icon: "hourglass_top", text: Ilot.fmtTime((Date.now() - v.queue_since) / 1000), hot: false, away: true }
+        }
         if (dl) {
             const inst = dl.phase === "install"
             return { icon: inst ? "install_desktop" : "download", text: Math.floor(dlPct(dl)) + " %", hot: false, away: false }
@@ -184,6 +196,25 @@ Item {
     }
     readonly property var peek: {
         tick
+        if (valoLive) {
+            const v = valo
+            const where = [v.map, valoQueue(v.queue)].filter(Boolean).join(" · ")
+            if (v.phase === "pregame") {
+                const left = valoLeft()
+                const pick = v.agent ? v.agent + (v.locked ? " verrouillé" : " sélectionné") : "Aucun agent choisi"
+                const team = v.allies > 1 ? v.allies_locked + "/" + v.allies + " verrouillés" : ""
+                return {
+                    pic: v.agent_icon, icon: "timer",
+                    title: v.done ? "Sélection terminée · chargement" : "Sélection des agents · " + (v.exact ? "" : "≈") + left + " s",
+                    sub: [pick, team, where].filter(Boolean).join(" · "),
+                    bar: v.done ? -1 : Math.min(1, (v.ends - Date.now()) / Math.max(1, v.ends - v.start))
+                }
+            }
+            if (v.phase === "found")
+                return { pic: "", icon: "sports_esports", title: "Partie trouvée !", sub: "Valorant" + (where ? " · " + where : ""), bar: -1 }
+            return { pic: "", icon: "hourglass_top", title: "Valorant · recherche d’une partie", bar: -1,
+                sub: "Depuis " + Ilot.fmtTime((Date.now() - v.queue_since) / 1000) + " · " + valoQueue(v.queue) }
+        }
         if (dl) {
             const inst = dl.phase === "install"
             const eta = fmtEta(dl)
@@ -291,6 +322,63 @@ Item {
         id: matchTimer
         interval: 5000
         onTriggered: w.matchFlash = false
+    }
+
+    // ================================================== Valorant
+    // src/valorant.rs (evenement `valorant`, null quand le jeu est ferme) :
+    // file d'attente, partie trouvee (notification), selection des agents
+    // (temps restant dans la pilule, rappel 15 s avant la fin)
+    property var valo: null
+    readonly property bool valoLive: cfg.valorant !== false && !!valo && ["queue", "found", "pregame"].indexOf(valo.phase) >= 0
+    readonly property var valoQueues: ({
+        competitive: "Compétition", unrated: "Non classée", swiftplay: "Vélocité", spikerush: "Spike Rush",
+        deathmatch: "Combat à mort", hurm: "Combat à mort par équipe", ggteam: "Escalade", onefa: "Réplication",
+        premier: "Premier", newmap: "Nouvelle carte", snowball: "Bataille de boules de neige"
+    })
+    function valoQueue(q) {
+        return q ? valoQueues[q] || Ilot.upperFirst(q) : "Partie personnalisée"
+    }
+    // secondes restantes de la selection des agents
+    function valoLeft() {
+        return valo && valo.ends ? Math.max(0, Math.ceil((valo.ends - Date.now()) / 1000)) : 0
+    }
+    property bool valoWarned: false
+    function onValo(v) {
+        const before = valo ? valo.phase : ""
+        valo = v
+        if (!v || v.phase !== "pregame")
+            valoWarned = false
+        if (!v || cfg.valorant === false)
+            return
+        // partie trouvee (ou selection des agents juste apres la file d'attente)
+        if ((v.phase === "found" && before !== "found") || (v.phase === "pregame" && before === "queue")) {
+            partyUntil = Date.now() + 8000
+            // son et clignotement seulement hors du jeu
+            if (cfg.match_alert && v.away) {
+                Backend.chime()
+                matchFlash = true
+                matchTimer.restart()
+            }
+            notify({ app: "Valorant", sym: "sports_esports", title: "Partie trouvée !", body: [valoQueue(v.queue), v.map].filter(Boolean).join(" · "),
+                action: "Y aller", cmd: ["valorant_focus"], ms: 12000, force: true })
+        }
+    }
+    // rappel : agent pas encore verrouille, plus que 15 s, joueur hors du jeu
+    Timer {
+        interval: 1000
+        repeat: true
+        running: w.valoLive && w.valo.phase === "pregame" && !w.valoWarned
+        onTriggered: {
+            const v = w.valo
+            const left = w.valoLeft()
+            if (v.done || v.locked || !v.away || left > 15 || left <= 0)
+                return
+            w.valoWarned = true
+            if (w.cfg.match_alert)
+                Backend.chime()
+            w.notify({ app: "Valorant", sym: "timer", title: "Plus que " + left + " s pour choisir ton agent",
+                body: v.agent ? v.agent + " n’est pas verrouillé" : "Aucun agent choisi", action: "Y aller", cmd: ["valorant_focus"], ms: 8000, force: true })
+        }
     }
 
     // ================================================== mode absent
@@ -751,7 +839,11 @@ Item {
             w.notify({ app: "Steam", sym: "download_done", icon: w.cover("steam:" + d.appid), title: d.name + " est prêt",
                 body: "Mise à jour terminée", action: "Jouer", url: "steam://rungameid/" + d.appid, ms: 12000 })
         })
+        Api.listen("valorant", v => w.onValo(v))
         Api.listen("match-found", name => {
+            // Valorant suivi a part (src/valorant.rs)
+            if (w.valo && w.cfg.valorant !== false)
+                return
             w.partyUntil = Date.now() + 8000
             if (!w.cfg.match_alert)
                 return

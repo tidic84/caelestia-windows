@@ -716,6 +716,14 @@ Item {
                     onToggled: on => Ilot.setCfg({ match_alert: on })
                 }
                 SetRow {
+                    subRow: true
+                    title: "Valorant"
+                    sub: "Partie trouvée et temps restant de la sélection des agents dans l'îlot"
+                    toggle: true
+                    checked: page.cfg.valorant !== false
+                    onToggled: on => Ilot.setCfg({ valorant: on })
+                }
+                SetRow {
                     icon: "bedtime"
                     title: "Mode absent"
                     sub: "10 min sans clavier ni souris : les notifications attendent ton retour"
