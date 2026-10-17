@@ -15,31 +15,27 @@ Item {
     readonly property real bass: band(0, 3)
     readonly property real mid: band(3, 12)
     readonly property real high: band(12, 24)
-    readonly property bool moving: visible && !Theme.reduced && !Ilot.fullscreen
+    readonly property bool moving: visible && !Theme.reduced && Ilot.ambient
     // plus vite pendant la lecture
     readonly property real speed: Ilot.media.playing ? 0.5 : 1
+    // temps des voiles : avance avec l'horloge d'ambiance (Ilot.amb), deux
+    // fois plus vite pendant la lecture, sans saut quand la vitesse change
+    property real at: 0
+    Connections {
+        target: Ilot
+        enabled: au.moving
+        function onAmbChanged() { au.at += Ilot.ambStep / au.speed }
+    }
     scale: 1 + bass * 0.12
     Behavior on scale { NumberAnimation { duration: 120 } }
 
     component Veil: Glow {
         id: v
-        property real dx: 0
-        property real dy: 0
         property int period: 17000
+        readonly property real dx: Ilot.wave(au.at, v.period * 2)
+        readonly property real dy: Ilot.wave(au.at, v.period * 1.4)
         core: 0.15
         opacity: Theme.light ? 0.35 : 0.8
-        SequentialAnimation on dx {
-            running: au.moving
-            loops: Animation.Infinite
-            NumberAnimation { to: 1; duration: v.period * au.speed; easing.type: Easing.InOutSine }
-            NumberAnimation { to: 0; duration: v.period * au.speed; easing.type: Easing.InOutSine }
-        }
-        SequentialAnimation on dy {
-            running: au.moving
-            loops: Animation.Infinite
-            NumberAnimation { to: 1; duration: v.period * 0.7 * au.speed; easing.type: Easing.InOutSine }
-            NumberAnimation { to: 0; duration: v.period * 0.7 * au.speed; easing.type: Easing.InOutSine }
-        }
     }
 
     Veil {

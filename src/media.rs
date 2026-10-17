@@ -138,7 +138,7 @@ fn art_bytes(s: &Session) -> windows::core::Result<String> {
     crate::wait(reader.LoadAsync(size)?.cast::<windows_future::IAsyncOperation<u32>>()?, WAIT_MS)?;
     let mut buf = vec![0u8; size as usize];
     reader.ReadBytes(&mut buf)?;
-    Ok(crate::img::url(crate::img::mime(&ctype), buf))
+    Ok(crate::img::ART.url(crate::img::mime(&ctype), buf))
 }
 
 /// Meme piece, meme etat : seule la position differe (elle avance toute seule

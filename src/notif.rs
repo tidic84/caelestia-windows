@@ -154,11 +154,20 @@ pub fn watch(app: AppHandle) {
         let mut conn = None;
         let mut seen_max: Option<i64> = None;
         let mut last: Vec<Notif> = Vec::new();
+        // compteur de SQLite qui change quand une autre connexion (Windows)
+        // modifie la base : sinon rien a relire
+        let mut version: Option<i64> = None;
         loop {
             if conn.is_none() {
                 conn = open();
+                version = None;
             }
             if let Some(c) = &conn {
+                let v = c.query_row("PRAGMA data_version", [], |r| r.get::<_, i64>(0)).ok();
+                if v.is_some() && v == version {
+                    std::thread::sleep(Duration::from_millis(1200));
+                    continue;
+                }
                 match query(c, 0) {
                     Ok(all) => {
                         let max = all.first().map(|n| n.id).unwrap_or(0);
@@ -168,6 +177,7 @@ pub fn watch(app: AppHandle) {
                             }
                         }
                         seen_max = Some(seen_max.unwrap_or(0).max(max));
+                        version = v;
                         let list = visible(&app, all);
                         if list != last {
                             *app.state::<Notifs>().0.lock().unwrap() = list.clone();

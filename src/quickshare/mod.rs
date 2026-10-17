@@ -776,7 +776,7 @@ fn qr_png(text: &str) -> String {
     if img.write_to(&mut out, image::ImageFormat::Png).is_err() {
         return String::new();
     }
-    crate::img::url("image/png", out.into_inner())
+    crate::img::ART.url("image/png", out.into_inner())
 }
 
 /// Nom de fichier sans chemin ni caracteres interdits par Windows.

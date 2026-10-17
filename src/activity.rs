@@ -225,7 +225,76 @@ fn manifests() -> Vec<Manifest> {
 
 // ---------------------------------------------------------------- GPU
 
-fn gpu() -> Option<Gpu> {
+/// NVML (`nvml.dll`, installee avec le pilote NVIDIA), chargee une fois :
+/// un releve ne coute que quelques microsecondes, la ou `nvidia-smi` cree un
+/// processus et initialise le pilote a chaque appel.
+struct Nvml {
+    dev: NvmlDevice,
+    name: String,
+    temp: unsafe extern "C" fn(NvmlDevice, u32, *mut u32) -> i32,
+    util: unsafe extern "C" fn(NvmlDevice, *mut NvmlUtil) -> i32,
+}
+
+type NvmlDevice = *mut std::ffi::c_void;
+
+#[repr(C)]
+#[derive(Default)]
+struct NvmlUtil {
+    gpu: u32,
+    memory: u32,
+}
+
+impl Nvml {
+    fn open() -> Option<Nvml> {
+        use windows::core::{s, HSTRING};
+        use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_SYSTEM32};
+        unsafe {
+            // System32 (pilotes DCH), sinon le dossier NVSMI des anciens pilotes
+            let lib = LoadLibraryExW(w!("nvml.dll"), None, LOAD_LIBRARY_SEARCH_SYSTEM32).ok().or_else(|| {
+                let pf = std::env::var("ProgramW6432").or_else(|_| std::env::var("ProgramFiles")).ok()?;
+                LoadLibraryExW(&HSTRING::from(format!(r"{pf}\NVIDIA Corporation\NVSMI\nvml.dll")), None, Default::default()).ok()
+            })?;
+            let init: unsafe extern "C" fn() -> i32 = std::mem::transmute(GetProcAddress(lib, s!("nvmlInit_v2"))?);
+            let handle: unsafe extern "C" fn(u32, *mut NvmlDevice) -> i32 =
+                std::mem::transmute(GetProcAddress(lib, s!("nvmlDeviceGetHandleByIndex_v2"))?);
+            let name: unsafe extern "C" fn(NvmlDevice, *mut u8, u32) -> i32 =
+                std::mem::transmute(GetProcAddress(lib, s!("nvmlDeviceGetName"))?);
+            let n = Nvml {
+                dev: std::ptr::null_mut(),
+                name: String::new(),
+                temp: std::mem::transmute(GetProcAddress(lib, s!("nvmlDeviceGetTemperature"))?),
+                util: std::mem::transmute(GetProcAddress(lib, s!("nvmlDeviceGetUtilizationRates"))?),
+            };
+            if init() != 0 {
+                return None;
+            }
+            let mut dev = std::ptr::null_mut();
+            if handle(0, &mut dev) != 0 {
+                return None;
+            }
+            let mut buf = [0u8; 96];
+            let label = if name(dev, buf.as_mut_ptr(), buf.len() as u32) == 0 {
+                let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+                String::from_utf8_lossy(&buf[..end]).trim_start_matches("NVIDIA ").to_string()
+            } else {
+                String::new()
+            };
+            let n = Nvml { dev, name: label, ..n };
+            // une carte sans capteur (ou un pilote trop ancien) : nvidia-smi
+            n.read().map(|_| n)
+        }
+    }
+
+    fn read(&self) -> Option<Gpu> {
+        let (mut temp, mut util) = (0u32, NvmlUtil::default());
+        // 0 = NVML_TEMPERATURE_GPU
+        let ok = unsafe { (self.temp)(self.dev, 0, &mut temp) == 0 && (self.util)(self.dev, &mut util) == 0 };
+        ok.then(|| Gpu { name: self.name.clone(), temp, load: util.gpu })
+    }
+}
+
+/// Repli sans NVML : un processus `nvidia-smi` par releve.
+fn smi() -> Option<Gpu> {
     let out = Command::new("nvidia-smi")
         .args(["--query-gpu=name,temperature.gpu,utilization.gpu", "--format=csv,noheader,nounits"])
         .creation_flags(CREATE_NO_WINDOW)
@@ -452,8 +521,10 @@ pub struct SteamDone {
 
 pub fn watch(app: AppHandle) {
     std::thread::spawn(move || {
-        // pas de carte NVIDIA (ou pilote sans nvidia-smi) : on n'insiste pas
-        let has_gpu = gpu().is_some();
+        // pas de carte NVIDIA (ou pilote sans NVML ni nvidia-smi) : on n'insiste pas
+        let nvml = Nvml::open();
+        let has_smi = nvml.is_none() && smi().is_some();
+        let gpu = || nvml.as_ref().map_or_else(|| if has_smi { smi() } else { None }, Nvml::read);
         let mut gpu_now = None;
         let mut slow_at: Option<Instant> = None;
         let mut sys = System::new();
@@ -521,12 +592,10 @@ pub fn watch(app: AppHandle) {
             // le telechargement en cours d'abord
             downloads.sort_by_key(|d| !d.active);
 
-            // releves plus lents (processus, nvidia-smi) : toutes les 3 s
+            // releves plus lents (processus, GPU) : toutes les 3 s
             if slow_at.is_none_or(|t: Instant| t.elapsed() >= Duration::from_millis(2900)) {
                 slow_at = Some(Instant::now());
-                if has_gpu {
-                    gpu_now = gpu();
-                }
+                gpu_now = gpu();
                 let found = playing(&app, &mut sys);
                 GAME_PID.store(found.as_ref().map_or(0, |f| f.2), Ordering::Relaxed);
                 let now = match found {

@@ -23,6 +23,9 @@ pub struct Ring(Mutex<VecDeque<(u64, &'static str, Vec<u8>)>>, usize);
 pub static THUMBS: Ring = Ring(Mutex::new(VecDeque::new()), 48);
 /// Images du presse-papiers (l'historique n'en garde que quelques-unes)
 pub static CLIPS: Ring = Ring(Mutex::new(VecDeque::new()), 16);
+/// Pochettes (une par morceau) et QR codes de Quick Share : gardees dans
+/// `KEPT`, elles s'accumuleraient tant que l'ilot tourne
+pub static ART: Ring = Ring(Mutex::new(VecDeque::new()), 16);
 
 fn key<T: Hash + ?Sized>(v: &T) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -95,7 +98,7 @@ fn find(k: u64) -> Option<(&'static str, Vec<u8>)> {
             Src::File(p) => std::fs::read(p).ok().map(|b| (*mime, b)),
         })
     });
-    kept.flatten().or_else(|| THUMBS.get(k)).or_else(|| CLIPS.get(k))
+    kept.flatten().or_else(|| THUMBS.get(k)).or_else(|| CLIPS.get(k)).or_else(|| ART.get(k))
 }
 
 /// Contenu d'une image d'apres son URL (diagnostics).

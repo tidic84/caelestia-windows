@@ -63,6 +63,8 @@ Item {
         Pet {
             visible: Watch.petShown
             opacity: Watch.petOut ? 0 : 1
+            // parti : la pilule n'a plus a redessiner sa respiration
+            animate: !Watch.petOut
             Behavior on opacity { NumberAnimation { duration: 400 } }
             anchors.verticalCenter: parent.verticalCenter
         }

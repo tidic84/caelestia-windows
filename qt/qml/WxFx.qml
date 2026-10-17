@@ -32,6 +32,14 @@ Item {
     opacity: on ? 1 : 0
     visible: opacity > 0
     Behavior on opacity { NumberAnimation { duration: 800 } }
+    // temps des animations : horloge d'ambiance (Ilot.amb, 25 images/s),
+    // fige quand personne ne regarde
+    property real t: 0
+    Binding on t {
+        when: fx.visible && Ilot.ambient
+        value: Ilot.amb
+        restoreMode: Binding.RestoreNone
+    }
 
     // positions et rythmes tires au hasard une fois
     readonly property var drops: {
@@ -50,17 +58,13 @@ Item {
         height: 140
         core: 0.1
         color: Qt.rgba(1, 0.75, 0.32, 0.45)
-        SequentialAnimation on scale {
-            running: fx.visible && fx.kind === "sun"
-            loops: Animation.Infinite
-            NumberAnimation { to: 1.18; duration: 2500; easing.type: Easing.InOutSine }
-            NumberAnimation { to: 1; duration: 2500; easing.type: Easing.InOutSine }
-        }
+        scale: visible ? 1 + 0.18 * Ilot.wave(fx.t, 5000) : 1
     }
 
     // nuages / brouillard qui passent
     Rectangle {
         visible: ["cloud", "fog", "rain", "heavy", "storm", "snow"].indexOf(fx.kind) >= 0
+        x: visible ? -100 + 80 * Ilot.wave(fx.t, 14000) : -100
         y: fx.kind === "fog" ? 0 : -20
         width: fx.width + 120
         height: fx.kind === "fog" ? fx.height : 40
@@ -70,12 +74,6 @@ Item {
             GradientStop { position: 0; color: "transparent" }
             GradientStop { position: 0.4; color: Qt.rgba(0.82, 0.82, 0.86, fx.kind === "fog" ? 0.22 : 0.16) }
             GradientStop { position: 0.8; color: "transparent" }
-        }
-        SequentialAnimation on x {
-            running: fx.visible
-            loops: Animation.Infinite
-            NumberAnimation { from: -100; to: -20; duration: 7000; easing.type: Easing.InOutSine }
-            NumberAnimation { from: -20; to: -100; duration: 7000; easing.type: Easing.InOutSine }
         }
     }
 
@@ -87,33 +85,21 @@ Item {
             required property var modelData
             readonly property bool star: fx.kind === "night"
             readonly property bool flake: fx.kind === "snow"
-            x: modelData.x * fx.width
-            y: star ? modelData.y * fx.height : -14
+            // chute : attente de `w` ms, puis descente (y) et glissement (x)
+            readonly property real fall: modelData.d * (flake ? 4 : fx.kind === "heavy" ? 0.7 : 1)
+            readonly property real drift: modelData.d * (flake ? 4 : 1)
+            // ms depuis le debut de la chute (negatif : en attente, hors champ)
+            readonly property real p: star ? 0 : fx.t % (modelData.w + Math.max(fall, drift)) - modelData.w
+            x: modelData.x * fx.width + (star || p < 0 ? 0 : (flake ? -3 : -8) * Math.min(1, p / drift))
+            y: star ? modelData.y * fx.height : p < 0 ? -14 : -14 + 90 * Math.min(1, p / fall)
             width: star ? 2 : flake ? 4 : 1.5
             height: star ? 2 : flake ? 4 : fx.kind === "heavy" ? 14 : 10
             radius: star || flake ? width / 2 : 1
             color: star || flake ? "white" : "#9ecbff"
-            // scintillement des etoiles (anime a part : la liaison reste)
-            property real twinkle: 0.15
+            // scintillement des etoiles : attente de `w` ms, puis 0,15 -> 0,9 -> 0,15
+            readonly property real tw: star ? fx.t % (modelData.w + modelData.d * 3) - modelData.w : -1
+            readonly property real twinkle: tw < 0 ? 0.15 : 0.15 + 0.75 * Ilot.wave(tw, modelData.d * 3)
             opacity: star ? twinkle : flake ? 0.8 : 0.75
-            // chute (pluie, neige)
-            SequentialAnimation {
-                running: fx.visible && !d.star
-                loops: Animation.Infinite
-                PauseAnimation { duration: d.modelData.w }
-                ParallelAnimation {
-                    NumberAnimation { target: d; property: "y"; from: -14; to: 76; duration: d.modelData.d * (d.flake ? 4 : fx.kind === "heavy" ? 0.7 : 1) }
-                    NumberAnimation { target: d; property: "x"; from: d.modelData.x * fx.width; to: d.modelData.x * fx.width + (d.flake ? -3 : -8); duration: d.modelData.d * (d.flake ? 4 : 1) }
-                }
-            }
-            // scintillement (etoiles)
-            SequentialAnimation on twinkle {
-                running: fx.visible && d.star
-                loops: Animation.Infinite
-                PauseAnimation { duration: d.modelData.w }
-                NumberAnimation { to: 0.9; duration: d.modelData.d * 1.5; easing.type: Easing.InOutSine }
-                NumberAnimation { to: 0.15; duration: d.modelData.d * 1.5; easing.type: Easing.InOutSine }
-            }
         }
     }
 
@@ -122,15 +108,9 @@ Item {
         visible: fx.kind === "storm"
         anchors.fill: parent
         color: Qt.rgba(0.86, 0.9, 1, 0.55)
-        opacity: 0
-        SequentialAnimation on opacity {
-            running: fx.visible && fx.kind === "storm"
-            loops: Animation.Infinite
-            PauseAnimation { duration: 6400 }
-            NumberAnimation { to: 1; duration: 70 }
-            NumberAnimation { to: 0; duration: 140 }
-            NumberAnimation { to: 1; duration: 70 }
-            NumberAnimation { to: 0; duration: 300 }
-        }
+        // toutes les 7 s : deux eclairs (monte en 70 ms, retombe en 140,
+        // remonte en 70, s'eteint en 300)
+        readonly property real q: visible ? fx.t % 6980 - 6400 : -1
+        opacity: q < 0 ? 0 : q < 70 ? q / 70 : q < 210 ? 1 - (q - 70) / 140 : q < 280 ? (q - 210) / 70 : Math.max(0, 1 - (q - 280) / 300)
     }
 }

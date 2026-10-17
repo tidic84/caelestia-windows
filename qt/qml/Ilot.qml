@@ -390,6 +390,31 @@ Item {
                 root.now = d
         }
     }
+    // ================================================== ambiance
+    // Animations d'ambiance (compagnon, meteo animee, aurore, contour, neon) :
+    // une animation Qt fait redessiner la fenetre a chaque rafraichissement
+    // de l'ecran (jusqu'a 240 images/s). Elles suivent donc une horloge
+    // commune a 25 images/s, en pause quand personne ne regarde (1 min sans
+    // clavier ni souris) ou en plein ecran.
+    readonly property bool ambient: !fullscreen && !Theme.reduced && Watch.idle < 60
+    readonly property bool ambientUsed: Watch.petShown || !!cfg.wxfx || cfg.island_bg === "aurora"
+        || cfg.border === "rgb" || cfg.border === "pulse" || cfg.clock === "neon"
+    readonly property int ambStep: 40
+    // millisecondes d'ambiance ecoulees
+    property real amb: 0
+    property Timer ambClock: Timer {
+        interval: root.ambStep
+        repeat: true
+        // la promenade du compagnon (quand on ne fait rien) et le
+        // clignotement « partie trouvee » continuent sans personne
+        running: (root.ambient && root.ambientUsed) || ((Watch.petOut || Watch.matchFlash) && !Theme.reduced && !root.fullscreen)
+        onTriggered: root.amb += root.ambStep
+    }
+    // va-et-vient 0 -> 1 -> 0 en `period` ms (deux NumberAnimation InOutSine)
+    function wave(t, period) {
+        return 0.5 - 0.5 * Math.cos(2 * Math.PI * t / period)
+    }
+
     function pad(n) {
         return String(n).padStart(2, "0")
     }

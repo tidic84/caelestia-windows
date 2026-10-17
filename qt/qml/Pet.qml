@@ -13,6 +13,10 @@ Item {
     property bool walking: false
     property bool blink: false
     property real k: 1
+    // respiration : horloge d'ambiance (Ilot.amb), a l'arret quand personne
+    // ne regarde, sauf pendant la promenade
+    property bool animate: true
+    readonly property bool breathing: visible && animate && !Theme.reduced && (Ilot.ambient || Watch.petOut)
     width: 20 * k
     height: 18 * k
 
@@ -49,11 +53,10 @@ Item {
         transformOrigin: Item.Bottom
         // respiration, dandinement en marchant, saut, danse
         property real breathe: 0
-        SequentialAnimation on breathe {
-            running: pet.visible && !Theme.reduced
-            loops: Animation.Infinite
-            NumberAnimation { to: 1; duration: pet.sleeping ? 2500 : 1600; easing.type: Easing.InOutSine }
-            NumberAnimation { to: 0; duration: pet.sleeping ? 2500 : 1600; easing.type: Easing.InOutSine }
+        Binding on breathe {
+            when: pet.breathing
+            value: Ilot.wave(Ilot.amb, pet.sleeping ? 5000 : 3200)
+            restoreMode: Binding.RestoreNone
         }
         property real hopY: 0
         property real wad: 0

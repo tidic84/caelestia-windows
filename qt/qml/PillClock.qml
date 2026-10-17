@@ -25,14 +25,8 @@ Item {
         color: c.style === "neon" ? Theme.primary : Theme.ink
         style: c.style === "neon" ? Text.Outline : Text.Normal
         styleColor: Theme.alpha(Theme.primary, 0.45)
-        // le neon respire doucement
-        SequentialAnimation on opacity {
-            running: c.style === "neon" && c.visible && !Theme.reduced
-            loops: Animation.Infinite
-            NumberAnimation { to: 0.75; duration: 1400; easing.type: Easing.InOutSine }
-            NumberAnimation { to: 1; duration: 1400; easing.type: Easing.InOutSine }
-            onRunningChanged: if (!running) label.opacity = 1
-        }
+        // le neon respire doucement (horloge d'ambiance, Ilot.amb)
+        opacity: c.style === "neon" && c.visible && Ilot.ambient ? 1 - 0.25 * Ilot.wave(Ilot.amb, 2800) : 1
     }
 
     // a volets : chaque chiffre bascule quand il change

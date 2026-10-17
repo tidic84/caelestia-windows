@@ -11,6 +11,24 @@ indique où regarder et ce qu'il faudrait changer.
 
 ## Priorité 1 : gros gains, peu de risque
 
+**Corrigée** (après 0.4.6, sans mesure : à vérifier sous Windows) :
+
+1. Les animations d'ambiance (compagnon, météo animée, aurore, contour RGB et
+   pulsé, horloge néon) suivent une horloge commune à 25 images/s
+   (`Ilot.amb`, `Ilot.wave`). Elles s'arrêtent après 1 min sans clavier ni
+   souris, et en plein écran. La promenade du compagnon et le clignotement
+   « partie trouvée » continuent dans ces deux cas. Le compteur d'images/s
+   n'est pas encore ajouté.
+2. GPU relevé par NVML (`nvml.dll` chargée une fois). `nvidia-smi` ne sert
+   plus qu'en repli, sans NVML.
+3. `pc::exe_names()` (instantané Toolhelp) pour Wallpaper Engine et
+   `procs_running`. Le relevé Discord ne tourne que si l'indicateur s'en sert.
+4. Volume : rappels `IAudioEndpointVolumeCallback` et
+   `IMMNotificationClient`, plus aucun sondage.
+5. Notifications : `PRAGMA data_version` à chaque tour, la base n'est relue
+   que si Windows l'a modifiée.
+6. Pochettes et QR codes dans `img::ART` (16 dernières images).
+
 ### 1. Des animations d'ambiance tournent en permanence, pilule repliée
 
 Avec les réglages par défaut (`pet: "blob"`, `wxfx: true`, `Ilot.qml:23`),

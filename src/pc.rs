@@ -1,7 +1,6 @@
 //! Onglet PC : mode d'alimentation de Windows 11 (Economie / Equilibre /
 //! Performances) et etat des logiciels constructeur (MSI, ASUS, Logitech).
 
-use sysinfo::{ProcessesToUpdate, System};
 use windows::core::{s, w, GUID};
 use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 
@@ -40,14 +39,32 @@ pub fn power_set(mode: String) -> bool {
     unsafe { f(g) == 0 }
 }
 
+/// Noms des executables en cours, en minuscules et sans « .exe ».
+/// Instantane Toolhelp : aucun processus n'est ouvert (bien plus leger qu'un
+/// releve sysinfo, qui lit le chemin de chaque executable).
+pub(crate) fn exe_names() -> Vec<String> {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+    };
+    let mut out = Vec::new();
+    unsafe {
+        let Ok(snap) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else { return out };
+        let mut e = PROCESSENTRY32W { dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
+        let mut ok = Process32FirstW(snap, &mut e).is_ok();
+        while ok {
+            let n = e.szExeFile.iter().position(|&c| c == 0).unwrap_or(e.szExeFile.len());
+            let name = String::from_utf16_lossy(&e.szExeFile[..n]).to_lowercase();
+            out.push(name.trim_end_matches(".exe").to_string());
+            ok = Process32NextW(snap, &mut e).is_ok();
+        }
+        let _ = CloseHandle(snap);
+    }
+    out
+}
+
 /// Pour chaque nom d'executable (sans .exe), vrai s'il tourne.
 pub fn procs_running(names: Vec<String>) -> Vec<bool> {
-    let mut sys = System::new();
-    sys.refresh_processes(ProcessesToUpdate::All, true);
-    let running: Vec<String> = sys
-        .processes()
-        .values()
-        .map(|p| p.name().to_string_lossy().to_lowercase().trim_end_matches(".exe").to_string())
-        .collect();
+    let running = exe_names();
     names.iter().map(|n| running.iter().any(|r| r == &n.to_lowercase())).collect()
 }
