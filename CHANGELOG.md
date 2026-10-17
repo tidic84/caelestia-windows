@@ -4,6 +4,15 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.7 — 2026-10-17
+
+- **Compagnon** entièrement redessiné : le chat (oreilles, moustaches, queue qui remue) et le fantôme (jupe ondulée, petits bras, il flotte) sont refaits, et sept espèces arrivent : lapin, grenouille, pingouin, poussin, robot (bouche en égaliseur sur la musique), axolotl et champignon.
+- **Expressions et tours** : yeux heureux, en cœur, étourdis, clin d'œil… et plus de vingt tours (salto, pirouette, coucou, étirement, bâillement, éternuement, danse, langue tirée, il fond comme une gelée). Il réagit à ce qui se passe : salto quand une partie est trouvée, danse quand la musique démarre, coucou à ton retour, frissons quand il gèle.
+- **Interactions** : au survol de la pilule, il apparaît à côté de l'heure et te suit des yeux. Clic : un tour ; double clic : salto ; appui long : il se fait caresser. Trop de clics d'affilée et la tête lui tourne. Chaque caresse le rend plus attaché (niveaux 1 à 10).
+- **Promenade** : il arrive en parachute, par un portail ou en courant, puis s'occupe : balade, sieste avec bonnet de nuit, ballon de plage, papillon qui se pose sur sa tête, ballon gonflable qui éclate, pêche, skate, bulles de savon, lecture, avion en papier, jardinage (les fleurs restent), cache-cache, méditation, danse avec projecteurs (musique), étoiles filantes (le soir), café (le matin), parapluie sous son petit nuage (pluie), bonhomme de neige (neige) et un tour propre à son espèce (le blob se divise, le chat chasse un point laser, la grenouille attrape une mouche…).
+- **Réglages › Compagnon** : nouvel onglet avec un aperçu à caresser, nourrir et faire jouer ; nom, couleur (naturelle, thème ou au choix), yeux, chapeau (couronne, sorcier, auréole…), visage (lunettes, monocle, masque…), cou (nœud papillon, écharpe, grelot…), délai et taille de la promenade, traînée (étincelles, cœurs, fleurs, arc-en-ciel…) et un bouton pour voir chaque scène tout de suite.
+- **Masqué**, le compagnon est entièrement retiré : plus aucun dessin, minuterie ni fenêtre de promenade. Même allumé, la fenêtre de promenade n'est chargée que pendant qu'il est dehors.
+
 ## 0.4.6 — 2026-10-17
 
 - **Valorant** : l'îlot suit vos parties. En file d'attente, la pilule affiche le temps d'attente ; quand une partie est trouvée, une notification apparaît (carillon et îlot qui clignote si vous êtes sur une autre fenêtre, clic pour retourner dans le jeu).
