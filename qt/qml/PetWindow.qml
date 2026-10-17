@@ -400,7 +400,7 @@ Window {
     // sieste : bonnet de nuit, bulle qui gonfle et des z
     property bool sleeping: false
     function sSleep() {
-        const long = sleepy ? rand(25000, 50000) : rand(9000, 16000)
+        const nap = sleepy ? rand(25000, 50000) : rand(9000, 16000)
         play([() => w.walkTo(w.px + w.rand(-150, 150), 40),
               () => pet.trick("yawn"),
               () => {
@@ -410,7 +410,7 @@ Window {
                   w.sleeping = true
                   w.poseSx = 1.1
                   w.poseSy = 0.86
-                  return long
+                  return nap
               },
               () => { w.sleeping = false; w.poseSx = 1; w.poseSy = 1; pet.face = ""; pet.tempHat = ""; return pet.trick("stretch") },
               () => pet.trick("shake")])

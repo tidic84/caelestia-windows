@@ -1123,20 +1123,6 @@ Item {
                 return (19.2 + 0.9 * Math.sin(w * 2 + i * 1.6) + body.jig).toFixed(2)
             }
             readonly property string shape: `M2 10 C2 4.6 5.6 1.6 10 1.6 C14.4 1.6 18 4.6 18 10 L18 16.4 Q16 ${b(0)} 14 16.4 Q12 ${b(1)} 10 16.4 Q8 ${b(2)} 6 16.4 Q4 ${b(3)} 2 16.4 Z`
-            // lueur
-            Shape {
-                anchors.fill: parent
-                visible: pet.rich
-                scale: 1.12
-                opacity: 0.16 + 0.06 * body.breathe
-                preferredRendererType: Shape.CurveRenderer
-                ShapePath {
-                    scale: pet.us
-                    strokeWidth: -1
-                    fillColor: pet.pal.main
-                    PathSvg { path: gh.shape }
-                }
-            }
             // bras
             Repeater {
                 model: 2
