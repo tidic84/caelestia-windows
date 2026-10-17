@@ -1,7 +1,8 @@
 //! Voyant camera / micro : Windows note dans le registre quelle appli utilise
 //! la webcam ou le micro (ConsentStore, comme l'icone de la barre des taches).
 //! Une appli s'en sert en ce moment si LastUsedTimeStop vaut 0. Releve toutes
-//! les 2 s, envoye a l'interface (`privacy`) a chaque changement.
+//! les ecritures dans le registre, envoye a l'interface (`privacy`) a chaque
+//! changement.
 
 use serde::Serialize;
 use crate::host::AppHandle;
@@ -103,13 +104,23 @@ fn users(kind: &str) -> Vec<String> {
 pub fn watch(app: AppHandle) {
     std::thread::spawn(move || {
         let mut last = Privacy::default();
+        // relu quand Windows ecrit dans ConsentStore (une appli prend ou
+        // lache la camera ou le micro), sinon toutes les minutes
+        let base = HSTRING::from(BASE);
+        let mut reg = crate::events::RegWatch::open(PCWSTR(base.as_ptr()), true);
         loop {
+            if let Some(r) = reg.as_mut() {
+                r.arm();
+            }
             let now = Privacy { cam: users("webcam"), mic: users("microphone") };
             if now != last {
                 let _ = app.emit("privacy", &now);
                 last = now;
             }
-            std::thread::sleep(std::time::Duration::from_secs(2));
+            match &reg {
+                Some(r) => r.wait(std::time::Duration::from_secs(60)),
+                None => std::thread::sleep(std::time::Duration::from_secs(2)),
+            }
         }
     });
 }

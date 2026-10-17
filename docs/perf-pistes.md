@@ -141,6 +141,24 @@ Il suffit d'un `Ring` de plus (`img::ART`, 8 à 16 entrées), comme `THUMBS` et
 
 ## Priorité 2 : gains moyens
 
+**En partie corrigée** (à vérifier sous Windows) :
+
+- visualiseur : 15 trames/s îlot replié, 30 panneau ouvert (le passage en
+  shader de l'onglet Média reste à faire, piste 7) ;
+- luminosité : événements WMI `WmiMonitorBrightnessEvent`, l'ancien sondage
+  ne sert plus qu'en repli (piste 9) ;
+- Steam : manifestes gardés en cache, relus seulement s'ils ont changé ;
+  bibliothèques relues toutes les minutes (piste 10) ;
+- caméra / micro et thème de Windows : `RegNotifyChangeKeyValue`
+  (`events::RegWatch`) ; presse-papiers : `AddClipboardFormatListener` ;
+  Discord : 60 ms seulement en vocal, sinon réveillé par les commandes ;
+  configuration absente : attente de `discord_setup` (piste 11) ;
+- disques : place libre relue toutes les 2 s seulement panneau ouvert, sinon
+  toutes les 30 s (piste 12).
+
+Restent : piste 8 (fenêtre repliée plus petite), Verr. Maj et plein écran
+(piste 11), et le relevé `sys` complet quand rien ne l'affiche.
+
 ### 7. Visualiseur
 
 À 30 trames/s, chaque trame passe par ces étapes : JSON en Rust, `QString`,

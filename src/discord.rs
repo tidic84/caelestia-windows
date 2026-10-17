@@ -81,6 +81,9 @@ fn save(c: &Config) {
     crate::store::write("discord", c);
 }
 
+/// Commande ajoutee a la file (reveille la boucle de la session)
+static COMMANDS: crate::events::Wake = crate::events::Wake::new();
+
 // ------------------------------------------------------------------- tube
 
 struct Pipe {
@@ -360,6 +363,7 @@ impl Session<'_> {
         self.load_channel()?;
         self.set_status("ready", "");
 
+        let mut seen = COMMANDS.seq();
         loop {
             // commandes de l'interface
             let todo: Vec<_> = queue.lock().unwrap().drain(..).collect();
@@ -385,7 +389,13 @@ impl Session<'_> {
                     self.emit();
                 }
             }
-            std::thread::sleep(Duration::from_millis(60));
+            // en vocal, les evenements (qui parle) arrivent vite ; sinon Discord
+            // ecrit rarement, et les commandes de l'interface reveillent la boucle
+            if self.channel_id.is_some() {
+                std::thread::sleep(Duration::from_millis(60));
+            } else {
+                seen = COMMANDS.wait(seen, Duration::from_millis(400));
+            }
         }
     }
 }
@@ -402,10 +412,13 @@ pub fn start(app: AppHandle) {
                 let _ = app.emit("discord", x.clone());
             }
         };
+        // lu avant la configuration : un `discord_setup` juste apres compte
+        let seen = COMMANDS.seq();
         let Some(mut cfg) = load() else {
             queue.lock().unwrap().clear();
             status("setup", "");
-            std::thread::sleep(Duration::from_secs(2));
+            // pas encore configure : `discord_setup` reveille la boucle
+            COMMANDS.wait(seen, Duration::from_secs(30));
             continue;
         };
         let Some(pipe) = Pipe::open() else {
@@ -444,12 +457,14 @@ pub fn discord_setup(st: State<Discord>, client_id: String, secret: String) -> R
     let secret = crate::mail::protect(&secret).ok_or("chiffrement impossible")?;
     save(&Config { client_id, secret, ..Default::default() });
     st.queue.lock().unwrap().push_back(("reset".into(), Value::Null));
+    COMMANDS.notify();
     Ok(())
 }
 
 pub fn discord_forget(st: State<Discord>) {
     let _ = std::fs::remove_file(crate::store::data_dir().join("discord.json"));
     st.queue.lock().unwrap().push_back(("reset".into(), Value::Null));
+    COMMANDS.notify();
 }
 
 /// Son micro / casque (dans Discord).
@@ -462,6 +477,7 @@ pub fn discord_self(st: State<Discord>, mute: Option<bool>, deaf: Option<bool>) 
         args["deaf"] = json!(d);
     }
     st.queue.lock().unwrap().push_back(("SET_VOICE_SETTINGS".into(), args));
+    COMMANDS.notify();
 }
 
 /// Volume du micro dans Discord (0-100) : Discord ignore le volume
@@ -470,6 +486,7 @@ pub fn discord_mic(st: State<Discord>, volume: f64) {
     let v = volume.clamp(0.0, 100.0);
     st.state.lock().unwrap().mic_volume = v;
     st.queue.lock().unwrap().push_back(("SET_VOICE_SETTINGS".into(), json!({ "input": { "volume": v } })));
+    COMMANDS.notify();
 }
 
 /// Volume (0-200) ou sourdine locale d'une personne.
@@ -493,4 +510,5 @@ pub fn discord_user(st: State<Discord>, user_id: String, volume: Option<f64>, mu
         args["mute"] = json!(m);
     }
     st.queue.lock().unwrap().push_back(("SET_USER_VOICE_SETTINGS".into(), args));
+    COMMANDS.notify();
 }

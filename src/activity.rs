@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::os::windows::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -190,6 +190,7 @@ impl LogTail {
 
 // ------------------------------------------------------- manifestes
 
+#[derive(Clone)]
 struct Manifest {
     appid: String,
     name: String,
@@ -200,27 +201,63 @@ struct Manifest {
     to_stage: u64,
 }
 
-fn manifests() -> Vec<Manifest> {
-    let mut out = Vec::new();
-    for lib in crate::we::libraries() {
-        let Ok(rd) = std::fs::read_dir(lib.join("steamapps")) else { continue };
-        for e in rd.flatten() {
-            let fname = e.file_name().to_string_lossy().to_string();
-            let Some(appid) = fname.strip_prefix("appmanifest_").and_then(|s| s.strip_suffix(".acf")) else { continue };
-            let Ok(acf) = std::fs::read_to_string(e.path()) else { continue };
-            let num = |k| acf_value(&acf, k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
-            out.push(Manifest {
-                appid: appid.to_string(),
-                name: acf_value(&acf, "name").unwrap_or("Steam").to_string(),
-                flags: num("StateFlags"),
-                done: num("BytesDownloaded"),
-                total: num("BytesToDownload"),
-                staged: num("BytesStaged"),
-                to_stage: num("BytesToStage"),
-            });
-        }
+fn read_manifest(appid: &str, path: &Path) -> Option<Manifest> {
+    let acf = std::fs::read_to_string(path).ok()?;
+    let num = |k| acf_value(&acf, k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    Some(Manifest {
+        appid: appid.to_string(),
+        name: acf_value(&acf, "name").unwrap_or("Steam").to_string(),
+        flags: num("StateFlags"),
+        done: num("BytesDownloaded"),
+        total: num("BytesToDownload"),
+        staged: num("BytesStaged"),
+        to_stage: num("BytesToStage"),
+    })
+}
+
+/// Manifestes `appmanifest_*.acf` de toutes les bibliotheques Steam. Seuls
+/// ceux qui ont change depuis le tour precedent (date, taille) sont relus ;
+/// la liste des bibliotheques est relue toutes les minutes.
+struct Manifests {
+    libs: Vec<PathBuf>,
+    libs_at: Option<Instant>,
+    files: HashMap<PathBuf, (SystemTime, u64, Manifest)>,
+}
+
+impl Manifests {
+    fn new() -> Self {
+        Manifests { libs: Vec::new(), libs_at: None, files: HashMap::new() }
     }
-    out
+
+    fn list(&mut self) -> Vec<Manifest> {
+        if self.libs_at.is_none_or(|t| t.elapsed() >= Duration::from_secs(60)) {
+            self.libs = crate::we::libraries();
+            self.libs_at = Some(Instant::now());
+        }
+        let mut seen = HashMap::new();
+        for lib in &self.libs {
+            let Ok(rd) = std::fs::read_dir(lib.join("steamapps")) else { continue };
+            for e in rd.flatten() {
+                let fname = e.file_name().to_string_lossy().to_string();
+                let Some(appid) = fname.strip_prefix("appmanifest_").and_then(|s| s.strip_suffix(".acf")) else { continue };
+                // sous Windows, la date et la taille viennent de la liste du dossier
+                let Ok(meta) = e.metadata() else { continue };
+                let stamp = (meta.modified().unwrap_or(UNIX_EPOCH), meta.len());
+                let path = e.path();
+                let m = match self.files.remove(&path) {
+                    Some((t, n, m)) if (t, n) == stamp => m,
+                    _ => {
+                        let Some(m) = read_manifest(appid, &path) else { continue };
+                        m
+                    }
+                };
+                seen.insert(path, (stamp.0, stamp.1, m));
+            }
+        }
+        // les manifestes supprimes (jeu desinstalle) disparaissent
+        self.files = seen;
+        self.files.values().map(|(_, _, m)| m.clone()).collect()
+    }
 }
 
 // ---------------------------------------------------------------- GPU
@@ -530,6 +567,7 @@ pub fn watch(app: AppHandle) {
         let mut sys = System::new();
         let mut game: Option<Playing> = None;
         let mut log = LogTail::new();
+        let mut steam = Manifests::new();
         let mut at = Instant::now();
         // octets recus estimes par jeu
         let mut est: HashMap<String, u64> = HashMap::new();
@@ -547,7 +585,7 @@ pub fn watch(app: AppHandle) {
             at = Instant::now();
 
             let mut downloads = Vec::new();
-            for m in manifests() {
+            for m in steam.list() {
                 let l = log.apps.get(&m.appid);
                 let active = l.is_some_and(|l| l.active);
                 let base = l.and_then(|l| l.base);

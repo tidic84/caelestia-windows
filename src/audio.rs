@@ -547,7 +547,9 @@ fn capture(emit: &dyn Fn(Vec<u8>)) -> windows::core::Result<()> {
                 let out: Vec<u8> = bands.iter().map(|v| (v * 100.0) as u8).collect();
                 emit(out);
             }
-            std::thread::sleep(Duration::from_millis(33));
+            // 30 trames/s panneau ouvert ; replie, l'egaliseur de la pilule
+            // (3 barres, lissees) se contente de 15
+            std::thread::sleep(Duration::from_millis(if crate::panel_open() { 33 } else { 66 }));
         };
         let _ = client.Stop();
         result
