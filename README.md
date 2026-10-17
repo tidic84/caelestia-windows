@@ -46,6 +46,7 @@ La pilule s'agrandit aussi un instant pour signaler :
 - un changement de volume ou de luminosité (OSD) ;
 - une notification Windows, un nouveau mail ;
 - une mise à jour Steam terminée (bouton Jouer), une **partie trouvée** pendant que vous attendez hors du jeu (carillon, îlot qui clignote, clic pour y retourner), le bilan de la session de jeu ;
+- **Valorant** : file d'attente (temps d'attente dans la pilule), partie trouvée (notification, carillon si vous êtes hors du jeu, clic pour y retourner), puis **temps restant de la sélection des agents** dans la pilule, avec l'agent choisi, la carte et les alliés verrouillés au survol ; rappel 15 s avant la fin si votre agent n'est pas verrouillé ;
 - une appli qui allume la caméra, un service en panne ou de retour, un disque presque plein, une demande **Quick Share** (Accepter / Refuser directement dans la pilule, avec le code de vérification), un fichier reçu, l'extinction programmée dans une minute ;
 - un appareil Bluetooth connecté ou déconnecté ;
 - une image copiée (capture d'écran) ;
@@ -78,6 +79,7 @@ Autres comportements :
 - **Discord** : RPC local (`\\.\pipe\discord-ipc-0`), avec une application créée sur le portail développeurs Discord (redirection `http://localhost`) ; jetons chiffrés avec DPAPI.
 - **Tâches** : compteurs de performance de Windows (PDH : `% Processor Utility`, `GPU Engine`, `PhysicalDisk`) comme le Gestionnaire des tâches, `sysinfo` pour la liste des processus, mémoire privée par `GetProcessMemoryInfo` ; connexions TCP par processus via `GetExtendedTcpTable` (le débit réseau par processus demanderait ETW et des droits administrateur).
 - **Activités** : journal de Steam (`logs\content_log.txt`) et manifestes `appmanifest_*.acf` pour les mises à jour ; `nvidia-smi` pour la charge et la température du GPU ; partie trouvée : fenêtre du jeu qui clignote (crochet Shell) ou lecture disque soutenue (chargement de la carte).
+- **Valorant** : API locale du client Riot (port et mot de passe dans `%LOCALAPPDATA%\Riot Games\Riot Client\Config\lockfile`) pour la présence du joueur (file, partie trouvée, sélection, en jeu) ; temps restant de la sélection, carte et agents par les serveurs de Riot (`pregame/v1`, adresse et version relevées dans `ShooterGame.log`), noms et icônes en français par [valorant-api.com](https://valorant-api.com). Sans réponse des serveurs, la fin de la sélection est estimée (≈ 80 s). Désactivable dans Réglages › Jeu et absence.
 - **Voyant caméra / micro** : registre `CapabilityAccessManager\ConsentStore`, comme l'icône de la barre des tâches.
 - **Soundboard** : sons décodés par [symphonia](https://github.com/pdeljanov/Symphonia) en 48 kHz stéréo ; le moteur WASAPI mélange le vrai micro et les sons dans la sortie du câble virtuel, et les rejoue dans votre casque.
 - **Sous-titres en direct** : Live Captions de Windows 11 (`LiveCaptions.exe`), lu par UI Automation (sa fenêtre est rendue invisible), traduit par le service de traduction de Google.
