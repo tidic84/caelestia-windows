@@ -1,5 +1,6 @@
-//! Raccourcis clavier globaux configurables (Apparence > Raccourcis) et
-//! sauvegarde / restauration de tous les reglages dans un seul fichier.
+//! Raccourcis clavier globaux configurables (Reglages > Raccourcis), dont ceux
+//! qui ouvrent une application (action « app:<id> »), et sauvegarde /
+//! restauration de tous les reglages dans un seul fichier.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -99,35 +100,48 @@ fn start(app: AppHandle) {
                 }
                 actions.clear();
                 let mut failed = Vec::new();
+                let mut win = Vec::new();
                 let map: HashMap<String, String> = crate::store::read("shortcuts").unwrap_or_default();
                 for (action, combo) in map {
                     if combo.is_empty() {
                         continue;
                     }
                     match parse(&combo) {
+                        // avec la touche Windows : pris par le hook clavier,
+                        // avant Windows (Win+T, Win+E... lui sont reserves)
+                        Some((mods, vk)) if mods.0 & MOD_WIN.0 != 0 => win.push((mods.0 & !MOD_WIN.0, vk, action)),
                         Some((mods, vk)) if RegisterHotKey(None, actions.len() as i32 + 1, mods | MOD_NOREPEAT, vk).is_ok() => {
                             actions.push(action)
                         }
                         _ => failed.push(action),
                     }
                 }
+                crate::winkey::set_combos(&app, win);
                 *KEYS.lock().unwrap() = actions.clone();
                 if let Some(t) = FAILED.lock().unwrap().as_ref() {
                     let _ = t.send(failed);
                 }
             } else if msg.message == WM_HOTKEY {
                 let Some(action) = actions.get((msg.wParam.0 as usize).wrapping_sub(1)).cloned() else { continue };
-                // la lecture se commande sans prendre le clavier du jeu ou de l'appli en cours
-                if !matches!(action.as_str(), "play" | "next" | "captions") {
-                    if let Some(w) = app.get_webview_window("island") {
-                        let _ = w.set_focus();
-                    }
-                }
-                let _ = app.emit("shortcut", action);
+                fire(&app, action);
             }
         }
     });
     let _ = rx.recv_timeout(std::time::Duration::from_secs(2));
+}
+
+/// Un raccourci a ete presse : application lancee, ou action de l'interface.
+pub(crate) fn fire(app: &AppHandle, action: String) {
+    if let Some(id) = action.strip_prefix("app:") {
+        return crate::apps::app_launch(id.to_string());
+    }
+    // la lecture se commande sans prendre le clavier du jeu ou de l'appli en cours
+    if !matches!(action.as_str(), "play" | "next" | "captions") {
+        if let Some(w) = app.get_webview_window("island") {
+            let _ = w.set_focus();
+        }
+    }
+    let _ = app.emit("shortcut", action);
 }
 
 /// Fait relire les raccourcis au thread ; renvoie les actions refusees.
@@ -236,6 +250,7 @@ mod tests {
         assert_eq!(parse("F5").map(|(_, k)| k), Some(0x74));
         assert_eq!(parse("Shift+Digit1").map(|(_, k)| k), Some('1' as u32));
         assert_eq!(parse("Ctrl+VK188").map(|(_, k)| k), Some(188));
+        assert_eq!(parse("Super+KeyT").map(|(m, k)| (m.0, k)), Some((MOD_WIN.0, 'T' as u32)));
         assert!(parse("KeyM").is_none());
         assert!(parse("Ctrl+Pomme").is_none());
     }

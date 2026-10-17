@@ -33,8 +33,17 @@ Item {
     property var winkey: null
     property bool winkeyBusy: false
 
-    onShownChanged: if (shown) load()
-    Component.onCompleted: if (shown) load()
+    onShownChanged: {
+        if (shown)
+            return load()
+        keyRec = ""
+        appPick = false
+    }
+    Component.onCompleted: {
+        if (shown)
+            load()
+        Api.listen("keyrec", r => page.recorded(r))
+    }
     function load() {
         Api.invoke("settings_get").then(s => {
             page.autostart = s.autostart
@@ -986,6 +995,98 @@ Item {
                 }
             }
 
+            // ------------------------------- raccourcis d'applications
+            Block {
+                sec: "keys"
+                SetRow {
+                    icon: "open_in_new"
+                    title: "Raccourcis d'applications"
+                    sub: "Une combinaison ouvre l'application de ton choix, par exemple Win+T pour le Terminal. Les combinaisons avec la touche Windows passent avant celles de Windows"
+                }
+                Item { width: 1; height: page.appKeys.length ? 8 : 0 }
+                Repeater {
+                    model: page.appKeys
+                    KeyRow {}
+                }
+                Item { width: 1; height: 10 }
+                TextBtn {
+                    x: 54
+                    visible: !page.appPick
+                    icon: "add"
+                    text: "Ajouter une application"
+                    onClicked: {
+                        page.appPick = true
+                        appSearch.text = ""
+                        Ilot.pinned = true
+                        Ilot.grabFocus()
+                        Qt.callLater(() => appSearch.input.forceActiveFocus())
+                    }
+                }
+                // choix de l'application
+                Column {
+                    visible: page.appPick
+                    x: 54
+                    width: parent.width - 54
+                    spacing: 4
+                    Row {
+                        width: parent.width
+                        spacing: 8
+                        Field {
+                            id: appSearch
+                            width: parent.width - cancelPick.width - 8
+                            height: 34
+                            bg: Theme.surfaceHigh
+                            focusRing: true
+                            placeholder: "Rechercher une application (Terminal, Explorateur…)"
+                            onFocused: Ilot.pinned = true
+                            onAccepted: if (page.appMatches.length) page.addAppKey(page.appMatches[0])
+                            onKeyPressed: e => {
+                                if (e.key === Qt.Key_Escape) {
+                                    e.accepted = true
+                                    page.appPick = false
+                                }
+                            }
+                        }
+                        TextBtn {
+                            id: cancelPick
+                            text: "Annuler"
+                            onClicked: page.appPick = false
+                        }
+                    }
+                    Repeater {
+                        model: page.appPick ? page.appMatches : []
+                        Btn {
+                            required property var modelData
+                            width: parent.width
+                            height: 38
+                            radius: 12
+                            color: hovered ? Theme.surfaceHigh : "transparent"
+                            onClicked: page.addAppKey(modelData)
+                            AppIcon {
+                                x: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                src: parent.modelData.icon || ""
+                                name: parent.modelData.name
+                            }
+                            Txt {
+                                x: 42
+                                width: parent.width - x - 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: parent.modelData.name
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                    Txt {
+                        visible: page.appPick && !page.appMatches.length
+                        topPadding: 6
+                        text: Ilot.apps.length ? "Aucune application trouvée" : "Chargement des applications…"
+                        px: 12
+                        color: Theme.inkVariant
+                    }
+                }
+            }
+
             // ---------------------------------------------- sauvegarde
             Block {
                 sec: "general"
@@ -1090,14 +1191,35 @@ Item {
                     spacing: 12
                     Repeater {
                         model: Ilot.addons
-                        SetRow {
+                        Column {
+                            id: addon
                             required property var modelData
-                            icon: modelData.icon
-                            title: modelData.label
-                            sub: modelData.desc
-                            toggle: true
-                            checked: Ilot.hasTab(modelData.id)
-                            onToggled: on => Ilot.setAddon(modelData.id, on)
+                            width: parent.width
+                            SetRow {
+                                icon: addon.modelData.icon
+                                title: addon.modelData.label
+                                sub: addon.modelData.desc
+                                toggle: true
+                                checked: Ilot.hasTab(addon.modelData.id)
+                                onToggled: on => Ilot.setAddon(addon.modelData.id, on)
+                            }
+                            // parties de l'addon (Assistant : traduction, Claude) ;
+                            // la derniere active ne se coupe pas
+                            Repeater {
+                                model: addon.modelData.parts || []
+                                SetRow {
+                                    required property var modelData
+                                    readonly property bool on: page.cfg[modelData.key] !== false
+                                    subRow: true
+                                    title: modelData.label
+                                    sub: modelData.sub
+                                    toggle: true
+                                    checked: on
+                                    disabled: !Ilot.hasTab(addon.modelData.id)
+                                        || (on && addon.modelData.parts.filter(p => page.cfg[p.key] !== false).length < 2)
+                                    onToggled: v => Ilot.setCfg({ [modelData.key]: v })
+                                }
+                            }
                         }
                     }
                 }
@@ -1340,11 +1462,64 @@ Item {
     readonly property var keyActions: [
         ["toggle", "Ouvrir / fermer l’îlot"], ["play", "Lecture / pause"], ["next", "Morceau suivant"], ["captions", "Sous-titres en direct"]
     ].concat(Ilot.tabItems.map(t => [t.id, t.label || t.tip]))
+    // raccourcis d'applications : action « app:<id> » -> [action, nom, icone]
+    readonly property var appKeys: Object.keys(Watch.keyMap).filter(k => k.startsWith("app:")).map(k => {
+        const id = k.slice(4)
+        const a = Ilot.apps.find(x => x.id === id)
+        return [k, a ? a.name : id.split(/[\\!]/).pop(), a ? a.icon || "" : ""]
+    }).sort((a, b) => a[1].localeCompare(b[1]))
+    property bool appPick: false
+    readonly property var appMatches: {
+        const q = appSearch.text.trim().toLowerCase()
+        return Ilot.apps.filter(a => !Watch.keyMap.hasOwnProperty("app:" + a.id) && (!q || a.name.toLowerCase().indexOf(q) >= 0))
+            .sort((a, b) => (q && b.name.toLowerCase().startsWith(q)) - (q && a.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name))
+            .slice(0, 8)
+    }
+    // ajoute l'appli puis attend sa combinaison
+    function addAppKey(a) {
+        appPick = false
+        const map = Object.assign({}, Watch.keyMap)
+        map["app:" + a.id] = ""
+        Watch.saveKeys(map)
+        Qt.callLater(() => { page.keyRec = "app:" + a.id })
+    }
     // « Ctrl+Alt+KeyM » -> « Ctrl+Alt+M »
     function keyLabel(c) {
-        return c.replace(/Key([A-Z])/g, "$1").replace(/Digit(\d)/g, "$1").replace(/Numpad/g, "Pavé ").replace(/VK(\d+)/, "touche $1")
+        return c.replace(/Key([A-Z])/g, "$1").replace(/Digit(\d)/g, "$1").replace(/Numpad/g, "Pavé ").replace(/VK(\d+)/, "touche $1").replace(/Super/, "Win")
+    }
+    // une combinaison n'appartient qu'a une action
+    function setKey(action, combo) {
+        const map = Object.assign({}, Watch.keyMap)
+        for (const k in map)
+            if (map[k] === combo && k !== action)
+                map[k] = k.startsWith("app:") ? "" : undefined
+        for (const k in map)
+            if (map[k] === undefined)
+                delete map[k]
+        map[action] = combo
+        keyRec = ""
+        Watch.saveKeys(map)
     }
     property string keyRec: ""
+    // pendant l'enregistrement, le coeur prend les combinaisons avec la touche
+    // Windows (sinon Windows les garde pour lui) et les renvoie (`keyrec`)
+    onKeyRecChanged: Api.invoke("shortcuts_record", { on: keyRec !== "" })
+    function recorded(r) {
+        if (!page.keyRec)
+            return
+        const mods = []
+        if (r.mods & 2) mods.push("Ctrl")
+        if (r.mods & 1) mods.push("Alt")
+        if (r.mods & 4) mods.push("Shift")
+        mods.push("Super")
+        const vk = r.vk
+        const k = vk >= 0x41 && vk <= 0x5A ? "Key" + String.fromCharCode(vk)
+            : vk >= 0x30 && vk <= 0x39 ? "Digit" + String.fromCharCode(vk)
+            : vk >= 0x60 && vk <= 0x69 ? "Numpad" + (vk - 0x60)
+            : vk >= 0x70 && vk <= 0x87 ? "F" + (vk - 0x6F)
+            : "VK" + vk
+        page.setKey(page.keyRec, mods.concat([k]).join("+"))
+    }
 
     // carte de reglages
     component Block: Card {
@@ -1476,20 +1651,52 @@ Item {
         onEdited: bad = false
     }
     // une action et sa combinaison ; clic : enregistrement de la combinaison
+    // (raccourci d'application : icone, bouton pour le retirer)
     component KeyRow: Item {
         id: kr
         required property var modelData
         readonly property string action: modelData[0]
+        readonly property bool isApp: action.startsWith("app:")
         readonly property string combo: Watch.keyMap[action] || ""
         readonly property bool rec: page.keyRec === action
         readonly property bool bad: Watch.keyBad.indexOf(action) >= 0
         width: parent ? parent.width : 0
-        height: 34
+        height: isApp ? 40 : 34
+        onRecChanged: if (rec) {
+            Ilot.pinned = true
+            Ilot.grabFocus()
+            keyBtn.forceActiveFocus()
+        }
+        AppIcon {
+            visible: kr.isApp
+            x: 54 - 34
+            anchors.verticalCenter: parent.verticalCenter
+            src: kr.modelData[2] || ""
+            name: kr.modelData[1]
+        }
         Txt {
             x: 54
+            width: delBtn.x - x - 10
             anchors.verticalCenter: parent.verticalCenter
             text: kr.modelData[1]
+            elide: Text.ElideRight
             color: kr.bad ? Theme.error : Theme.ink
+        }
+        IconBtn {
+            id: delBtn
+            x: kr.isApp ? keyBtn.x - width - 6 : keyBtn.x
+            visible: kr.isApp
+            anchors.verticalCenter: parent.verticalCenter
+            small: true
+            icon: "close"
+            tip: "Retirer ce raccourci"
+            onClicked: {
+                const map = Object.assign({}, Watch.keyMap)
+                delete map[kr.action]
+                if (page.keyRec === kr.action)
+                    page.keyRec = ""
+                Watch.saveKeys(map)
+            }
         }
         Btn {
             id: keyBtn
@@ -1502,14 +1709,7 @@ Item {
             border.width: kr.bad ? 2 : 0
             border.color: Theme.error
             tip: kr.bad ? "Déjà pris par une autre appli : choisis-en un autre" : "Clic puis appuie sur la combinaison · Échap : annuler · Retour arrière : effacer"
-            onClicked: {
-                page.keyRec = kr.rec ? "" : kr.action
-                if (page.keyRec) {
-                    Ilot.pinned = true
-                    Ilot.grabFocus()
-                    keyBtn.forceActiveFocus()
-                }
-            }
+            onClicked: page.keyRec = kr.rec ? "" : kr.action
             Keys.onPressed: e => {
                 if (!kr.rec)
                     return
@@ -1520,7 +1720,11 @@ Item {
                 }
                 const map = Object.assign({}, Watch.keyMap)
                 if (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete) {
-                    delete map[kr.action]
+                    // une appli garde sa ligne (croix pour la retirer)
+                    if (kr.isApp)
+                        map[kr.action] = ""
+                    else
+                        delete map[kr.action]
                     page.keyRec = ""
                     return Watch.saveKeys(map)
                 }
@@ -1547,9 +1751,7 @@ Item {
                     Watch.osd("keyboard", null, "Ajoute Ctrl, Alt ou Maj")
                     return
                 }
-                map[kr.action] = mods.concat([k]).join("+")
-                page.keyRec = ""
-                Watch.saveKeys(map)
+                page.setKey(kr.action, mods.concat([k]).join("+"))
             }
             Txt {
                 id: keyText
@@ -1558,6 +1760,35 @@ Item {
                 px: 12
                 weight: kr.combo ? Font.Medium : Font.Normal
                 color: kr.rec ? Theme.inkPrimary : kr.combo ? Theme.inkSecondaryContainer : Theme.inkVariant
+            }
+        }
+    }
+
+    // icone d'application (lettre sur fond colore sans icone)
+    component AppIcon: Item {
+        property string src
+        property string name
+        width: 26
+        height: 26
+        Image {
+            anchors.fill: parent
+            visible: parent.src !== ""
+            source: parent.src
+            sourceSize.width: Math.ceil(26 * Screen.devicePixelRatio)
+            asynchronous: true
+            mipmap: true
+        }
+        Rectangle {
+            anchors.fill: parent
+            visible: parent.src === ""
+            radius: 8
+            color: Theme.tertiaryContainer
+            Txt {
+                anchors.centerIn: parent
+                text: (parent.parent.name || "?").charAt(0).toUpperCase()
+                px: 12
+                weight: Font.Medium
+                color: Theme.inkTertiaryContainer
             }
         }
     }

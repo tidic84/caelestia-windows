@@ -2,11 +2,16 @@ import QtQuick
 
 // Assistant : traduction (src/translate.rs), sous-titres en direct de tout le
 // son du PC (src/captions.rs, bandeau Captions.qml) et questions envoyees a
-// l'application Claude (lien claude://, rien ne passe par l'API).
+// l'application Claude (lien claude://, rien ne passe par l'API). Chaque
+// partie se desactive dans Reglages > Addons (cfg.assist_tr, cfg.assist_claude).
 Item {
     id: page
     readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "assist"
-    property string view: "translate"
+    readonly property bool trOn: Ilot.cfg.assist_tr !== false
+    readonly property bool clOn: Ilot.cfg.assist_claude !== false
+    property string pick: "translate"
+    // partie desactivee : l'autre
+    readonly property string view: !clOn ? "translate" : !trOn ? "claude" : pick
     onShownChanged: if (shown) Qt.callLater(focusInput)
     function focusInput() {
         Ilot.grabFocus()
@@ -21,17 +26,20 @@ Item {
         Seg {
             id: seg
             anchors.verticalCenter: parent.verticalCenter
+            // une seule partie : pas de choix
+            visible: page.trOn && page.clOn
+            width: visible ? implicitWidth : 0
             model: [{ id: "translate", label: "Traduction" }, { id: "claude", label: "Claude" }]
             current: page.view
             onPicked: id => {
-                page.view = id
+                page.pick = id
                 Qt.callLater(page.focusInput)
             }
         }
         // traduction : langues
         Row {
             visible: page.view === "translate"
-            x: seg.width + 12
+            x: seg.visible ? seg.width + 12 : 0
             spacing: 4
             anchors.verticalCenter: parent.verticalCenter
             LangBtn {
@@ -55,7 +63,7 @@ Item {
         }
         Txt {
             visible: page.view === "claude"
-            x: seg.width + 12
+            x: seg.visible ? seg.width + 12 : 0
             width: parent.width - x - clTools.width - 10
             anchors.verticalCenter: parent.verticalCenter
             text: page.clNote
