@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import QtQml.WorkerScript
 import IlotCore
+import "rank.mjs" as Rank
 
 // Etat de l'ilot et ce qui ne depend pas d'une page (app.js) : reglages,
 // theme, etats replie / survol / ouvert, activites de la pilule, lecteur,
@@ -712,6 +713,18 @@ Item {
         folders = Object.assign({}, folders)
         Api.invoke("store_set", { key: "folders", value: folders })
     }
+    // %LOCALAPPDATA%\Ilot\usage.json : lancements notés pour classer les résultats (rank.mjs)
+    property var usage: Rank.empty()
+    function noteLaunch(id, query) {
+        if (!id)
+            return
+        usage = Object.assign({}, Rank.record(usage, id, norm(query || ""), Date.now()))
+        Api.invoke("store_set", { key: "usage", value: usage })
+    }
+    function forgetUsage() {
+        usage = Rank.empty()
+        Api.invoke("store_set", { key: "usage", value: usage })
+    }
     readonly property var gameHints: /steam|epic games|roblox|minecraft|riot client|valorant|league of legends|battle\.net|ubisoft|ea app|gog galaxy|fortnite|rockstar|xbox|playnite|heroic|curseforge|lunar client|genshin|hoyoplay/
     function newFolder(name) {
         const f = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name, apps: [] }
@@ -1191,6 +1204,7 @@ Item {
             root.notesLoaded()
         })
         Api.invoke("store_get", { key: "playlists" }).then(l => { if (Array.isArray(l)) root.playlists = l })
+        Api.invoke("store_get", { key: "usage" }).then(u => { root.usage = Rank.clean(u) })
         Api.invoke("store_get", { key: "folders" }).then(saved => {
             if (saved && Array.isArray(saved.list)) {
                 root.folders = Object.assign({}, saved, {

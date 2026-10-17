@@ -33,7 +33,8 @@ parle à Windows reste dans le cœur Rust (`../src`, `ilot_core.dll`).
     `ServicesCard`, `HealthCard`, `ShutdownCard`, `SensCard`, `SoundsPage`,
     `TasksPage`, `ClipsPage`, `AssistPage`, `WallsPage`, `SettingsPage`) ;
   - modules JavaScript repris de l'interface web : `mcu.mjs`
-    (material-color-utilities), `calc.mjs`, `emoji.mjs`, `ical.mjs`.
+    (material-color-utilities), `calc.mjs`, `emoji.mjs`, `ical.mjs` ;
+    `rank.mjs` : classement des résultats du lanceur selon les habitudes.
 - `shaders/round.frag` : images aux coins arrondis, sans calque.
 - `fonts/` : Rubik (graisses 300 à 700) et Material Symbols Rounded, les
   mêmes polices que l'interface web, converties de WOFF2 en TTF (fontTools :

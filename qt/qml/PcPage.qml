@@ -377,6 +377,7 @@ Item {
                         active: !missing
                         onClicked: {
                             Api.invoke("app_launch", { id: modelData.app.id })
+                            Ilot.noteLaunch(modelData.app.id)
                             Ilot.setMode("collapsed")
                         }
                         onRightClicked: Api.invoke("app_folder", { id: modelData.app.id, name: modelData.app.name }).then(ok => { if (ok) Ilot.setMode("collapsed") })

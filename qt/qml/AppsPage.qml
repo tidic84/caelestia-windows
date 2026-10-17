@@ -2,10 +2,12 @@ import QtQuick
 import IlotCore
 import "calc.mjs" as Calc
 import "emoji.mjs" as Emoji
+import "rank.mjs" as Rank
 
 // Apps : recherche (> commandes, = calcul, : emoji, ? web), dossiers,
 // Launcher de jeux, tri, menu contextuel, glisser-deposer vers un dossier,
-// fichiers deposes depuis l'Explorateur
+// fichiers deposes depuis l'Explorateur. Les resultats sont classes selon
+// les habitudes (rank.mjs) : les applis les plus lancees passent devant.
 Item {
     id: page
     readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "apps"
@@ -50,6 +52,7 @@ Item {
     // ------------------------------------------------------------ outils
     readonly property var sorts: ({
         name: ["sort_by_alpha", "Nom", "Nom (A → Z)"],
+        frequent: ["bolt", "Fréquentes", "Les plus utilisées"],
         "name-desc": ["sort_by_alpha", "Nom ↓", "Nom (Z → A)"],
         recent: ["schedule", "Récentes", "Ajout le plus récent"],
         old: ["history", "Anciennes", "Ajout le plus ancien"]
@@ -120,7 +123,8 @@ Item {
             recent: (x, y) => (y.added || 0) - (x.added || 0) || byName(x, y),
             old: (x, y) => late(x) - late(y) || byName(x, y)
         }[Ilot.folders.sort] || byName
-        return list.slice().sort(by)
+        const sorted = list.slice().sort(by)
+        return Ilot.folders.sort === "frequent" ? Rank.byHabit(Ilot.usage, sorted, Date.now()) : sorted
     }
     function save() {
         Ilot.saveFolders()
@@ -154,6 +158,7 @@ Item {
                 { icon: "settings", title: "Réglages", keys: "reglages parametres settings options", run: () => Ilot.open("settings"), stay: true },
                 { icon: "content_paste_off", title: "Vider l'historique du presse-papiers", keys: "vider effacer presse-papiers clipboard", run: () => Api.invoke("clips_clear") },
                 { icon: "notifications_off", title: "Effacer les notifications", keys: "effacer notifications", run: () => Api.invoke("notifs_dismiss", { id: null }) },
+                { icon: "settings_backup_restore", title: "Oublier les applications fréquentes", keys: "oublier effacer reinitialiser historique habitudes frequentes lancements recherche", danger: true, run: () => Ilot.forgetUsage(), stay: true },
                 { icon: "close", title: "Quitter l'îlot", keys: "quitter fermer ilot exit quit", danger: true, run: () => Backend.quit() },
                 { icon: "lock", title: "Verrouiller", keys: "verrouiller lock session", run: () => Api.invoke("session_action", { action: "lock" }) },
                 { icon: "bedtime", title: "Mettre en veille", keys: "veille sleep suspendre", run: () => Api.invoke("session_action", { action: "sleep" }) },
@@ -204,15 +209,7 @@ Item {
         const folder = Ilot.folders.list.find(f => f.id === Ilot.folders.sel)
         const inGames = Ilot.folders.sel === games
         const pool = sortItems(inGames ? launcherItems() : folder ? folderItems(folder) : Ilot.apps.filter(a => !isHidden(a.id)))
-        view = !s ? pool : pool
-            .map(a => {
-                const n = Ilot.norm(a.name)
-                const score = n.startsWith(s) ? 0 : n.split(/[\s\-_.]/).some(w => w.startsWith(s)) ? 1 : n.includes(s) ? 2 : 9
-                return { a: a, score: score }
-            })
-            .filter(x => x.score < 9)
-            .sort((x, y) => x.score - y.score)
-            .map(x => x.a)
+        view = !s ? pool : Rank.search(Ilot.usage, pool, s, Ilot.norm, Date.now())
         // un calcul tape directement s'affiche en tete
         mathRow = Calc.looksLikeMath(t.trim()) ? Calc.calc(t.trim()) : null
         mathDone = false
@@ -221,6 +218,7 @@ Item {
     readonly property bool inGames: Ilot.folders.sel === games
 
     function launch(a) {
+        Ilot.noteLaunch(a.id, q.trim())
         if (a.file)
             Api.invoke("file_open", { path: a.file })
         else if (a.source)
