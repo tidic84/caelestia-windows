@@ -185,6 +185,35 @@ pub fn watch(app: AppHandle) {
         crate::com_init_mta();
         let Ok(svc) = wmi() else { return };
         let Some(mut last) = wmi_get(&svc) else { return };
+        // evenements WMI : reveille seulement quand la luminosite change
+        let events = unsafe {
+            svc.ExecNotificationQuery(
+                &BSTR::from("WQL"),
+                &BSTR::from("SELECT * FROM WmiMonitorBrightnessEvent"),
+                WBEM_GENERIC_FLAG_TYPE(WBEM_FLAG_FORWARD_ONLY.0 | WBEM_FLAG_RETURN_IMMEDIATELY.0),
+                None,
+            )
+        };
+        if let Ok(en) = events {
+            loop {
+                let mut objs = [None];
+                let mut n = 0u32;
+                if unsafe { en.Next(WBEM_INFINITE, &mut objs, &mut n) }.is_err() {
+                    break;
+                }
+                let Some(obj) = objs[0].take().filter(|_| n > 0) else { continue };
+                let mut v = VARIANT::default();
+                if unsafe { obj.Get(w!("Brightness"), 0, &mut v, None, None) }.is_err() {
+                    continue;
+                }
+                let Ok(v) = u32::try_from(&v) else { continue };
+                if v != last {
+                    last = v;
+                    let _ = app.emit("osd", serde_json::json!({ "kind": "brightness", "value": v as f32 / 100.0, "muted": false }));
+                }
+            }
+        }
+        // repli (service WMI arrete, evenement indisponible) : releve sonde
         loop {
             std::thread::sleep(Duration::from_millis(250));
             if let Some(v) = wmi_get(&svc) {

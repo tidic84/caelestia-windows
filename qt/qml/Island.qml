@@ -110,23 +110,17 @@ Item {
     // contour (Apparence > Contour de l'ilot), clignotement « partie trouvee »
     readonly property string border: Ilot.cfg.border || "none"
     readonly property bool flash: Watch.matchFlash
+    // horloge d'ambiance (Ilot.amb) : couleurs figees quand personne ne regarde
     property real hue: 0
-    NumberAnimation on hue {
-        running: island.border === "rgb" && !Theme.reduced && !Ilot.fullscreen
-        from: 0
-        to: 1
-        duration: 6000
-        loops: Animation.Infinite
+    Binding on hue {
+        when: island.border === "rgb" && Ilot.ambient
+        value: (Ilot.amb % 6000) / 6000
+        restoreMode: Binding.RestoreNone
     }
     readonly property color lineColor: flash ? Theme.bad : border === "rgb" ? Qt.hsva(hue, 0.85, 1, 1) : Theme.primary
-    property real pulse: 1
-    SequentialAnimation on pulse {
-        running: (island.border === "pulse" || island.flash) && !Theme.reduced && !Ilot.fullscreen
-        loops: Animation.Infinite
-        NumberAnimation { to: 0.35; duration: island.flash ? 400 : Ilot.media.playing ? 600 : 1200; easing.type: Easing.InOutSine }
-        NumberAnimation { to: 1; duration: island.flash ? 400 : Ilot.media.playing ? 600 : 1200; easing.type: Easing.InOutSine }
-        onRunningChanged: if (!running) island.pulse = 1
-    }
+    // 1 -> 0,35 -> 1 ; le clignotement « partie trouvee » continue sans personne
+    readonly property bool pulsing: ((island.border === "pulse" && Ilot.ambient) || island.flash) && !Theme.reduced && !Ilot.fullscreen
+    readonly property real pulse: pulsing ? 1 - 0.65 * Ilot.wave(Ilot.amb, island.flash ? 800 : Ilot.media.playing ? 1200 : 2400) : 1
     // Trace du contour (SVG), decale de (ox, oy) : il part du bord de
     // l'ecran, suit le coin concave (meme coupe que Ear quand l'arrondi du
     // bas le rogne), descend le cote, fait le tour du bas et remonte.

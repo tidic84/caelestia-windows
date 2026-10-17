@@ -101,16 +101,24 @@ pub fn win_theme_apply(light: Option<bool>, palette: Option<Vec<u32>>) {
     broadcast();
 }
 
-/// Emet `win-theme` quand Windows passe en clair / sombre.
+/// Emet `win-theme` quand Windows passe en clair / sombre (reveille par
+/// l'ecriture de la cle Personalize, sinon toutes les minutes).
 pub fn watch(app: AppHandle) {
     std::thread::spawn(move || {
-        let mut last = windows_light();
+        let mut reg = crate::events::RegWatch::open(PERSONALIZE, false);
+        let mut last = None;
         loop {
-            std::thread::sleep(Duration::from_secs(2));
+            if let Some(r) = reg.as_mut() {
+                r.arm();
+            }
             let now = windows_light();
-            if now != last {
-                last = now;
+            if last.is_some_and(|l| l != now) {
                 let _ = app.emit("win-theme", now);
+            }
+            last = Some(now);
+            match &reg {
+                Some(r) => r.wait(Duration::from_secs(60)),
+                None => std::thread::sleep(Duration::from_secs(2)),
             }
         }
     });

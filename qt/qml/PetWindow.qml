@@ -435,15 +435,10 @@ Window {
         color: Qt.rgba(0.75, 0.9, 1, 0.35)
         border.width: 1
         border.color: Qt.rgba(1, 1, 1, 0.7)
+        // gonfle et degonfle (horloge d'ambiance : la sieste peut durer)
         QtObject {
             id: snore
-            property real v: 0
-        }
-        SequentialAnimation {
-            running: snoreBubble.visible
-            loops: Animation.Infinite
-            NumberAnimation { target: snore; property: "v"; from: 0; to: 1; duration: 1800; easing.type: Easing.InOutSine }
-            NumberAnimation { target: snore; property: "v"; to: 0; duration: 1200; easing.type: Easing.InOutSine }
+            readonly property real v: snoreBubble.visible ? Ilot.wave(Ilot.amb, 3000) : 0
         }
     }
 

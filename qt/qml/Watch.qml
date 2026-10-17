@@ -518,7 +518,8 @@ Item {
     readonly property bool dcSpeaking: dcRpc && (Ilot.dc.people || []).some(p => p.id === Ilot.dc.me_id && p.speaking)
     Timer {
         interval: 10000
-        running: true
+        // seulement si l'indicateur s'en sert (mode simple, sans RPC)
+        running: !!w.cfg.dc_pill && !w.dcRpc
         repeat: true
         triggeredOnStart: true
         onTriggered: Api.invoke("procs_running", { names: ["Discord"] }).then(r => { w.dcRunning = !!r[0] })
@@ -770,7 +771,8 @@ Item {
     property int petTick: 0
     Timer {
         interval: 1000
-        running: w.petShown && !Ilot.fullscreen && !Theme.reduced
+        // pas de notes ni de « z » animes quand personne ne regarde
+        running: w.petShown && !Ilot.fullscreen && !Theme.reduced && (Ilot.ambient || w.petWinOn)
         repeat: true
         onTriggered: w.petStep()
     }

@@ -46,6 +46,9 @@ Item {
     property real bop: mood === "music" ? (Ilot.shown.slice(0, 4).reduce((a, b) => a + b, 0) / 4) : 0
     // grand format (promenade, apercu) : details animes en plus
     readonly property bool rich: k >= 1.4
+    // respiration et details animes : horloge d'ambiance (Ilot.amb, 25
+    // images/s), a l'arret quand personne ne regarde, sauf en promenade
+    readonly property bool alive: visible && !Theme.reduced && (Ilot.ambient || Watch.petWinOn)
     readonly property size us: Qt.size(k, k)
 
     signal poked()
@@ -184,9 +187,20 @@ Item {
         // respiration, phase des details animes (queue, oreilles...),
         // dandinement en marchant, et les valeurs des tours
         property real breathe: 0
+        Binding on breathe {
+            when: pet.alive
+            value: Ilot.wave(Ilot.amb, pet.mood === "sleep" ? 5000 : 3200)
+            restoreMode: Binding.RestoreNone
+        }
         property real phase: 0
+        Binding on phase {
+            when: pet.alive && pet.rich
+            value: (Ilot.amb % 2400) / 2400 * Math.PI * 2
+            restoreMode: Binding.RestoreNone
+        }
         property real hopY: 0
-        property real wad: 0
+        // dandinement (marche, fete) : 0 -> 1 -> 0 -> -1 -> 0 en 800 ms
+        readonly property real wad: (pet.walking || pet.mood === "party") && pet.alive ? Math.sin(Ilot.amb / 800 * Math.PI * 2) : 0
         property real sx: 1
         property real sy: 1
         property real rot: 0
@@ -197,27 +211,6 @@ Item {
         property real twitch: 0
         property bool waving: false
         property real pawRot: 0
-        SequentialAnimation on breathe {
-            running: pet.visible && !Theme.reduced
-            loops: Animation.Infinite
-            NumberAnimation { to: 1; duration: pet.mood === "sleep" ? 2500 : 1600; easing.type: Easing.InOutSine }
-            NumberAnimation { to: 0; duration: pet.mood === "sleep" ? 2500 : 1600; easing.type: Easing.InOutSine }
-        }
-        NumberAnimation on phase {
-            running: pet.visible && pet.rich && !Theme.reduced
-            from: 0
-            to: Math.PI * 2
-            duration: 2400
-            loops: Animation.Infinite
-        }
-        SequentialAnimation on wad {
-            running: pet.walking || pet.mood === "party"
-            loops: Animation.Infinite
-            NumberAnimation { to: 1; duration: 200; easing.type: Easing.InOutSine }
-            NumberAnimation { to: -1; duration: 400; easing.type: Easing.InOutSine }
-            NumberAnimation { to: 0; duration: 200; easing.type: Easing.InOutSine }
-            onRunningChanged: if (!running) body.wad = 0
-        }
         rotation: wad * 7 + lean
         transform: [
             Scale {

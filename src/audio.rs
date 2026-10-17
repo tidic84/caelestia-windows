@@ -272,39 +272,105 @@ pub struct Osd {
     muted: bool,
 }
 
+/// Changements signales par Windows au fil de veille du volume.
+enum VolEvent {
+    /// volume ou sourdine de la sortie suivie
+    Level(f32, bool),
+    /// nouvelle sortie par defaut
+    Device,
+}
+
+#[windows::core::implement(windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolumeCallback)]
+struct VolumeCb(std::sync::mpsc::Sender<VolEvent>);
+
+impl windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolumeCallback_Impl for VolumeCb_Impl {
+    fn OnNotify(&self, data: *mut windows::Win32::Media::Audio::AUDIO_VOLUME_NOTIFICATION_DATA) -> windows::core::Result<()> {
+        if let Some(d) = unsafe { data.as_ref() } {
+            let _ = self.0.send(VolEvent::Level(d.fMasterVolume, d.bMuted.as_bool()));
+        }
+        Ok(())
+    }
+}
+
+#[windows::core::implement(windows::Win32::Media::Audio::IMMNotificationClient)]
+struct DeviceCb(std::sync::mpsc::Sender<VolEvent>);
+
+impl windows::Win32::Media::Audio::IMMNotificationClient_Impl for DeviceCb_Impl {
+    fn OnDeviceStateChanged(&self, _: &PCWSTR, _: windows::Win32::Media::Audio::DEVICE_STATE) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnDeviceAdded(&self, _: &PCWSTR) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnDeviceRemoved(&self, _: &PCWSTR) -> windows::core::Result<()> {
+        Ok(())
+    }
+    fn OnDefaultDeviceChanged(
+        &self,
+        flow: windows::Win32::Media::Audio::EDataFlow,
+        role: windows::Win32::Media::Audio::ERole,
+        _: &PCWSTR,
+    ) -> windows::core::Result<()> {
+        if flow == eRender && role == eConsole {
+            let _ = self.0.send(VolEvent::Device);
+        }
+        Ok(())
+    }
+    fn OnPropertyValueChanged(&self, _: &PCWSTR, _: &windows::Win32::Foundation::PROPERTYKEY) -> windows::core::Result<()> {
+        Ok(())
+    }
+}
+
 /// Surveille le volume de la sortie par defaut et emet `osd` quand il
 /// change (touches multimedia, autre appli...). Un changement de sortie
-/// ne declenche rien.
+/// ne declenche rien. Windows previent a chaque changement (volume et
+/// sortie par defaut) : aucun sondage.
 pub fn watch_volume(app: AppHandle) {
+    use windows::Win32::Media::Audio::Endpoints::{IAudioEndpointVolume, IAudioEndpointVolumeCallback};
+    use windows::Win32::Media::Audio::IMMNotificationClient;
     std::thread::spawn(move || {
         crate::com_init_mta();
-        let mut last: Option<(String, f32, bool)> = None;
-        let mut ep = None;
-        let mut id = String::new();
-        let mut tick = 0u32;
+        let (tx, rx) = std::sync::mpsc::channel();
+        let vol_cb: IAudioEndpointVolumeCallback = VolumeCb(tx.clone()).into();
+        let dev_cb: IMMNotificationClient = DeviceCb(tx).into();
+        // l'enumerateur doit vivre tant que son rappel est enregistre
+        let devices = enumerator().ok();
+        if let Some(e) = &devices {
+            let _ = unsafe { e.RegisterEndpointNotificationCallback(&dev_cb) };
+        }
         loop {
-            if tick % 30 == 0 || ep.is_none() {
-                if let Ok(d) = default_device() {
-                    id = device_id(&d);
-                    ep = unsafe { d.Activate::<windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume>(CLSCTX_ALL, None) }.ok();
-                }
-            }
-            tick = tick.wrapping_add(1);
-            if let Some(e) = &ep {
-                let now = unsafe { (e.GetMasterVolumeLevelScalar(), e.GetMute()) };
-                if let (Ok(l), Ok(m)) = now {
-                    let m = m.as_bool();
-                    if let Some((lid, ll, lm)) = &last {
-                        if *lid == id && ((ll - l).abs() > 0.004 || *lm != m) {
+            // sortie par defaut : volume actuel (sans OSD), puis ses changements
+            let bound = default_device().and_then(|d| unsafe {
+                let ep = d.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)?;
+                let now = (ep.GetMasterVolumeLevelScalar()?, ep.GetMute()?.as_bool());
+                ep.RegisterControlChangeNotify(&vol_cb)?;
+                Ok((ep, now))
+            });
+            let (ep, mut last) = match bound {
+                Ok((ep, now)) => (Some(ep), now),
+                Err(_) => (None, (0.0, false)),
+            };
+            loop {
+                // sans sortie (ou sans rappel de sortie), on reessaie de temps en temps
+                let wait = if ep.is_some() && devices.is_some() { Duration::from_secs(3600) } else { Duration::from_secs(2) };
+                match rx.recv_timeout(wait) {
+                    Ok(VolEvent::Level(l, m)) => {
+                        if (last.0 - l).abs() > 0.004 || last.1 != m {
                             let _ = app.emit("osd", Osd { kind: "volume", value: l, muted: m });
                         }
+                        last = (l, m);
                     }
-                    last = Some((id.clone(), l, m));
-                } else {
-                    ep = None;
+                    Ok(VolEvent::Device) => break,
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) if ep.is_none() || devices.is_none() => break,
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
                 }
             }
-            std::thread::sleep(Duration::from_millis(70));
+            if let Some(ep) = ep {
+                let _ = unsafe { ep.UnregisterControlChangeNotify(&vol_cb) };
+            }
+            // les rappels de l'ancienne sortie encore en file sont ignores
+            while rx.try_recv().is_ok() {}
         }
     });
 }
@@ -481,7 +547,9 @@ fn capture(emit: &dyn Fn(Vec<u8>)) -> windows::core::Result<()> {
                 let out: Vec<u8> = bands.iter().map(|v| (v * 100.0) as u8).collect();
                 emit(out);
             }
-            std::thread::sleep(Duration::from_millis(33));
+            // 30 trames/s panneau ouvert ; replie, l'egaliseur de la pilule
+            // (3 barres, lissees) se contente de 15
+            std::thread::sleep(Duration::from_millis(if crate::panel_open() { 33 } else { 66 }));
         };
         let _ = client.Stop();
         result

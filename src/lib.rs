@@ -116,6 +116,11 @@ fn island_open(_app: &AppHandle) -> bool {
     ISLAND_OPEN.load(Ordering::Relaxed)
 }
 
+/// Panneau deplie : ce qu'il affiche (disques...) merite un releve frequent.
+pub(crate) fn panel_open() -> bool {
+    ISLAND_OPEN.load(Ordering::Relaxed)
+}
+
 /// Derniere fenetre d'application active avant l'ilot
 static PREV_FG: AtomicIsize = AtomicIsize::new(0);
 

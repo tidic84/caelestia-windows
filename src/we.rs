@@ -8,7 +8,6 @@ use std::process::Command;
 use std::time::{Duration, SystemTime};
 
 use serde::Serialize;
-use sysinfo::{ProcessesToUpdate, System};
 use crate::host::{AppHandle};
 use windows::core::w;
 use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
@@ -147,12 +146,7 @@ fn current_dir(install: &Path) -> Option<PathBuf> {
 }
 
 pub fn running() -> bool {
-    let mut sys = System::new();
-    sys.refresh_processes(ProcessesToUpdate::All, true);
-    sys.processes().values().any(|p| {
-        let n = p.name().to_string_lossy().to_lowercase();
-        n == "wallpaper32.exe" || n == "wallpaper64.exe"
-    })
+    crate::pc::exe_names().iter().any(|n| n == "wallpaper32" || n == "wallpaper64")
 }
 
 /// Fond WE actif, seulement si Wallpaper Engine tourne (sinon c'est le fond

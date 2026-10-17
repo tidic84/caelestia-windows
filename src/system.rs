@@ -110,10 +110,12 @@ pub fn watch(app: AppHandle) {
         loop {
             sys.refresh_cpu_usage();
             sys.refresh_memory();
-            // nouveaux disques / disques retires : liste relue toutes les 30 s
+            // nouveaux disques / disques retires : liste relue toutes les 30 s ;
+            // place libre toutes les 2 s seulement panneau ouvert (seul
+            // l'accueil l'affiche, et un lecteur reseau peut faire attendre)
             if n % 15 == 0 {
                 disks = Disks::new_with_refreshed_list();
-            } else {
+            } else if crate::panel_open() {
                 disks.refresh(true);
             }
             n = n.wrapping_add(1);
@@ -222,9 +224,11 @@ fn clips_view(q: &VecDeque<Clip>) -> Vec<ClipView> {
 /// Surveille le presse-papiers (texte et images) et emet `clips`. Une image
 /// copiee (capture d'ecran...) donne aussi une activite `shot`.
 pub fn watch_clipboard(app: AppHandle) {
+    crate::events::watch_clipboard();
     std::thread::spawn(move || {
         let mut seq = 0u32;
         let mut next_id = 1u64;
+        let mut seen = crate::events::CLIPBOARD.seq();
         let mut first = true;
         loop {
             let s = unsafe { GetClipboardSequenceNumber() };
@@ -266,7 +270,15 @@ pub fn watch_clipboard(app: AppHandle) {
                 }
                 first = false;
             }
-            std::thread::sleep(std::time::Duration::from_millis(400));
+            // reveille par Windows a chaque copie (le compteur de sequence reste
+            // le juge) ; sinon releve toutes les 400 ms
+            if crate::events::CLIPBOARD_EVENTS.load(std::sync::atomic::Ordering::Relaxed) {
+                seen = crate::events::CLIPBOARD.wait(seen, std::time::Duration::from_secs(30));
+                // laisse l'appli qui copie refermer le presse-papiers
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(400));
+            }
         }
     });
 }

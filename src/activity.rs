@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::os::windows::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -190,6 +190,7 @@ impl LogTail {
 
 // ------------------------------------------------------- manifestes
 
+#[derive(Clone)]
 struct Manifest {
     appid: String,
     name: String,
@@ -200,32 +201,137 @@ struct Manifest {
     to_stage: u64,
 }
 
-fn manifests() -> Vec<Manifest> {
-    let mut out = Vec::new();
-    for lib in crate::we::libraries() {
-        let Ok(rd) = std::fs::read_dir(lib.join("steamapps")) else { continue };
-        for e in rd.flatten() {
-            let fname = e.file_name().to_string_lossy().to_string();
-            let Some(appid) = fname.strip_prefix("appmanifest_").and_then(|s| s.strip_suffix(".acf")) else { continue };
-            let Ok(acf) = std::fs::read_to_string(e.path()) else { continue };
-            let num = |k| acf_value(&acf, k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
-            out.push(Manifest {
-                appid: appid.to_string(),
-                name: acf_value(&acf, "name").unwrap_or("Steam").to_string(),
-                flags: num("StateFlags"),
-                done: num("BytesDownloaded"),
-                total: num("BytesToDownload"),
-                staged: num("BytesStaged"),
-                to_stage: num("BytesToStage"),
-            });
-        }
+fn read_manifest(appid: &str, path: &Path) -> Option<Manifest> {
+    let acf = std::fs::read_to_string(path).ok()?;
+    let num = |k| acf_value(&acf, k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    Some(Manifest {
+        appid: appid.to_string(),
+        name: acf_value(&acf, "name").unwrap_or("Steam").to_string(),
+        flags: num("StateFlags"),
+        done: num("BytesDownloaded"),
+        total: num("BytesToDownload"),
+        staged: num("BytesStaged"),
+        to_stage: num("BytesToStage"),
+    })
+}
+
+/// Manifestes `appmanifest_*.acf` de toutes les bibliotheques Steam. Seuls
+/// ceux qui ont change depuis le tour precedent (date, taille) sont relus ;
+/// la liste des bibliotheques est relue toutes les minutes.
+struct Manifests {
+    libs: Vec<PathBuf>,
+    libs_at: Option<Instant>,
+    files: HashMap<PathBuf, (SystemTime, u64, Manifest)>,
+}
+
+impl Manifests {
+    fn new() -> Self {
+        Manifests { libs: Vec::new(), libs_at: None, files: HashMap::new() }
     }
-    out
+
+    fn list(&mut self) -> Vec<Manifest> {
+        if self.libs_at.is_none_or(|t| t.elapsed() >= Duration::from_secs(60)) {
+            self.libs = crate::we::libraries();
+            self.libs_at = Some(Instant::now());
+        }
+        let mut seen = HashMap::new();
+        for lib in &self.libs {
+            let Ok(rd) = std::fs::read_dir(lib.join("steamapps")) else { continue };
+            for e in rd.flatten() {
+                let fname = e.file_name().to_string_lossy().to_string();
+                let Some(appid) = fname.strip_prefix("appmanifest_").and_then(|s| s.strip_suffix(".acf")) else { continue };
+                // sous Windows, la date et la taille viennent de la liste du dossier
+                let Ok(meta) = e.metadata() else { continue };
+                let stamp = (meta.modified().unwrap_or(UNIX_EPOCH), meta.len());
+                let path = e.path();
+                let m = match self.files.remove(&path) {
+                    Some((t, n, m)) if (t, n) == stamp => m,
+                    _ => {
+                        let Some(m) = read_manifest(appid, &path) else { continue };
+                        m
+                    }
+                };
+                seen.insert(path, (stamp.0, stamp.1, m));
+            }
+        }
+        // les manifestes supprimes (jeu desinstalle) disparaissent
+        self.files = seen;
+        self.files.values().map(|(_, _, m)| m.clone()).collect()
+    }
 }
 
 // ---------------------------------------------------------------- GPU
 
-fn gpu() -> Option<Gpu> {
+/// NVML (`nvml.dll`, installee avec le pilote NVIDIA), chargee une fois :
+/// un releve ne coute que quelques microsecondes, la ou `nvidia-smi` cree un
+/// processus et initialise le pilote a chaque appel.
+struct Nvml {
+    dev: NvmlDevice,
+    name: String,
+    temp: unsafe extern "C" fn(NvmlDevice, u32, *mut u32) -> i32,
+    util: unsafe extern "C" fn(NvmlDevice, *mut NvmlUtil) -> i32,
+}
+
+type NvmlDevice = *mut std::ffi::c_void;
+
+#[repr(C)]
+#[derive(Default)]
+struct NvmlUtil {
+    gpu: u32,
+    memory: u32,
+}
+
+impl Nvml {
+    fn open() -> Option<Nvml> {
+        use windows::core::{s, HSTRING};
+        use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_SYSTEM32};
+        unsafe {
+            // System32 (pilotes DCH), sinon le dossier NVSMI des anciens pilotes
+            let lib = LoadLibraryExW(w!("nvml.dll"), None, LOAD_LIBRARY_SEARCH_SYSTEM32).ok().or_else(|| {
+                let pf = std::env::var("ProgramW6432").or_else(|_| std::env::var("ProgramFiles")).ok()?;
+                LoadLibraryExW(&HSTRING::from(format!(r"{pf}\NVIDIA Corporation\NVSMI\nvml.dll")), None, Default::default()).ok()
+            })?;
+            let init: unsafe extern "C" fn() -> i32 = std::mem::transmute(GetProcAddress(lib, s!("nvmlInit_v2"))?);
+            let handle: unsafe extern "C" fn(u32, *mut NvmlDevice) -> i32 =
+                std::mem::transmute(GetProcAddress(lib, s!("nvmlDeviceGetHandleByIndex_v2"))?);
+            let name: unsafe extern "C" fn(NvmlDevice, *mut u8, u32) -> i32 =
+                std::mem::transmute(GetProcAddress(lib, s!("nvmlDeviceGetName"))?);
+            let n = Nvml {
+                dev: std::ptr::null_mut(),
+                name: String::new(),
+                temp: std::mem::transmute(GetProcAddress(lib, s!("nvmlDeviceGetTemperature"))?),
+                util: std::mem::transmute(GetProcAddress(lib, s!("nvmlDeviceGetUtilizationRates"))?),
+            };
+            if init() != 0 {
+                return None;
+            }
+            let mut dev = std::ptr::null_mut();
+            if handle(0, &mut dev) != 0 {
+                return None;
+            }
+            let mut buf = [0u8; 96];
+            let label = if name(dev, buf.as_mut_ptr(), buf.len() as u32) == 0 {
+                let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+                String::from_utf8_lossy(&buf[..end]).trim_start_matches("NVIDIA ").to_string()
+            } else {
+                String::new()
+            };
+            let n = Nvml { dev, name: label, ..n };
+            // une carte sans capteur (ou un pilote trop ancien) : nvidia-smi
+            n.read().map(|_| n)
+        }
+    }
+
+    fn read(&self) -> Option<Gpu> {
+        let (mut temp, mut util) = (0u32, NvmlUtil::default());
+        // 0 = NVML_TEMPERATURE_GPU
+        let ok = unsafe { (self.temp)(self.dev, 0, &mut temp) == 0 && (self.util)(self.dev, &mut util) == 0 };
+        ok.then(|| Gpu { name: self.name.clone(), temp, load: util.gpu })
+    }
+}
+
+/// Repli sans NVML : un processus `nvidia-smi` par releve.
+fn smi() -> Option<Gpu> {
     let out = Command::new("nvidia-smi")
         .args(["--query-gpu=name,temperature.gpu,utilization.gpu", "--format=csv,noheader,nounits"])
         .creation_flags(CREATE_NO_WINDOW)
@@ -452,13 +558,16 @@ pub struct SteamDone {
 
 pub fn watch(app: AppHandle) {
     std::thread::spawn(move || {
-        // pas de carte NVIDIA (ou pilote sans nvidia-smi) : on n'insiste pas
-        let has_gpu = gpu().is_some();
+        // pas de carte NVIDIA (ou pilote sans NVML ni nvidia-smi) : on n'insiste pas
+        let nvml = Nvml::open();
+        let has_smi = nvml.is_none() && smi().is_some();
+        let gpu = || nvml.as_ref().map_or_else(|| if has_smi { smi() } else { None }, Nvml::read);
         let mut gpu_now = None;
         let mut slow_at: Option<Instant> = None;
         let mut sys = System::new();
         let mut game: Option<Playing> = None;
         let mut log = LogTail::new();
+        let mut steam = Manifests::new();
         let mut at = Instant::now();
         // octets recus estimes par jeu
         let mut est: HashMap<String, u64> = HashMap::new();
@@ -476,7 +585,7 @@ pub fn watch(app: AppHandle) {
             at = Instant::now();
 
             let mut downloads = Vec::new();
-            for m in manifests() {
+            for m in steam.list() {
                 let l = log.apps.get(&m.appid);
                 let active = l.is_some_and(|l| l.active);
                 let base = l.and_then(|l| l.base);
@@ -521,12 +630,10 @@ pub fn watch(app: AppHandle) {
             // le telechargement en cours d'abord
             downloads.sort_by_key(|d| !d.active);
 
-            // releves plus lents (processus, nvidia-smi) : toutes les 3 s
+            // releves plus lents (processus, GPU) : toutes les 3 s
             if slow_at.is_none_or(|t: Instant| t.elapsed() >= Duration::from_millis(2900)) {
                 slow_at = Some(Instant::now());
-                if has_gpu {
-                    gpu_now = gpu();
-                }
+                gpu_now = gpu();
                 let found = playing(&app, &mut sys);
                 GAME_PID.store(found.as_ref().map_or(0, |f| f.2), Ordering::Relaxed);
                 let now = match found {
