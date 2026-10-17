@@ -43,9 +43,13 @@ Window {
     Binding { target: Ilot; property: "screenH"; value: win.Screen.height }
 
     TipWindow {}
-    // bandeau des sous-titres en direct, promenade du compagnon
+    // bandeau des sous-titres en direct ; promenade du compagnon, chargee
+    // seulement pendant qu'il est dehors
     Captions { host: win }
-    PetWindow { host: win }
+    Loader {
+        active: Watch.petWinOn
+        sourceComponent: PetWindow { host: win }
+    }
 
     Item {
         id: root

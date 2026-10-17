@@ -59,12 +59,18 @@ Item {
             }
         ]
 
-        // compagnon (parti se promener : il n'est plus dans la pilule)
-        Pet {
-            visible: Watch.petShown
-            opacity: Watch.petOut ? 0 : 1
-            Behavior on opacity { NumberAnimation { duration: 400 } }
+        // compagnon (masque : pas cree du tout ; parti se promener : il
+        // n'est plus dans la pilule)
+        Loader {
+            active: Watch.petShown
+            visible: active
             anchors.verticalCenter: parent.verticalCenter
+            sourceComponent: Pet {
+                opacity: Watch.petWinOn ? 0 : 1
+                // parti : plus d'animation dans la pilule (sa place reste)
+                visible: opacity > 0
+                Behavior on opacity { NumberAnimation { duration: 400 } }
+            }
         }
         RoundArt {
             size: 18
@@ -379,6 +385,20 @@ Item {
             anchors.centerIn: parent
             anchors.horizontalCenterOffset: peekDc.visible ? -35 : 0
             spacing: 10
+            // le compagnon, en plus grand : il suit la souris des yeux, se
+            // laisse caresser (appui long) et fait des tours (clic, double clic)
+            Loader {
+                active: Watch.petShown && pill.peek
+                visible: active && !Watch.petWinOn
+                anchors.verticalCenter: parent.verticalCenter
+                sourceComponent: Pet {
+                    k: 1.45
+                    interactive: true
+                    tip: Watch.petName + " " + (Watch.petMoodLabels[Watch.mood] || "") + " · niveau " + Watch.petLevel + " — clic, double clic ou appui long"
+                    onPoked: Watch.petLoved(1, false)
+                    onCaressed: Watch.petLoved(2, true)
+                }
+            }
             Txt {
                 id: peekClock
                 text: Ilot.hm(Ilot.now)

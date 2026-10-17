@@ -3,7 +3,7 @@ import IlotCore
 
 // Reglages, en onglets (a gauche) : general (demarrage, touche Windows,
 // ecran, notifications, sauvegarde), barre, apparence (et rotation des
-// fonds), pilule, jeu et absence, accessibilite, meteo et agenda, raccourcis
+// fonds), pilule, compagnon, jeu et absence, accessibilite, meteo et agenda, raccourcis
 // clavier, addons (onglets facultatifs), mises a jour et notes de version
 Item {
     id: page
@@ -16,6 +16,7 @@ Item {
         { id: "bar", icon: "dashboard", label: "Barre" },
         { id: "look", icon: "palette", label: "Apparence" },
         { id: "pill", icon: "pill", label: "Pilule" },
+        { id: "pet", icon: "emoji_emotions", label: "Compagnon" },
         { id: "game", icon: "sports_esports", label: "Jeu et absence" },
         { id: "access", icon: "accessibility_new", label: "Accessibilité" },
         { id: "weather", icon: "partly_cloudy_day", label: "Météo et agenda" },
@@ -629,20 +630,17 @@ Item {
                     current: page.cfg.clock || "digital"
                     onPicked: v => Ilot.setCfg({ clock: v })
                 }
-                SubTitle { text: "Compagnon" }
-                Chips {
-                    model: [["blob", "Blob"], ["cat", "Chat"], ["ghost", "Fantôme"], ["off", "Masqué"]]
-                    current: page.cfg.pet || "blob"
-                    onPicked: v => Ilot.setCfg({ pet: v })
-                }
                 SetRow {
                     subRow: true
-                    title: "Il se promène quand tu ne fais rien"
-                    sub: "Après 90 s sans clavier ni souris, au-dessus de la barre des tâches"
-                    toggle: true
-                    disabled: page.cfg.pet === "off"
-                    checked: !!page.cfg.pet_walk
-                    onToggled: on => Ilot.setCfg({ pet_walk: on })
+                    title: "Compagnon"
+                    sub: page.cfg.pet === "off" ? "Masqué" : Watch.petName + " : espèce, couleur, accessoires et promenade"
+                    TextBtn {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: "emoji_emotions"
+                        text: "Personnaliser"
+                        onClicked: Ilot.settingsSection = "pet"
+                    }
                 }
                 SetRow {
                     subRow: true
@@ -675,6 +673,309 @@ Item {
                     toggle: true
                     checked: !!page.cfg.wxfx
                     onToggled: on => Ilot.setCfg({ wxfx: on })
+                }
+            }
+
+            // ------------------------------------------------- compagnon
+            Block {
+                sec: "pet"
+                SetRow {
+                    icon: "emoji_emotions"
+                    title: "Compagnon"
+                    sub: "Une petite bête dans la pilule. Survole la pilule pour la caresser ; quand tu t'absentes, elle se promène au-dessus de la barre des tâches."
+                }
+                SubTitle { text: "Espèce" }
+                Chips {
+                    model: [["blob", "Blob"], ["cat", "Chat"], ["ghost", "Fantôme"], ["bunny", "Lapin"], ["frog", "Grenouille"], ["penguin", "Pingouin"],
+                            ["chick", "Poussin"], ["robot", "Robot"], ["axolotl", "Axolotl"], ["mush", "Champignon"], ["off", "Masqué"]]
+                    current: page.cfg.pet || "blob"
+                    onPicked: v => Ilot.setCfg({ pet: v })
+                }
+                Txt {
+                    visible: page.cfg.pet === "off"
+                    topPadding: 10
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    px: 11.5
+                    color: Theme.inkVariant
+                    text: "Masqué, le compagnon est complètement retiré : ni dessin, ni animations, ni promenade."
+                }
+
+                // apercu : on peut le caresser, le nourrir, jouer avec lui
+                Item {
+                    visible: page.cfg.pet !== "off"
+                    width: parent.width
+                    height: 186
+                    Rectangle {
+                        id: stage
+                        y: 14
+                        width: parent.width
+                        height: 172
+                        radius: 18
+                        color: Theme.surfaceHigh
+                        clip: true
+                        // sol
+                        Rectangle {
+                            y: parent.height - 34
+                            width: 150
+                            height: 34
+                            bottomLeftRadius: 18
+                            color: Theme.alpha(Theme.primary, 0.08)
+                        }
+                        Loader {
+                            id: stagePet
+                            active: page.shown && page.section === "pet"
+                            x: 40
+                            y: stage.height - 34 - 18 * 4.5 + 6
+                            sourceComponent: Pet {
+                                k: 4.5
+                                listen: false
+                                interactive: true
+                                look: 0
+                                mood: Watch.mood === "sleep" || Watch.mood === "surprise" ? "idle" : Watch.mood
+                                tip: "Clic : un tour · double clic : salto · appui long : caresse"
+                                onPoked: Watch.petLoved(1, false)
+                                onCaressed: Watch.petLoved(2, true)
+                            }
+                        }
+                        // biscuit et balle
+                        Txt {
+                            id: cookie
+                            text: "🍪"
+                            px: 26
+                            x: stagePet.x + 45 - width / 2
+                            y: -40
+                        }
+                        SequentialAnimation {
+                            id: feedA
+                            NumberAnimation { target: cookie; property: "y"; from: -40; to: stagePet.y + 10; duration: 600; easing.type: Easing.InQuad }
+                            ScriptAction { script: { cookie.y = -40; stagePet.item.trick("eat"); Watch.petLoved(2, false) } }
+                        }
+                        Rectangle {
+                            id: toy
+                            width: 22
+                            height: 22
+                            radius: 11
+                            x: -30
+                            y: stage.height - 34 - 22
+                            color: "#ff5d6c"
+                            border.width: 3
+                            border.color: "#ffd84a"
+                        }
+                        SequentialAnimation {
+                            id: playA
+                            ParallelAnimation {
+                                NumberAnimation { target: toy; property: "x"; from: stage.width; to: stagePet.x + 100; duration: 900; easing.type: Easing.OutQuad }
+                                RotationAnimation { target: toy; from: 0; to: -540; duration: 900 }
+                            }
+                            ScriptAction { script: stagePet.item.trick("kick") }
+                            ParallelAnimation {
+                                NumberAnimation { target: toy; property: "x"; to: stage.width + 30; duration: 700; easing.type: Easing.InQuad }
+                                SequentialAnimation {
+                                    NumberAnimation { target: toy; property: "y"; to: 20; duration: 350; easing.type: Easing.OutQuad }
+                                    NumberAnimation { target: toy; property: "y"; to: stage.height - 34 - 22; duration: 350; easing.type: Easing.InQuad }
+                                }
+                                RotationAnimation { target: toy; to: 180; duration: 700 }
+                            }
+                            ScriptAction { script: { stagePet.item.trick("love"); Watch.petLoved(1, false) } }
+                        }
+                        // nom, niveau d'affection
+                        Column {
+                            x: 160
+                            y: 18
+                            width: parent.width - x - 16
+                            spacing: 4
+                            Txt {
+                                width: parent.width
+                                text: Watch.petName
+                                px: 20
+                                weight: Font.Medium
+                                elide: Text.ElideRight
+                            }
+                            Txt {
+                                width: parent.width
+                                text: (Watch.petMoodLabels[Watch.mood] || "") + " · niveau " + Watch.petLevel
+                                px: 12
+                                color: Theme.inkVariant
+                            }
+                            Row {
+                                spacing: 2
+                                Repeater {
+                                    model: 10
+                                    Txt {
+                                        required property int index
+                                        text: "♥"
+                                        px: 13
+                                        color: index < Watch.petLevel ? "#ff5d8f" : Theme.surfaceHighest
+                                    }
+                                }
+                            }
+                            Item { width: 1; height: 6 }
+                            Flow {
+                            width: parent.width
+                            spacing: 6
+                            TextBtn {
+                                icon: "waving_hand"
+                                text: "Caresser"
+                                onClicked: {
+                                    stagePet.item.caress(true)
+                                    Ilot.later(1800, () => { if (stagePet.item) stagePet.item.caress(false) })
+                                }
+                            }
+                            TextBtn {
+                                text: "🍪 Nourrir"
+                                onClicked: feedA.restart()
+                            }
+                            TextBtn {
+                                icon: "sports_esports"
+                                text: "Jouer"
+                                onClicked: playA.restart()
+                            }
+                            TextBtn {
+                                icon: "auto_awesome"
+                                text: "Un tour"
+                                onClicked: stagePet.item.trick(["flip", "spin", "dance", "wave", "jump", "giggle", "stretch", "blep", "sneeze", "melt", "dizzy", "boo"][Math.floor(Math.random() * 12)])
+                            }
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    visible: page.cfg.pet !== "off"
+                    width: parent.width
+                    SubTitle { text: "Nom" }
+                    Item { width: 1; height: 8 }
+                    Field {
+                        id: petName
+                        width: Math.min(parent.width, 260)
+                        height: 34
+                        placeholder: Watch.petNames[Watch.petSpecies] || ""
+                        text: page.cfg.pet_name || ""
+                        onFocused: {
+                            Ilot.pinned = true
+                            Ilot.grabFocus()
+                        }
+                        onEdited: petNameSave.restart()
+                        onAccepted: petNameSave.triggered()
+                        Timer {
+                            id: petNameSave
+                            interval: 600
+                            onTriggered: if (petName.text.trim() !== (page.cfg.pet_name || "")) Ilot.setCfg({ pet_name: petName.text.trim().slice(0, 24) })
+                        }
+                    }
+                    SubTitle { text: "Couleur" }
+                    Flow {
+                        width: parent.width
+                        topPadding: 8
+                        spacing: 6
+                        Swatch {
+                            on: (page.cfg.pet_color || "nature") === "nature"
+                            icon: "eco"
+                            tip: "Couleurs naturelles de l'espèce"
+                            onClicked: Ilot.setCfg({ pet_color: "nature" })
+                        }
+                        Swatch {
+                            on: page.cfg.pet_color === "theme"
+                            icon: "palette"
+                            tip: "Couleur du thème"
+                            onClicked: Ilot.setCfg({ pet_color: "theme" })
+                        }
+                        Repeater {
+                            model: ["#ff8fb8", "#ff7a59", "#ffd447", "#7cc65b", "#5ec8ff", "#6d8cff", "#b28dff", "#f3f0fa", "#9e9e9e", "#3c4363"]
+                            Swatch {
+                                required property var modelData
+                                fill: modelData
+                                on: page.cfg.pet_color === modelData
+                                onClicked: Ilot.setCfg({ pet_color: modelData })
+                            }
+                        }
+                    }
+                    SubTitle { text: "Yeux" }
+                    Chips {
+                        model: [["dot", "Points"], ["shine", "Brillants"], ["big", "Grands"], ["lash", "Cils"], ["sleepy", "Endormis"], ["square", "Carrés"]]
+                        current: page.cfg.pet_eyes || "dot"
+                        onPicked: v => Ilot.setCfg({ pet_eyes: v })
+                    }
+                    SubTitle { text: "Chapeau" }
+                    Chips {
+                        model: [["none", "Aucun"], ["party", "Fête"], ["crown", "Couronne"], ["cap", "Casquette"], ["beanie", "Bonnet"], ["top", "Haut-de-forme"],
+                                ["wizard", "Sorcier"], ["chef", "Toque"], ["flower", "Fleur"], ["bow", "Nœud"], ["halo", "Auréole"], ["horns", "Cornes"], ["headphones", "Casque audio"]]
+                        current: page.cfg.pet_hat || "none"
+                        onPicked: v => Ilot.setCfg({ pet_hat: v })
+                    }
+                    SubTitle { text: "Visage" }
+                    Chips {
+                        model: [["none", "Rien"], ["glasses", "Lunettes"], ["sun", "Lunettes de soleil"], ["monocle", "Monocle"], ["mask", "Masque"],
+                                ["blush", "Joues roses"], ["freckles", "Taches de rousseur"]]
+                        current: page.cfg.pet_face || "none"
+                        onPicked: v => Ilot.setCfg({ pet_face: v })
+                    }
+                    SubTitle { text: "Cou" }
+                    Chips {
+                        model: [["none", "Rien"], ["bowtie", "Nœud papillon"], ["scarf", "Écharpe"], ["bell", "Grelot"], ["bandana", "Bandana"]]
+                        current: page.cfg.pet_neck || "none"
+                        onPicked: v => Ilot.setCfg({ pet_neck: v })
+                    }
+
+                    // promenade
+                    Item { width: 1; height: 8 }
+                    SetRow {
+                        subRow: true
+                        title: "Il se promène quand tu ne fais rien"
+                        sub: "Au-dessus de la barre des tâches : balade, sieste, ballon, papillon, pêche, skate… selon l'heure, la météo et la musique. Il remonte en te faisant coucou dès que tu reviens."
+                        toggle: true
+                        checked: !!page.cfg.pet_walk
+                        onToggled: on => Ilot.setCfg({ pet_walk: on })
+                    }
+                    Column {
+                        visible: !!page.cfg.pet_walk
+                        width: parent.width
+                        SubTitle { text: "Au bout de" }
+                        Chips {
+                            model: [[30, "30 s"], [90, "1 min 30"], [180, "3 min"], [300, "5 min"]]
+                            current: Number(page.cfg.pet_afk) || 90
+                            onPicked: v => Ilot.setCfg({ pet_afk: v })
+                        }
+                        SubTitle { text: "Taille en promenade" }
+                        Chips {
+                            model: [["s", "Petite"], ["m", "Moyenne"], ["l", "Grande"]]
+                            current: page.cfg.pet_size || "m"
+                            onPicked: v => Ilot.setCfg({ pet_size: v })
+                        }
+                        SubTitle { text: "Traînée derrière lui" }
+                        Chips {
+                            model: [["none", "Aucune"], ["sparkle", "Étincelles"], ["hearts", "Cœurs"], ["bubbles", "Bulles"], ["flowers", "Fleurs"],
+                                    ["steps", "Empreintes"], ["rainbow", "Arc-en-ciel"]]
+                            current: page.cfg.pet_trail || "sparkle"
+                            onPicked: v => Ilot.setCfg({ pet_trail: v })
+                        }
+                    }
+                    SubTitle { text: "Voir une scène tout de suite (40 s)" }
+                    Chips {
+                        model: [["stroll", "Balade"], ["sleep", "Sieste"], ["ball", "Ballon"], ["butterfly", "Papillon"], ["balloon", "Montgolfière"],
+                                ["fishing", "Pêche"], ["skate", "Skate"], ["bubbles", "Bulles"], ["read", "Lecture"], ["plane", "Avion en papier"],
+                                ["garden", "Jardinage"], ["hide", "Cache-cache"], ["meditate", "Méditation"], ["dance", "Danse"], ["stars", "Étoiles filantes"],
+                                ["coffee", "Café"], ["umbrella", "Parapluie"], ["snow", "Bonhomme de neige"], ["special", "Son tour secret"]]
+                        current: ""
+                        onPicked: v => Watch.petDemo(v)
+                    }
+                    Txt {
+                        visible: Theme.reduced
+                        topPadding: 8
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        px: 11.5
+                        color: Theme.inkVariant
+                        text: "Mouvements réduits (Accessibilité) : il reste dans la pilule."
+                    }
+                    Item { width: 1; height: 10 }
+                    TextBtn {
+                        visible: Watch.petOut
+                        icon: "close"
+                        text: "Le faire rentrer"
+                        onClicked: Watch.petDemoStop()
+                    }
                 }
             }
 
