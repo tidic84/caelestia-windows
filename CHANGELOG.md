@@ -4,6 +4,13 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.8 — 2026-10-17
+
+- **Plus léger au repos** : les animations d'ambiance (compagnon, météo animée, aurore boréale, contour RGB ou pulsé, horloge néon) tournent à 25 images/s au lieu de suivre la fréquence de l'écran (jusqu'à 240 images/s), et s'arrêtent après une minute sans clavier ni souris ou pendant un jeu en plein écran. La promenade du compagnon et le clignotement « partie trouvée » continuent, eux.
+- **Moins de travail en arrière-plan** : température et charge du GPU NVIDIA lues directement par le pilote (plus de `nvidia-smi` lancé toutes les 3 s) ; volume, luminosité, presse-papiers, voyant caméra / micro et thème de Windows suivis par les notifications de Windows au lieu d'être relus plusieurs fois par seconde ; notifications, manifestes Steam et espace des disques relus seulement quand ils changent ou quand ils s'affichent.
+- **Mémoire** : les pochettes des morceaux écoutés ne s'accumulent plus (seules les dernières sont gardées).
+- Discord : la connexion n'est surveillée en continu que pendant un appel vocal.
+
 ## 0.4.7 — 2026-10-17
 
 - **Compagnon** entièrement redessiné : le chat (oreilles, moustaches, queue qui remue) et le fantôme (jupe ondulée, petits bras, il flotte) sont refaits, et sept espèces arrivent : lapin, grenouille, pingouin, poussin, robot (bouche en égaliseur sur la musique), axolotl et champignon.
