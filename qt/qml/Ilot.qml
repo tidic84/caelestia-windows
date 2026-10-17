@@ -22,7 +22,7 @@ Item {
         text_size: 100, contrast: "normal", motion: "system", cvd: "off", activity: true, game_mode: true,
         game_perf: true, game_notif: false, match_alert: true, mix_auto: true, away: "on", pet: "blob",
         pet_walk: true, clock: "digital", privacy: true, wxfx: true, dc_pill: true, media_bg: "art", pill_size: "m",
-        assist_tr: true, assist_claude: true
+        assist_tr: true, assist_claude: true, bar_titles: true
     })
     signal settingsChanged()
 

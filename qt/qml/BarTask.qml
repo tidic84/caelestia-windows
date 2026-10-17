@@ -1,22 +1,23 @@
 import QtQuick
 
 // Une appli de la barre (ses fenetres regroupees) : icone, titre si elle est
-// active, nombre de fenetres
+// active (sauf si cfg.bar_titles est coupe), nombre de fenetres
 Btn {
     id: t
     property var group
     readonly property var wins: group ? group.wins : []
     readonly property var activeWin: wins.find(w => w.id === Ilot.barWins.active)
     readonly property bool on: !!activeWin
+    readonly property bool showTitle: on && Ilot.cfg.bar_titles !== false
     height: 22
-    width: row.implicitWidth + (on ? 16 : 10)
+    width: row.implicitWidth + (showTitle ? 16 : 10)
     radius: 11
     color: on ? Theme.secondaryContainer : hovered ? Theme.surfaceHigh : "transparent"
     Behavior on width { NumberAnimation { duration: 200 } }
 
     Row {
         id: row
-        x: t.on ? 6 : 5
+        x: t.showTitle ? 6 : 5
         anchors.verticalCenter: parent.verticalCenter
         spacing: 6
         TaskIcon {
@@ -27,7 +28,7 @@ Btn {
             anchors.verticalCenter: parent.verticalCenter
         }
         Txt {
-            visible: t.on
+            visible: t.showTitle
             width: Math.min(implicitWidth, 180)
             text: (t.activeWin || t.wins[0] || {}).title || ""
             px: 12

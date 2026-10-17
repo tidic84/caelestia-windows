@@ -333,6 +333,15 @@ Item {
                 }
                 SetRow {
                     subRow: true
+                    title: "Titre de la fenêtre active"
+                    sub: "Le nom de la fenêtre au premier plan, à côté de son icône"
+                    toggle: true
+                    checked: page.cfg.bar_titles !== false
+                    disabled: !page.cfg.bar || !page.cfg.bar_tasks
+                    onToggled: on => Ilot.setCfg({ bar_titles: on })
+                }
+                SetRow {
+                    subRow: true
                     title: "Masquer automatiquement"
                     sub: "La barre apparaît quand la souris touche le haut de l'écran"
                     toggle: true
