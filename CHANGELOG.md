@@ -4,6 +4,12 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.5 — 2026-10-17
+
+- **Lanceur** : la recherche apprend vos habitudes. Les applications lancées souvent, récemment ou d'habitude à cette heure-ci passent devant, ainsi que celle choisie la dernière fois pour les mêmes lettres (si vous tapez « d » puis lancez Discord, Discord revient en tête).
+- Recherche plus souple : les initiales (« vsc » pour Visual Studio Code) et les lettres dans l'ordre (« ntpd » pour Notepad++) sont acceptées.
+- Nouveau tri « Les plus utilisées » ; la commande `>oublier` efface les habitudes du lanceur.
+
 ## 0.4.4 — 2026-10-17
 
 - **Bloc-notes** : plusieurs notes (liste à gauche, nouvelle note, suppression en deux clics), mise en forme **Markdown** (titres, gras, italique, listes, cases à cocher, citations, code, liens) avec une barre d'outils, Ctrl+B / Ctrl+I et un aperçu ; un interrupteur repasse en texte brut. L'ancien bloc-notes devient la première note.
