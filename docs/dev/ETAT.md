@@ -6,8 +6,9 @@ reprendre.
 
 ## Où on en est (mis à jour le 2026-10-17)
 
-- **Version** : 0.4.8 (sur `main`, avec les optimisations de consommation au
-  repos déjà fusionnées).
+- **Version** : 0.4.9, publiée par le tag `v0.4.9` (GitHub Action
+  `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
+  dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
   un raccourci dans le dossier Démarrage. Elle a été construite depuis les
   sources par `install.ps1`.
@@ -18,6 +19,16 @@ reprendre.
   puis piocher dans `BACKLOG.md` (les 🔴 Qt d'abord).
 
 ## Journal
+
+### 2026-10-17 : publication de la 0.4.9
+
+- Passage de `Cargo.toml` et `Cargo.lock` en 0.4.9, plus une section dans
+  `CHANGELOG.md`.
+- Tag `v0.4.9` poussé, ce qui lance la GitHub Action qui publie
+  `ilot-0.4.9-win64.zip`.
+- Pour publier une version : changer la version dans `Cargo.toml`, ajouter
+  une section `## x.y.z — date` dans `CHANGELOG.md`, commiter, puis
+  `git tag vx.y.z && git push origin main vx.y.z`.
 
 ### 2026-10-17 : revue complète, installation, documentation
 

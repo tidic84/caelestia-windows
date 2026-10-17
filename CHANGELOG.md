@@ -4,6 +4,13 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.9 — 2026-10-17
+
+- **Confidentialité** : les copies marquées privées par l'application (mots de passe copiés depuis KeePass, Bitwarden ou un autre gestionnaire) n'apparaissent plus dans l'historique du presse-papiers, comme dans celui de Windows.
+- **Mémoire** : les pochettes, jaquettes et fonds d'écran sont réduits à leur taille d'affichage au lieu d'être gardés en pleine résolution.
+- **Stabilité** : quitter ou relancer l'îlot pendant une opération en cours (recherche Wi-Fi, mail…) ne peut plus le faire planter.
+- Inclut la **0.4.8**, qui n'a pas été publiée séparément : îlot beaucoup plus léger au repos (animations d'ambiance à 25 images/s et en pause sans activité ou en plein écran, volume, luminosité, presse-papiers, caméra / micro et thème suivis par les notifications de Windows au lieu d'être relus en boucle, GPU NVIDIA lu directement par le pilote, pochettes en mémoire limitée).
+
 ## 0.4.8 — 2026-10-17
 
 - **Plus léger au repos** : les animations d'ambiance (compagnon, météo animée, aurore boréale, contour RGB ou pulsé, horloge néon) tournent à 25 images/s au lieu de suivre la fréquence de l'écran (jusqu'à 240 images/s), et s'arrêtent après une minute sans clavier ni souris ou pendant un jeu en plein écran. La promenade du compagnon et le clignotement « partie trouvée » continuent, eux.
