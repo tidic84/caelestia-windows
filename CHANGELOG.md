@@ -9,6 +9,7 @@ description à chaque version publiée sur GitHub.
 - **Valorant** : l'îlot suit vos parties. En file d'attente, la pilule affiche le temps d'attente ; quand une partie est trouvée, une notification apparaît (carillon et îlot qui clignote si vous êtes sur une autre fenêtre, clic pour retourner dans le jeu).
 - **Sélection des agents** : le temps restant s'affiche dans la pilule (en rouge dans les 10 dernières secondes si votre agent n'est pas verrouillé) ; au survol, l'agent choisi avec son icône, la carte, le mode et le nombre d'alliés verrouillés. Rappel 15 s avant la fin si vous n'avez pas verrouillé et n'êtes pas dans le jeu.
 - Se désactive dans Réglages › Jeu et absence › Valorant.
+- **Barre** : nouvelle option « Titre de la fenêtre active » (Réglages › Barre) ; coupée, la fenêtre au premier plan n'affiche plus que son icône, sans son nom.
 
 ## 0.4.5 — 2026-10-17
 
