@@ -23,7 +23,11 @@ use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyState, VK_CAPITAL};
 use windows::Win32::Media::Audio::{eConsole, eRender, IMMDeviceEnumerator, MMDeviceEnumerator};
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
-use windows::Win32::System::DataExchange::GetClipboardSequenceNumber;
+use windows::Win32::System::DataExchange::{
+    CloseClipboard, GetClipboardData, GetClipboardSequenceNumber, IsClipboardFormatAvailable, OpenClipboard,
+    RegisterClipboardFormatW,
+};
+use windows::Win32::System::Memory::{GlobalLock, GlobalSize, GlobalUnlock};
 use windows::Win32::System::Power::{GetSystemPowerStatus, SetSuspendState, SYSTEM_POWER_STATUS};
 use windows::Win32::System::Shutdown::LockWorkStation;
 
@@ -234,6 +238,11 @@ pub fn watch_clipboard(app: AppHandle) {
             let s = unsafe { GetClipboardSequenceNumber() };
             if s != seq {
                 seq = s;
+                if private_clip() {
+                    first = false;
+                    continue_wait(&mut seen);
+                    continue;
+                }
                 let mut cb = arboard::Clipboard::new();
                 let entry = match cb.as_mut().map(|c| c.get_text()) {
                     Ok(Ok(t)) if !t.trim().is_empty() => {
@@ -270,17 +279,64 @@ pub fn watch_clipboard(app: AppHandle) {
                 }
                 first = false;
             }
-            // reveille par Windows a chaque copie (le compteur de sequence reste
-            // le juge) ; sinon releve toutes les 400 ms
-            if crate::events::CLIPBOARD_EVENTS.load(std::sync::atomic::Ordering::Relaxed) {
-                seen = crate::events::CLIPBOARD.wait(seen, std::time::Duration::from_secs(30));
-                // laisse l'appli qui copie refermer le presse-papiers
-                std::thread::sleep(std::time::Duration::from_millis(100));
-            } else {
-                std::thread::sleep(std::time::Duration::from_millis(400));
-            }
+            continue_wait(&mut seen);
         }
     });
+}
+
+// reveille par Windows a chaque copie (le compteur de sequence reste le juge) ;
+// sinon releve toutes les 400 ms
+fn continue_wait(seen: &mut u64) {
+    if crate::events::CLIPBOARD_EVENTS.load(std::sync::atomic::Ordering::Relaxed) {
+        *seen = crate::events::CLIPBOARD.wait(*seen, std::time::Duration::from_secs(30));
+        // laisse l'appli qui copie refermer le presse-papiers
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    } else {
+        std::thread::sleep(std::time::Duration::from_millis(400));
+    }
+}
+
+// Copie marquee privee par l'appli (mot de passe KeePass, Bitwarden...) : ni
+// historique ni capture, comme l'historique de Windows
+fn private_clip() -> bool {
+    let fmt = |f: &str| unsafe { RegisterClipboardFormatW(&HSTRING::from(f)) };
+    let has = |id: u32| id != 0 && unsafe { IsClipboardFormatAvailable(id).is_ok() };
+    if has(fmt("ExcludeClipboardContentFromMonitorProcessing")) || has(fmt("Clipboard Viewer Ignore")) {
+        return true;
+    }
+    // CanIncludeInClipboardHistory : 0 exclut, 1 autorise explicitement
+    let id = fmt("CanIncludeInClipboardHistory");
+    has(id) && clip_dword(id) == Some(0)
+}
+
+fn clip_dword(id: u32) -> Option<u32> {
+    unsafe {
+        // l'appli qui copie peut encore tenir le presse-papiers
+        let mut open = false;
+        for _ in 0..5 {
+            if OpenClipboard(None).is_ok() {
+                open = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        if !open {
+            return None;
+        }
+        let mut v = None;
+        if let Ok(h) = GetClipboardData(id) {
+            let mem = windows::Win32::Foundation::HGLOBAL(h.0);
+            if GlobalSize(mem) >= 4 {
+                let p = GlobalLock(mem) as *const u32;
+                if !p.is_null() {
+                    v = Some(p.read_unaligned());
+                    let _ = GlobalUnlock(mem);
+                }
+            }
+        }
+        let _ = CloseClipboard();
+        v
+    }
 }
 
 pub fn clips_get(st: State<Clips>) -> Vec<ClipView> {

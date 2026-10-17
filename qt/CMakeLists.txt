@@ -3,6 +3,8 @@ project(ilot LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# compile_commands.json pour clangd (plugin clangd-lsp de Claude Code, editeurs)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 6.9 REQUIRED COMPONENTS Gui Quick ShaderTools)

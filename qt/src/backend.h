@@ -12,6 +12,7 @@ class Backend : public QObject
 
 public:
     explicit Backend(QObject *parent = nullptr);
+    ~Backend() override;
     static Backend *instance();
 
     // Commande `cmd` (arguments en JSON) appelee pour la fenetre `label` ;

@@ -19,6 +19,14 @@ Backend::Backend(QObject *parent) : QObject(parent)
     QThreadPool::globalInstance()->setMaxThreadCount(16);
 }
 
+// detruit avant l'application : les commandes encore en cours ne doivent plus
+// toucher cet objet, ni le coeur Rust lui envoyer des evenements
+Backend::~Backend()
+{
+    s_instance = nullptr;
+    QThreadPool::globalInstance()->waitForDone();
+}
+
 Backend *Backend::instance()
 {
     return s_instance;
@@ -173,11 +181,11 @@ QImage IlotImages::requestImage(const QString &id, QSize *size, const QSize &req
     }
     if (size)
         *size = img.size();
-    if (!img.isNull() && requested.isValid() && (requested.width() < img.width() || requested.height() < img.height())) {
-        QSize s = img.size().scaled(requested.width() > 0 ? requested.width() : img.width(),
-                                     requested.height() > 0 ? requested.height() : img.height(),
-                                     Qt::KeepAspectRatioByExpanding);
-        img = img.scaled(s, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    }
+    // une seule dimension demandee (sourceSize.width seul) : traitee comme un
+    // carre, le petit cote reste assez grand pour un affichage en cover
+    const int rw = requested.width(), rh = requested.height();
+    const int bw = rw > 0 ? rw : rh, bh = rh > 0 ? rh : rw;
+    if (!img.isNull() && bw > 0 && bw < img.width() && bh < img.height())
+        img = img.scaled(img.size().scaled(bw, bh, Qt::KeepAspectRatioByExpanding), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     return img;
 }
