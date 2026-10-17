@@ -409,6 +409,8 @@ Item {
         } else if (away.on && s < 5) {
             const a = away
             away = { on: false, since: 0, missed: [], paused: false }
+            if (petShown)
+                Ilot.later(800, () => w.petTrick("wave"))
             if (!a.missed.length && !a.paused)
                 return
             const byApp = {}
@@ -743,22 +745,34 @@ Item {
     }
 
     // =================================================== compagnon
-    // petite bete dans la pilule repliee : danse sur la musique, met un casque
-    // en jeu, transpire si le GPU chauffe, dort la nuit, saute de joie quand
-    // une partie est trouvee. Apres 90 s d'inactivite, elle descend se
-    // promener au-dessus de la barre des taches (PetWindow).
+    // petite bete dans la pilule repliee (Reglages > Compagnon : espece, nom,
+    // couleur, yeux, chapeau, accessoires) : danse sur la musique, met un
+    // casque en jeu, transpire si le GPU chauffe, grelotte quand il gele, dort
+    // la nuit (bonnet de nuit), fait un salto quand une partie est trouvee, te
+    // fait coucou a ton retour. Au survol de la pilule, il se laisse caresser
+    // (affection, niveaux). Apres un moment sans clavier ni souris, il descend
+    // se promener au-dessus de la barre des taches (PetWindow). « Masque » :
+    // plus rien ne tourne (ni minuterie, ni fenetre, ni dessin).
     readonly property bool petShown: (cfg.pet || "blob") !== "off"
+    readonly property string petSpecies: petShown ? cfg.pet || "blob" : "blob"
+    readonly property var petNames: ({ blob: "Blobby", cat: "Minou", ghost: "Boo", bunny: "Pompon", frog: "Gribouille",
+        penguin: "Glagla", chick: "Piou", robot: "Bip", axolotl: "Axo", mush: "Champi" })
+    readonly property string petName: String(cfg.pet_name || "").trim() || petNames[petSpecies] || "Blobby"
+    readonly property var petMoodLabels: ({ idle: "tranquille", music: "écoute la musique", game: "joue avec toi", hot: "a chaud",
+        sleep: "dort", party: "fait la fête", surprise: "a vu quelque chose", love: "est aux anges" })
     property real partyUntil: 0
+    property real loveUntil: 0
     property string mood: "idle"
     signal petFx(string sym)
     signal petBlink()
     signal petHop()
+    signal petTrick(string name)
     property real petLook: 0
     property int petTick: 0
     Timer {
         interval: 1000
         // pas de notes ni de « z » animes quand personne ne regarde
-        running: w.petShown && !Ilot.fullscreen && !Theme.reduced && (Ilot.ambient || w.petOut)
+        running: w.petShown && !Ilot.fullscreen && !Theme.reduced && (Ilot.ambient || w.petWinOn)
         repeat: true
         onTriggered: w.petStep()
     }
@@ -766,6 +780,8 @@ Item {
         const h = new Date().getHours()
         if (Date.now() < partyUntil)
             return "party"
+        if (Date.now() < loveUntil)
+            return "love"
         if (Ilot.act && Ilot.act.kind === "notif")
             return "surprise"
         if (gaming.game && gaming.gpu && gaming.gpu.temp >= 80)
@@ -778,9 +794,22 @@ Item {
             return "sleep"
         return "idle"
     }
+    function petPick(a) {
+        return a[Math.floor(Math.random() * a.length)]
+    }
     function petStep() {
         petTick++
+        const prev = mood
         mood = petMood()
+        // changements d'humeur : il reagit
+        if (prev !== mood) {
+            if (mood === "party")
+                petTrick("flip")
+            else if (mood === "music")
+                petTrick("dance")
+            else if (prev === "sleep")
+                petTrick("stretch")
+        }
         if (mood === "music" && petTick % 3 === 0)
             petFx(Math.random() < 0.5 ? "♪" : "♫")
         if (mood === "sleep" && petTick % 3 === 0)
@@ -788,28 +817,103 @@ Item {
         if (mood === "hot" && petTick % 4 === 0)
             petFx("💧")
         if (mood === "party" && petTick % 2 === 0)
-            petFx("!")
+            petFx(Math.random() < 0.5 ? "!" : "✦")
+        if (mood === "love" && petTick % 2 === 0)
+            petFx("♥")
         if (mood === "idle" || mood === "game" || mood === "music") {
-            // clignement, coup d'oeil, petit saut de temps en temps
+            // clignement, coup d'oeil, et de temps en temps une envie
             if (Math.random() < 0.3)
                 petBlink()
             if (Math.random() < 0.15)
                 petLook = Math.random() * 3 - 1.5
-            if (mood === "idle" && Math.random() < 0.04)
-                petHop()
-            if (mood === "idle" && Math.random() < 0.02)
-                petFx("♥")
+            if (mood === "idle") {
+                const h = new Date().getHours()
+                const r = Math.random()
+                if (r < 0.03)
+                    petHop()
+                else if (r < 0.045)
+                    petTrick(petPick(h >= 21 || h < 8 ? ["yawn", "stretch", "look", "nod"]
+                        : ["stretch", "look", "spin", "wave", "nod", "giggle", "blep", "sneeze", "dance"]
+                          .concat(petSpecies === "blob" || petSpecies === "ghost" ? ["melt"] : [])))
+                // plus il t'aime, plus il envoie de coeurs
+                if (Math.random() < 0.01 + petLevel * 0.002)
+                    petFx("♥")
+                if (Ilot.weather && Ilot.weather.temp <= 0 && Math.random() < 0.015)
+                    petTrick("shiver")
+            }
+            if (mood === "music" && Math.random() < 0.03)
+                petTrick(petPick(["dance", "spin", "hop"]))
         }
     }
-    // promenade : apres 90 s sans clavier ni souris
+
+    // affection : caresses et clics (sauvegardee avec l'interface), niveaux 1 a 10
+    readonly property int petLove: Number(Ilot.ui.pet_love) || 0
+    readonly property int petLevel: Math.min(10, 1 + Math.floor(Math.sqrt(petLove / 8)))
+    function petLoved(n, caress) {
+        const before = petLevel
+        Ilot.saveUi({ pet_love: petLove + n })
+        if (caress)
+            loveUntil = Date.now() + 3000
+        if (petLevel > before) {
+            petTrick("flip")
+            Ilot.later(900, () => w.petFx("★"))
+        }
+    }
+
+    // promenade : apres un moment sans clavier ni souris (Reglages >
+    // Compagnon), ou tout de suite pour l'apercu d'une scene ; la fenetre reste
+    // chargee le temps qu'il remonte dans la pilule (petBack)
     property bool petOut: false
-    readonly property int petIdleSecs: 90
+    property bool petBack: false
+    readonly property bool petWinOn: petShown && (petOut || petBack)
+    readonly property int petIdleSecs: Number(cfg.pet_afk) || 90
+    property real petDemoUntil: 0
+    property string petScene: ""
+    signal petSceneRequest(string name)
+    function setPetOut(v) {
+        if (v === petOut)
+            return
+        if (!v)
+            petBack = true
+        petOut = v
+        if (!v)
+            petBackTimer.restart()
+    }
+    Timer {
+        id: petBackTimer
+        interval: 6000
+        onTriggered: w.petBack = false
+    }
+    function petReturned() {
+        petBack = false
+    }
     function petIdle(s) {
-        const can = !!cfg.pet_walk && petShown && !gameOn && Ilot.mode === "collapsed" && !Ilot.fullscreen && !Ilot.act && !Theme.reduced
-        if (can && s >= petIdleSecs)
-            petOut = true
+        const demo = Date.now() < petDemoUntil
+        const can = petShown && !Ilot.fullscreen && !Theme.reduced
+            && (demo || (!!cfg.pet_walk && !gameOn && Ilot.mode === "collapsed" && !Ilot.act))
+        if (can && (demo || s >= petIdleSecs))
+            setPetOut(true)
         else if (petOut && (!can || s < 3))
-            petOut = false
+            setPetOut(false)
+    }
+    // apercu : une scene choisie, pendant 40 s meme si tu bouges la souris
+    function petDemo(name) {
+        petDemoUntil = Date.now() + 40000
+        if (petOut) {
+            petSceneRequest(name)
+        } else {
+            petScene = name
+            setPetOut(true)
+        }
+    }
+    function petDemoStop() {
+        petDemoUntil = 0
+        setPetOut(false)
+    }
+    onPetShownChanged: if (!petShown) {
+        petOut = false
+        petBack = false
+        petDemoUntil = 0
     }
 
     // ================================================== evenements

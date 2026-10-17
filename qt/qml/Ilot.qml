@@ -22,7 +22,10 @@ Item {
         text_size: 100, contrast: "normal", motion: "system", cvd: "off", activity: true, game_mode: true,
         game_perf: true, game_notif: false, match_alert: true, valorant: true, mix_auto: true, away: "on", pet: "blob",
         pet_walk: true, clock: "digital", privacy: true, wxfx: true, dc_pill: true, media_bg: "art", pill_size: "m",
-        assist_tr: true, assist_claude: true, bar_titles: true
+        assist_tr: true, assist_claude: true, bar_titles: true,
+        // compagnon (Reglages > Compagnon)
+        pet_color: "nature", pet_eyes: "dot", pet_hat: "none", pet_face: "none", pet_neck: "none", pet_name: "",
+        pet_trail: "sparkle", pet_afk: 90, pet_size: "m"
     })
     signal settingsChanged()
 
@@ -116,7 +119,7 @@ Item {
     // un addon desactive alors que son onglet est ouvert : retour a l'accueil
     onTabsChanged: if (!hasTab(currentTab)) currentTab = "home"
 
-    // section ouverte dans Reglages (general, bar, look, pill, game, access,
+    // section ouverte dans Reglages (general, bar, look, pill, pet, game, access,
     // weather, keys, addons, updates)
     property string settingsSection: "general"
     function openSettings(section) {
@@ -206,7 +209,9 @@ Item {
         if (s === "open")
             return big ? bigSize : openSize
         if (s === "peek") {
-            const p = hasMedia ? { w: 420, h: 66 } : Watch.actShown ? { w: 380, h: 60 } : { w: weather ? 320 : 250, h: 50 }
+            // sans musique ni activite : le compagnon se montre a cote de l'heure
+            const p = hasMedia ? { w: 420, h: 66 } : Watch.actShown ? { w: 380, h: 60 }
+                : { w: (weather ? 320 : 250) + (Watch.petShown ? 40 : 0), h: 50 }
             return Watch.dcShown ? { w: p.w + 70, h: p.h } : p
         }
         if (act)
@@ -407,7 +412,7 @@ Item {
         repeat: true
         // la promenade du compagnon (quand on ne fait rien) et le
         // clignotement « partie trouvee » continuent sans personne
-        running: (root.ambient && root.ambientUsed) || ((Watch.petOut || Watch.matchFlash) && !Theme.reduced && !root.fullscreen)
+        running: (root.ambient && root.ambientUsed) || ((Watch.petWinOn || Watch.matchFlash) && !Theme.reduced && !root.fullscreen)
         onTriggered: root.amb += root.ambStep
     }
     // va-et-vient 0 -> 1 -> 0 en `period` ms (deux NumberAnimation InOutSine)
