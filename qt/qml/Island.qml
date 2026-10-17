@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import QtQuick.Shapes
 import IlotCore
 
 // L'ilot : fond aux coins bas arrondis, coins concaves en haut, pilule
@@ -126,26 +127,72 @@ Item {
         NumberAnimation { to: 1; duration: island.flash ? 400 : Ilot.media.playing ? 600 : 1200; easing.type: Easing.InOutSine }
         onRunningChanged: if (!running) island.pulse = 1
     }
-    RectangularShadow {
-        visible: island.flash || ["glow", "rgb", "pulse"].indexOf(island.border) >= 0
-        anchors.fill: parent
-        anchors.topMargin: -island.r
-        radius: island.r
-        blur: 22
-        offset.y: 4
-        color: Theme.alpha(island.lineColor, 0.5 * island.pulse)
-        z: -1
+    // Trace du contour (SVG), decale de (ox, oy) : il part du bord de
+    // l'ecran, suit le coin concave (meme coupe que Ear quand l'arrondi du
+    // bas le rogne), descend le cote, fait le tour du bas et remonte.
+    function outline(ox, oy) {
+        const w = width, h = height, t = earTop, e = ear
+        const r = Math.max(0, Math.min(island.r, w / 2, h - t))
+        // bas des cotes droits : debut de l'arrondi du bas
+        const yc = Math.max(t, h - r)
+        const f = n => (Math.round(n * 100) / 100).toString()
+        const P = (x, y) => f(x + ox) + " " + f(y + oy)
+        let left, right
+        if (e > 0.5) {
+            const ye = Math.min(t + e, yc)
+            const dx = e - Math.sqrt(Math.max(0, e * e - (t + e - ye) * (t + e - ye)))
+            left = "M " + P(-e, t) + " A " + f(e) + " " + f(e) + " 0 0 1 " + P(-dx, ye) + " L " + P(0, ye)
+            right = " L " + P(w, ye) + " L " + P(w + dx, ye) + " A " + f(e) + " " + f(e) + " 0 0 1 " + P(w + e, t)
+        } else {
+            left = "M " + P(0, t - 3)
+            right = " L " + P(w, t - 3)
+        }
+        return left + " L " + P(0, yc)
+            + " A " + f(r) + " " + f(r) + " 0 0 0 " + P(r, h)
+            + " L " + P(w - r, h)
+            + " A " + f(r) + " " + f(r) + " 0 0 0 " + P(w, yc)
+            + right
     }
-    Rectangle {
+    // lueur : le contour epais et flou, sous l'ilot
+    Shape {
+        id: glow
+        visible: island.flash || ["glow", "rgb", "pulse"].indexOf(island.border) >= 0
+        readonly property real pad: island.ear + 6
+        x: -pad
+        y: -6 + 4
+        width: island.width + pad * 2
+        height: island.height + 12
+        z: -1
+        preferredRendererType: Shape.CurveRenderer
+        layer.enabled: visible
+        layer.effect: MultiEffect {
+            blurEnabled: true
+            blur: 1
+            blurMax: 24
+        }
+        ShapePath {
+            fillColor: "transparent"
+            strokeWidth: 7
+            strokeColor: Theme.alpha(island.lineColor, 0.55 * island.pulse)
+            capStyle: ShapePath.FlatCap
+            joinStyle: ShapePath.RoundJoin
+            PathSvg { path: glow.visible ? island.outline(glow.pad, 6) : "" }
+        }
+    }
+    Shape {
+        id: edge
         visible: island.flash || island.border !== "none"
-        y: -3
-        width: parent.width
-        height: parent.height + 3
-        color: "transparent"
-        bottomLeftRadius: island.r
-        bottomRightRadius: island.r
-        border.width: island.border === "line" && !island.flash ? 1 : 1.5
-        border.color: Theme.alpha(island.lineColor, (island.border === "line" && !island.flash ? 0.45 : 0.8) * island.pulse)
+        width: island.width
+        height: island.height
+        preferredRendererType: Shape.CurveRenderer
+        ShapePath {
+            fillColor: "transparent"
+            strokeWidth: island.border === "line" && !island.flash ? 1 : 1.5
+            strokeColor: Theme.alpha(island.lineColor, (island.border === "line" && !island.flash ? 0.45 : 0.8) * island.pulse)
+            capStyle: ShapePath.FlatCap
+            joinStyle: ShapePath.RoundJoin
+            PathSvg { path: edge.visible ? island.outline(0, 0) : "" }
+        }
     }
 
     // ilot ouvert : un glisser entre deux zones de depot (vers le bouton

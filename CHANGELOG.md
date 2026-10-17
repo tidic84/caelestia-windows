@@ -4,6 +4,13 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.4 — 2026-10-17
+
+- **Bloc-notes** : plusieurs notes (liste à gauche, nouvelle note, suppression en deux clics), mise en forme **Markdown** (titres, gras, italique, listes, cases à cocher, citations, code, liens) avec une barre d'outils, Ctrl+B / Ctrl+I et un aperçu ; un interrupteur repasse en texte brut. L'ancien bloc-notes devient la première note.
+- **Raccourcis d'applications** : dans Réglages › Raccourcis, une combinaison ouvre l'application de votre choix, par exemple Win+T pour le Terminal. Les combinaisons avec la touche Windows passent avant celles de Windows.
+- **Assistant** : la Traduction ou Claude se désactive dans Réglages › Addons.
+- Contour **néon** (et les autres contours) : il suit maintenant les coins arrondis qui relient l'îlot au haut de l'écran, lueur comprise.
+
 ## 0.4.3 — 2026-10-17
 
 - **Quick Share** : le vrai partage de Google des téléphones Android remplace le partage par QR code. Bouton en haut à gauche du panneau (ou glisser des fichiers sur l'îlot) : appareils à proximité, envoi de fichiers, de texte ou de liens, QR code à scanner avec le téléphone, progression et annulation.

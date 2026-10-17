@@ -20,7 +20,8 @@ Item {
         color: "auto", day: "07:00", night: "20:00", border: "none", shape: "round", anim: "normal",
         text_size: 100, contrast: "normal", motion: "system", cvd: "off", activity: true, game_mode: true,
         game_perf: true, game_notif: false, match_alert: true, mix_auto: true, away: "on", pet: "blob",
-        pet_walk: true, clock: "digital", privacy: true, wxfx: true, dc_pill: true, media_bg: "art", pill_size: "m"
+        pet_walk: true, clock: "digital", privacy: true, wxfx: true, dc_pill: true, media_bg: "art", pill_size: "m",
+        assist_tr: true, assist_claude: true
     })
     signal settingsChanged()
 
@@ -85,7 +86,10 @@ Item {
         { id: "clips", icon: "content_paste", label: "Presse-papiers", page: "ClipsPage",
           desc: "Les 40 derniers textes et images copiés, et un bloc-notes" },
         { id: "assist", icon: "translate", label: "Assistant", page: "AssistPage", tip: "Traduction, sous-titres en direct et Claude",
-          desc: "Traduction, sous-titres en direct traduits, questions envoyées à Claude" },
+          desc: "Traduction, sous-titres en direct traduits, questions envoyées à Claude",
+          // parties de l'addon, a desactiver une a une (cfg)
+          parts: [{ key: "assist_tr", label: "Traduction", sub: "Traduction de textes et sous-titres en direct" },
+                  { key: "assist_claude", label: "Claude", sub: "Questions envoyées à l'application Claude" }] },
         { id: "walls", icon: "wallpaper", label: "Fonds", page: "WallsPage",
           desc: "Vos fonds d'écran et ceux de Wallpaper Engine ; choisir un fond recalcule les couleurs" },
         { id: "settings", icon: "settings", label: "", tip: "Réglages", page: "SettingsPage", core: true }
@@ -730,7 +734,11 @@ Item {
 
     // ========================================= presse-papiers, notes
     property var clips: []
-    property string notes: ""
+    // bloc-notes : [{ id, text, t }], note ouverte, mise en forme Markdown
+    property var notes: []
+    property string noteCur: ""
+    property bool notesMd: true
+    signal notesLoaded()
 
     // ========================================= fonds d'ecran
     property var we: ({ installed: false, running: false, current: "" })
@@ -1169,7 +1177,19 @@ Item {
         Api.invoke("clips_get").then(l => { root.clips = l })
         Api.invoke("bar_windows").then(t => root.applyBarWins(t))
         Api.invoke("store_get", { key: "calnotes" }).then(n => { if (n && typeof n === "object") root.calNotes = n })
-        Api.invoke("store_get", { key: "notes" }).then(n => { if (n && typeof n.text === "string") root.notes = n.text })
+        Api.invoke("store_get", { key: "notes" }).then(n => {
+            if (!n)
+                return
+            if (Array.isArray(n.notes)) {
+                root.notes = n.notes.filter(x => x && x.id && typeof x.text === "string")
+                root.noteCur = n.cur || ""
+                root.notesMd = n.md !== false
+            } else if (typeof n.text === "string" && n.text) {
+                // ancien bloc-notes (une seule note)
+                root.notes = [{ id: "n" + Date.now().toString(36), text: n.text, t: Date.now() }]
+            }
+            root.notesLoaded()
+        })
         Api.invoke("store_get", { key: "playlists" }).then(l => { if (Array.isArray(l)) root.playlists = l })
         Api.invoke("store_get", { key: "folders" }).then(saved => {
             if (saved && Array.isArray(saved.list)) {

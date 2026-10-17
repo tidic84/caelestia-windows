@@ -351,6 +351,7 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "monitor_target" => json(settings::target_screen(&app)),
         "shortcuts_get" => json(prefs::shortcuts_get()),
         "shortcuts_set" => json(prefs::shortcuts_set(a!("map"))),
+        "shortcuts_record" => json(winkey::shortcuts_record(app, a!("on"))),
         "settings_export" => json(prefs::settings_export(app)),
         "settings_import" => prefs::settings_import(app).and_then(json),
         // mises a jour, notes de version

@@ -10,10 +10,15 @@
 //! touche, ou quand l'ilot ne la prend pas, elle redevient une vraie touche
 //! Windows. Tant que le remappage n'est pas actif, le hook intercepte la vraie
 //! touche Windows et referme le menu Demarrer s'il s'ouvre quand meme.
+//!
+//! Le hook prend aussi les raccourcis configures avec la touche Windows
+//! (Win+T pour un terminal...), que `RegisterHotKey` refuse quand Windows se
+//! les reserve, et capte la combinaison tapee dans Reglages > Raccourcis
+//! (Windows la garderait pour lui, l'ilot ne la verrait pas).
 
 use std::os::windows::ffi::OsStrExt;
-use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU16, Ordering};
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU16, AtomicU32, AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -32,8 +37,8 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CONTROL, VK_ESCAPE, VK_F24, VK_L, VK_LWIN,
-    VK_MENU, VK_RWIN, VK_SHIFT,
+    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MOD_ALT, MOD_CONTROL, MOD_SHIFT, VIRTUAL_KEY, VK_CONTROL,
+    VK_ESCAPE, VK_F24, VK_L, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
 };
 use windows::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -69,6 +74,16 @@ static SENT: AtomicBool = AtomicBool::new(false);
 static PASS: AtomicBool = AtomicBool::new(false);
 /// Touche Win retenue (gauche ou droite)
 static WIN: AtomicU16 = AtomicU16::new(0);
+/// Une touche Windows est enfoncee (vraie touche ou F24 remappee)
+static WIN_DOWN: AtomicBool = AtomicBool::new(false);
+/// Raccourcis avec la touche Windows : (autres modificateurs MOD_*, touche, action)
+static COMBOS: Mutex<Vec<(u32, u32, String)>> = Mutex::new(Vec::new());
+/// Touche du dernier raccourci declenche, tant qu'elle reste enfoncee
+/// (la repetition automatique ne relance pas l'appli)
+static FIRED: AtomicU32 = AtomicU32::new(0);
+/// Enregistrement d'une combinaison dans les reglages, jusqu'a cette heure
+/// (GetTickCount64) : sans reponse de l'interface, il s'arrete tout seul
+static RECORD: AtomicU64 = AtomicU64::new(0);
 
 // ------------------------------------------------------------------ hook
 
@@ -86,6 +101,45 @@ pub fn set(app: &AppHandle, on: bool) {
     if on || remap_configured() || pending(app) {
         start(app);
     }
+}
+
+/// Raccourcis avec la touche Windows (prefs) ; le hook tourne s'il y en a.
+pub fn set_combos(app: &AppHandle, list: Vec<(u32, u32, String)>) {
+    let any = !list.is_empty();
+    *COMBOS.lock().unwrap() = list;
+    if any {
+        start(app);
+    }
+}
+
+/// Reglages > Raccourcis : la prochaine combinaison avec la touche Windows
+/// n'est pas executee mais envoyee a l'interface (`keyrec` : touche et
+/// modificateurs), Windows ne la voyant jamais.
+pub fn shortcuts_record(app: AppHandle, on: bool) {
+    let until = if on { unsafe { GetTickCount64() + 20_000 } } else { 0 };
+    RECORD.store(until, Ordering::Relaxed);
+    if on {
+        start(&app);
+    }
+}
+
+fn recording() -> bool {
+    let now = unsafe { GetTickCount64() };
+    now < RECORD.load(Ordering::Relaxed)
+}
+
+/// Ctrl, Alt, Maj enfoncees (MOD_*)
+fn held_mods() -> u32 {
+    let down = |k: VIRTUAL_KEY| unsafe { GetAsyncKeyState(k.0 as i32) } as u16 & 0x8000 != 0;
+    [(VK_MENU, MOD_ALT), (VK_CONTROL, MOD_CONTROL), (VK_SHIFT, MOD_SHIFT)]
+        .iter()
+        .filter(|(k, _)| down(*k))
+        .fold(0, |m, (_, f)| m | f.0)
+}
+
+/// Maj, Ctrl, Alt (gauche ou droite), Windows, Verr. Maj
+fn is_modifier(vk: u32) -> bool {
+    matches!(vk, 0x10..=0x12 | 0x14 | 0x5B | 0x5C | 0xA0..=0xA5)
 }
 
 fn start(app: &AppHandle) {
@@ -168,9 +222,52 @@ unsafe extern "system" fn hook(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     let remapped = vk == VK_F24 && kb.scanCode == F24_SC;
     let is_win = remapped || vk == VK_LWIN || vk == VK_RWIN;
     let held = HELD.load(Ordering::Relaxed);
+    if is_win {
+        WIN_DOWN.store(down, Ordering::Relaxed);
+    }
 
     if !is_win {
-        if !down || !held || COMBO.swap(true, Ordering::Relaxed) {
+        let code = kb.vkCode;
+        if !down {
+            if FIRED.load(Ordering::Relaxed) == code {
+                FIRED.store(0, Ordering::Relaxed);
+            }
+            return next();
+        }
+        // raccourci avec la touche Windows (ou enregistrement dans les reglages)
+        if WIN_DOWN.load(Ordering::Relaxed) && !is_modifier(code) {
+            if FIRED.load(Ordering::Relaxed) == code {
+                return LRESULT(1);
+            }
+            let mods = held_mods();
+            let rec = recording();
+            let action = if rec {
+                None
+            } else {
+                COMBOS.lock().unwrap().iter().find(|c| c.0 == mods && c.1 == code).map(|c| c.2.clone())
+            };
+            if rec || action.is_some() {
+                FIRED.store(code, Ordering::Relaxed);
+                COMBO.store(true, Ordering::Relaxed);
+                if rec {
+                    RECORD.store(0, Ordering::Relaxed);
+                }
+                // si Windows a vu Win enfoncee : une touche sans effet, pour
+                // qu'il n'ouvre pas le menu Demarrer au relachement
+                send(&[key(MASK, KEYBD_EVENT_FLAGS(0)), key(MASK, KEYEVENTF_KEYUP)]);
+                if let Some(&app) = APP.get() {
+                    // hors du hook : il doit rendre la main tres vite
+                    std::thread::spawn(move || match action {
+                        Some(a) => crate::prefs::fire(&app, a),
+                        None => {
+                            let _ = app.emit("keyrec", serde_json::json!({ "vk": code, "mods": mods }));
+                        }
+                    });
+                }
+                return LRESULT(1);
+            }
+        }
+        if !held || COMBO.swap(true, Ordering::Relaxed) {
             return next();
         }
         // Premiere touche d'un raccourci : on rend Win a Windows, suivie de
@@ -232,7 +329,8 @@ unsafe extern "system" fn hook(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
         send(&[win_key(true)]);
         return LRESULT(1);
     }
-    if !COMBO.load(Ordering::Relaxed) {
+    // appui seul pendant l'enregistrement d'un raccourci : rien
+    if !COMBO.load(Ordering::Relaxed) && !recording() {
         if let Some(app) = APP.get() {
             // hors du hook : il doit rendre la main tres vite
             let app = app.clone();
