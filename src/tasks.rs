@@ -74,6 +74,11 @@ pub struct Sub {
     pid: u32,
     /// heure de creation en ms (exacte en JavaScript), rendue a `task_kill`
     created: u64,
+    /// processus principal : son parent n'est pas du groupe. Le terminer
+    /// ferme en general tout le programme (les autres en dependent).
+    main: bool,
+    #[serde(skip)]
+    ppid: u32,
     /// titre de sa fenetre principale, vide s'il n'en a pas
     title: String,
     cpu: f32,
@@ -167,6 +172,8 @@ const _: () = assert!(std::mem::size_of::<SpInfo>() == 256);
 /// Un processus tel que vu par le noyau a l'instant du releve.
 struct Proc {
     pid: u32,
+    /// pid du parent a la creation (peut avoir ete reutilise depuis)
+    ppid: u32,
     name: String,
     create: i64,
     /// temps processeur noyau + utilisateur, en unites de 100 ns
@@ -220,6 +227,7 @@ fn snapshot(buf: &mut Vec<u64>) -> Option<Vec<Proc>> {
         };
         out.push(Proc {
             pid: e.unique_process_id as u32,
+            ppid: e.inherited_from_unique_process_id as u32,
             name,
             create: e.create_time,
             cpu: e.kernel_time.saturating_add(e.user_time),
@@ -594,6 +602,8 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
             t.procs.push(Sub {
                 pid: p.pid,
                 created: created_ms(p.create),
+                main: false,
+                ppid: p.ppid,
                 // pas notre propre fenetre : GetWindowTextW lui enverrait un message
                 title: hwnd.filter(|_| p.pid != std::process::id()).map(window_title).unwrap_or_default(),
                 cpu: c.min(100.0),
@@ -629,6 +639,19 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
     }
     if !missing.is_empty() {
         icons.extend(icons_for(missing));
+    }
+    // principal : racine du groupe qui a au moins un enfant dans le groupe
+    // (des instances independantes, comme plusieurs notepad, ne le sont pas)
+    for g in groups.values_mut() {
+        let procs = &g.task.procs;
+        let born: HashMap<u32, u64> = procs.iter().map(|s| (s.pid, s.created)).collect();
+        // parent du groupe ne avant l'enfant : sinon le pid a ete reutilise
+        let has_parent = |s: &Sub| s.ppid != s.pid && born.get(&s.ppid).is_some_and(|&c| c <= s.created);
+        let parents: HashSet<u32> = procs.iter().filter(|s| has_parent(s)).map(|s| s.ppid).collect();
+        let mains: Vec<bool> = procs.iter().map(|s| !has_parent(s) && parents.contains(&s.pid)).collect();
+        for (s, m) in g.task.procs.iter_mut().zip(mains) {
+            s.main = m;
+        }
     }
     let mut list: Vec<Task> = groups
         .into_values()
@@ -742,6 +765,8 @@ mod tests {
         let pids: Vec<u32> = g.procs.iter().map(|s| s.pid).collect();
         let created = g.procs.iter().find(|s| s.pid == a.id()).unwrap().created;
         assert!(pids.contains(&a.id()) && pids.contains(&b.id()), "{pids:?}");
+        // deux ping independants, sans enfant : aucun n'est « principal »
+        assert!(g.procs.iter().filter(|s| s.pid == a.id() || s.pid == b.id()).all(|s| !s.main));
         // les autres groupes n'envoient pas de detail
         assert!(r.list.iter().filter(|t| !t.name.eq_ignore_ascii_case("ping")).all(|t| t.procs.is_empty()));
         // un pid qui ne porte pas ce nom n'est pas termine
@@ -756,6 +781,40 @@ mod tests {
         assert!(b.try_wait().unwrap().is_none(), "l'autre ping doit survivre");
         let _ = b.kill();
         let _ = b.wait();
+    }
+
+    #[test]
+    fn principal_seulement_pour_un_parent_du_groupe() {
+        // cmd -> cmd -> ping : le premier cmd est le principal du groupe cmd
+        let mut outer = Command::new("cmd")
+            .args(["/c", "cmd", "/c", "ping", "-n", "60", "127.0.0.1"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .unwrap();
+        let tasks = Tasks::default();
+        let mut found = None;
+        for _ in 0..20 {
+            let r = tasks_get(State::of(&tasks), Some(vec!["cmd".into()]));
+            let g = r.list.into_iter().find(|t| t.name.eq_ignore_ascii_case("cmd")).expect("groupe cmd");
+            let o = g.procs.iter().find(|s| s.pid == outer.id()).map(|s| s.main);
+            let i = g.procs.iter().find(|s| s.ppid == outer.id()).map(|s| (s.pid, s.main));
+            if let (Some(o), Some(i)) = (o, i) {
+                found = Some((o, i));
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let snap = snapshot(&mut Vec::new()).unwrap_or_default();
+        let (outer_main, (inner, inner_main)) = found.expect("cmd imbrique");
+        // menage : le ping lance par le cmd interieur, puis les deux cmd
+        for p in snap.iter().filter(|p| p.ppid == inner && p.name.eq_ignore_ascii_case("ping.exe")) {
+            task_kill(State::of(&tasks), "ping".into(), Some(p.pid), None);
+        }
+        task_kill(State::of(&tasks), "cmd".into(), Some(inner), None);
+        let _ = outer.kill();
+        let _ = outer.wait();
+        assert!(outer_main, "le cmd exterieur a un enfant cmd : principal");
+        assert!(!inner_main, "le cmd interieur a son parent dans le groupe");
     }
 
     #[test]

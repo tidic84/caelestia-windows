@@ -179,7 +179,8 @@ Item {
             n: s ? 1 : t ? t.count : 0, cpu: v ? v.cpu : 0, mem: v ? v.mem : 0, disk: v ? v.disk : 0,
             gpu: v ? v.gpu : 0, net: v ? v.net : 0, icon: t && !s ? t.icon : "", path: t ? t.path : "",
             prot: t ? !!t.protected : false,
-            pid: s ? s.pid : 0, created: s ? s.created : 0, title: s ? s.title : "", expanded: !!open
+            pid: s ? s.pid : 0, created: s ? s.created : 0, main: s ? !!s.main : false,
+            title: s ? s.title : "", expanded: !!open
         }
     }
     function sync(items) {
@@ -209,13 +210,13 @@ Item {
     }
 
     function showMenu(c, p) {
-        const t = { name: c.name, label: c.label, n: c.n, prot: c.prot, path: c.path, pid: c.pid, created: c.created }
+        const t = { name: c.name, label: c.label, n: c.n, prot: c.prot, path: c.path, pid: c.pid, created: c.created, main: c.main }
         const title = t.label + (t.pid ? " · PID " + t.pid : t.n > 1 ? " (" + t.n + " processus)" : "")
         let entries = [{ type: "title", label: title }]
         if (t.prot)
             entries.push({ type: "title", label: "Processus Windows protégé" })
         else
-            entries.push({ icon: "close", label: t.pid ? "Fin du processus" : "Fin de tâche", danger: true, confirm: t.n > 1 ? "Confirmer (" + t.n + ")" : "Confirmer", run: () => { ctx.hide(); page.kill(t) } })
+            entries.push({ icon: "close", label: t.pid ? "Fin du processus" : "Fin de tâche", danger: true, confirm: t.main ? "Tout fermer ?" : t.n > 1 ? "Confirmer (" + t.n + ")" : "Confirmer", run: () => { ctx.hide(); page.kill(t) } })
         if (t.path)
             entries.push({ icon: "folder_open", label: "Ouvrir l’emplacement du fichier", run: () => {
                 ctx.hide()
@@ -401,6 +402,7 @@ Item {
             required property string key
             required property int pid
             required property real created
+            required property bool main
             required property string title
             required property bool expanded
             required property string header
@@ -488,7 +490,7 @@ Item {
                             id: count
                             visible: cell.n > 1 || cell.pid > 0
                             anchors.baseline: taskName.baseline
-                            text: cell.pid ? "PID " + cell.pid : "(" + cell.n + ")"
+                            text: cell.pid ? "PID " + cell.pid + (cell.main ? " · principal" : "") : "(" + cell.n + ")"
                             px: 11.5
                             tnum: true
                             color: Theme.inkVariant
@@ -547,7 +549,7 @@ Item {
                         active: !cell.prot
                         opacity: armed ? 1 : cell.prot ? (row.hovered ? 0.4 : 0) : (row.hovered || hovered ? 1 : 0)
                         color: (hovered && !cell.prot) || armed ? Theme.error : "transparent"
-                        tip: cell.prot ? "Processus Windows protégé" : cell.pid ? "Fin du processus " + cell.pid : cell.n > 1 ? "Fin de tâche (" + cell.n + " processus)" : "Fin de tâche"
+                        tip: cell.prot ? "Processus Windows protégé" : cell.main ? "Processus principal : le terminer ferme en général tout le programme" : cell.pid ? "Fin du processus " + cell.pid : cell.n > 1 ? "Fin de tâche (" + cell.n + " processus)" : "Fin de tâche"
                         onClicked: {
                             if (!armed) {
                                 page.armed = cell.key
@@ -569,7 +571,7 @@ Item {
                             }
                             Txt {
                                 visible: kill.armed
-                                text: cell.n > 1 ? "Confirmer (" + cell.n + ")" : "Confirmer"
+                                text: cell.main ? "Tout fermer ?" : cell.n > 1 ? "Confirmer (" + cell.n + ")" : "Confirmer"
                                 px: 12
                                 color: killRow.fg
                                 anchors.verticalCenter: parent.verticalCenter

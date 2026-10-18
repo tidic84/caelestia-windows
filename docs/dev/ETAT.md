@@ -24,6 +24,20 @@ reprendre.
 
 ## Journal
 
+### 2026-10-18 : 0.4.11, processus « principal »
+
+Retour d'usage : terminer une sous-ligne a fermé tout le programme (c'était
+sans doute le processus principal, dont les autres dépendent). Une autre
+sous-ligne a fait planter un seul onglet (processus de rendu, comportement
+normal). Ajouts : `Proc.ppid`, `Sub.main`. Est principal une racine du
+groupe qui a au moins un enfant dans ce groupe, avec un parent né avant
+l'enfant (contre les PID réutilisés). Des instances indépendantes, comme
+plusieurs notepad, ne sont pas marquées. Dans le QML, ça donne « PID x ·
+principal », la confirmation « Tout fermer ? » et une infobulle
+d'avertissement. Nouveau test avec cmd → cmd → ping. Tests 6/6, clippy
+propre, relu par `relecteur` (sa remarque sur les instances indépendantes
+est appliquée). Compilé et installé.
+
 ### 2026-10-18 : 0.4.11, nom de Spotify
 
 `apps::file_description` coupe maintenant au premier `\0`. Pour Spotify
