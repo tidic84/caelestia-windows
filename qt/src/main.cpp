@@ -52,6 +52,12 @@ int main(int argc, char *argv[])
             qInstallMessageHandler(toFile);
     }
 
+    // Qt plante en demontant ce thread de synchro (QDxgiVSyncService) quand
+    // l'ecran ou le GPU change (veille, rebranchement) ; la synchro reste
+    // assuree par la swapchain
+    if (!qEnvironmentVariableIsSet("QT_D3D_NO_VBLANK_THREAD"))
+        qputenv("QT_D3D_NO_VBLANK_THREAD", "1");
+
     QGuiApplication app(argc, argv);
     app.setQuitOnLastWindowClosed(false);
     app.setApplicationName(QStringLiteral("Ilot"));

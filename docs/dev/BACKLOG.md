@@ -72,3 +72,6 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   - `~Backend()` (plantage possible à la fermeture) ;
   - images réduites quand un seul côté de `sourceSize` est donné.
   Voir `ETAT.md`.
+- Session du 2026-10-18 : deux plantages trouvés dans les dumps de Windows,
+  le pointeur nul de `Tray` à la fermeture (`~Shell`) et le bug de Qt
+  `QDxgiVSyncService`. Voir `ETAT.md`.

@@ -53,6 +53,13 @@ Shell::Shell(QObject *parent) : QObject(parent)
 
 Shell::~Shell()
 {
+    // les membres (moteur QML) sont detruits avant ~QObject : sans cela, un
+    // evenement en attente (settings, ecran) arrive sur un Shell a moitie detruit
+    if (Backend *b = Backend::instance())
+        b->disconnect(this);
+    qGuiApp->disconnect(this);
+    for (QScreen *s : QGuiApplication::screens())
+        s->disconnect(this);
     if (m_msgWnd) {
         NOTIFYICONDATAW nid{sizeof(nid)};
         nid.hWnd = HWND(m_msgWnd);
@@ -99,7 +106,8 @@ bool Shell::start()
         QJsonObject c = parse(json);
         bool barChanged = c.value("bar") != m_cfg.value("bar") || c.value("bar_autohide") != m_cfg.value("bar_autohide");
         m_cfg = c;
-        Tray::instance()->setEnabled(c.value("bar").toBool());
+        if (Tray *t = Tray::instance())
+            t->setEnabled(c.value("bar").toBool());
         if (barChanged)
             place();
     });
@@ -122,7 +130,8 @@ bool Shell::start()
     connect(qGuiApp, &QCoreApplication::aboutToQuit, this, [] { ilot_shutdown(); });
 
     m_cfg = ok(b->invokeSync(QStringLiteral("island"), QStringLiteral("settings_get"))).toObject();
-    Tray::instance()->setEnabled(m_cfg.value("bar").toBool());
+    if (Tray *t = Tray::instance())
+        t->setEnabled(m_cfg.value("bar").toBool());
     place();
     m_island->show();
     QMetaObject::invokeMethod(m_island, "start");

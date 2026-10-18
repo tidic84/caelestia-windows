@@ -20,6 +20,29 @@ reprendre.
 
 ## Journal
 
+### 2026-10-18 : plantages de l'îlot (dumps du 16 et du 17)
+
+Neuf plantages en deux jours, retrouvés dans `%LOCALAPPDATA%\CrashDumps`
+(`ilot.exe.<pid>.dmp`) et lus avec `cdbX64.exe` (WinDbg). Il y avait deux
+causes :
+- **Pointeur nul dans `Tray::setEnabled`** (6 dumps, `[rcx+0x58]`, qui
+  correspond à `m_thread.joinable()`). L'appel venait de `Shell` à la
+  fermeture ou au « Recharger » : un événement `settings` en attente arrivait
+  pendant que les membres de `Shell` (le moteur QML) étaient détruits, alors
+  que `Tray::instance()` était déjà nul. Correction : `~Shell` se désabonne
+  d'abord de `Backend`, de `qGuiApp` et des écrans, et les deux appels à
+  `Tray::instance()` sont protégés.
+- **Bug de Qt dans `QDxgiVSyncService`** (2 dumps, thread de rendu,
+  `_purecall` ou corruption du tas). Il survient quand l'écran ou le GPU
+  change (veille, rebranchement). Correction : `QT_D3D_NO_VBLANK_THREAD=1`
+  dans `main.cpp`, sauf si la variable est déjà définie.
+
+Vérifié : ça compile avec `qt\build.cmd`, et l'îlot se relance.
+Non vérifié : aucune fermeture, aucun « Recharger », aucune mise en veille
+de l'écran n'a été testée. Pas de relecture par l'agent `relecteur`, qui
+n'est pas installé sur ce poste. Pour vérifier, surveiller les nouveaux
+`.dmp` dans `CrashDumps`.
+
 ### 2026-10-17 : publication de la 0.4.9
 
 - Passage de `Cargo.toml` et `Cargo.lock` en 0.4.9, plus une section dans
