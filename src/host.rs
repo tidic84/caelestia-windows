@@ -37,6 +37,13 @@ static STATES: RwLock<Option<States>> = RwLock::new(None);
 /// Etat partage d'un type donne, comme `tauri::State`.
 pub struct State<'a, T>(&'a T);
 
+#[cfg(test)]
+impl<'a, T> State<'a, T> {
+    pub fn of(v: &'a T) -> Self {
+        State(v)
+    }
+}
+
 impl<T> Deref for State<'_, T> {
     type Target = T;
     fn deref(&self) -> &T {

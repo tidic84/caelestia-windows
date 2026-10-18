@@ -6,7 +6,9 @@ reprendre.
 
 ## Où on en est (mis à jour le 2026-10-18)
 
-- **Version** : 0.4.10, publiée par le tag `v0.4.10` (GitHub Action
+- **Version** : 0.4.11 dans `Cargo.toml` (gestionnaire des tâches retravaillé),
+  installée sur le poste et commitée, **pas encore publiée**. Dernière publiée :
+  0.4.10, par le tag `v0.4.10` (GitHub Action
   `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
   dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
@@ -15,10 +17,74 @@ reprendre.
 - **Consigne de l'utilisateur** : ne corriger que l'essentiel, sans rien qui
   change l'usage. Le Rust se traite « selon l'usage », et les bugs au fur et à
   mesure. Ce qui reste à faire est dans `BACKLOG.md`.
-- **Prochaine étape** : aucune n'est imposée. Attendre les retours d'usage,
-  puis piocher dans `BACKLOG.md` (les 🔴 Qt d'abord).
+- **Prochaine étape** : publier la 0.4.11 (tag `v0.4.11`) quand
+  l'utilisateur aura essayé l'onglet. Option encore en attente de son
+  accord : « Redémarrer » dans le clic droit de la ligne `explorer`.
+  Ensuite, piocher dans `BACKLOG.md`.
 
 ## Journal
+
+### 2026-10-18 : 0.4.11, groupes développés dans le gestionnaire des tâches
+
+- **Rust** (`src/tasks.rs`). `tasks_get` prend `expanded` (noms des groupes
+  ouverts). Seuls ces groupes reçoivent `procs`, une liste de `Sub` : pid,
+  `created` (heure de création en ms, exacte en JS), titre de la fenêtre
+  (`GetWindowTextW`, sans message envoyé aux autres processus), CPU,
+  mémoire, disque, GPU et connexions. `pids_with_window` renvoie maintenant
+  pid → HWND. `task_kill` prend `pid` et `created` en option. Un seul
+  processus est alors terminé, et seulement s'il porte toujours ce nom et
+  cette heure de création (contre la réutilisation des PID).
+- **`src/host.rs`** : `State::of`, réservé aux tests (`#[cfg(test)]`).
+- **QML** (`TasksPage.qml`). Un clic sur un groupe de plusieurs processus
+  le développe ou le replie (chevron à gauche du nom). Les sous-lignes ont
+  la clé `nom/pid`, font 32 px, sont en retrait et sans icône. Chacune a sa
+  fin de tâche (bouton, et « Fin du processus » au clic droit). `opened`
+  garde les groupes ouverts, même quand l'onglet est fermé. `again` relance
+  un rafraîchissement demandé pendant qu'un autre est en cours. Le bouton
+  s'arme sur `key` au lieu de `name`, et il est désarmé quand on replie le
+  groupe.
+- **Vérifié.** `cargo test` : 5/5, dont un nouveau test qui lance deux
+  `ping`. Il vérifie que le groupe ouvert est seul à recevoir son détail,
+  qu'un PID avec un autre nom ou une autre heure de création est refusé, et
+  qu'on termine un seul des deux `ping`. `cargo clippy` : aucun nouvel
+  avertissement. `qt\build.cmd` et `install.ps1` OK, aucune erreur QML au
+  démarrage. Mémoire privée : 227 Mo, sans changement. Relu par
+  `relecteur` : deux remarques appliquées (heure de création, désarmement).
+  **Pas manipulé à la main** : le clic sur un groupe, l'affichage des
+  sous-lignes et la fin d'un seul processus dans l'interface restent à
+  confirmer.
+
+### 2026-10-18 : 0.4.11, gestionnaire des tâches retravaillé
+
+Audit par deux agents `relecteur` (Rust et QML), puis réécriture de
+`src/tasks.rs` et `qt/qml/TasksPage.qml`, relue par un troisième.
+
+- **Chiffres.** `NtQuerySystemInformation(SystemProcessInformation)`, un seul
+  appel par tick, remplace sysinfo pour les processus (sysinfo ne sert plus
+  qu'à `Networks`). Raison : sysinfo ouvre chaque processus, et 142 sur 279
+  refusaient sans admin (svchost, postgres…), d'où 0 % de CPU et une mémoire
+  surévaluée. La struct `SpInfo` est maison (256 octets, vérifiés par un
+  assert). Le chemin de l'exe vient de `QueryFullProcessImageNameW`, sinon de
+  la classe 88 (`SystemProcessIdInformation`) + `QueryDosDeviceW`. Il est mis
+  en cache par pid + heure de création.
+- **Amorce.** Au premier relevé, ou après plus de 6 s sans appel, un relevé
+  d'amorce est suivi d'une pause de 300 ms. Sinon, débits et CPU seraient des
+  moyennes depuis le démarrage.
+- **`tasks_stop`.** Nouvelle commande, appelée quand l'onglet se cache : elle
+  libère PDH, `Networks`, le tampon et les caches par pid.
+- **`task_kill`.** Passe par `TerminateProcess` (plus de `taskkill.exe` par
+  processus) et renvoie `{killed, denied}`.
+- **QML.** `ListModel` synchronisé sur place (`sync()`, clé = nom en
+  minuscules), au lieu d'un tableau remplacé toutes les 2 s. Ce remplacement
+  ramenait la liste en haut et recréait ~1 500 objets. Ajouts : menu clic
+  droit (`CtxMenu`) avec Fin de tâche, Ouvrir l'emplacement et Rechercher en
+  ligne ; tri en cliquant les en-têtes de colonnes ; virgule décimale.
+- **Vérifié.** `cargo clippy` sans nouvel avertissement. `cargo test` : 4/4,
+  dont un nouveau test qui relève svchost avec des valeurs non nulles et
+  compare le chemin NT converti à `exe_path`. Build complet et `install.ps1`
+  OK, aucune erreur QML au démarrage dans `ILOT_QT_LOG`. **L'onglet n'a pas
+  été manipulé à la main par Claude** : défilement, clic droit et fin de tâche
+  restent à confirmer à l'usage.
 
 ### 2026-10-18 : 0.4.10, Claude Code dans l'îlot + plantages de Tidic, publiée
 

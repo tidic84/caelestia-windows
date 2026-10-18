@@ -75,6 +75,21 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 - 🟢 `ilot.exe --claude` lancé à la main depuis mintty (Git Bash) attend
   stdin. Ce n'est pas un problème avec Claude Code, qui ferme stdin.
 
+## Gestionnaire des tâches (0.4.11) : restes
+
+- 🟢 Pas d'état « Ne répond pas » (`IsHungAppWindow`). Les applis du Store
+  sont comptées sous `ApplicationFrameHost`. On ne peut pas viser un seul PID.
+- 🟢 `src/tasks.rs` : un chemin d'exe illisible une fois reste `None` en cache
+  pour toute la vie du processus (pas d'icône, et le processus peut être
+  classé « win »).
+- 🟢 Les caches `icons` et `labels` (par chemin) grossissent sans limite. Ça
+  ne compte que pour les exe lancés depuis `%TEMP%` sous des noms aléatoires.
+- 🟢 La colonne « Disque » compte toutes les E/S (réseau et pipes compris),
+  comme `GetProcessIoCounters`.
+- 🟢 Clic droit sur une sous-ligne (un seul processus) : « Ouvrir
+  l'emplacement » prend le chemin du groupe. Si deux installations ont le
+  même nom d'exe (Chrome et Chrome Canary), il peut viser la mauvaise.
+
 ## Fait
 
 - 0.4.10 : Claude Code dans l'îlot (hooks, animation L4, son de fin).

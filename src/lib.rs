@@ -379,8 +379,9 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "power_get" => json(pc::power_get()),
         "power_set" => json(pc::power_set(a!("mode"))),
         "procs_running" => json(pc::procs_running(a!("names"))),
-        "tasks_get" => json(tasks::tasks_get(app.state())),
-        "task_kill" => json(tasks::task_kill(app.state(), a!("name"))),
+        "tasks_get" => json(tasks::tasks_get(app.state(), a!("expanded"))),
+        "tasks_stop" => json(tasks::tasks_stop(app.state())),
+        "task_kill" => json(tasks::task_kill(app.state(), a!("name"), a!("pid"), a!("created"))),
         "taskmgr_open" => json(tasks::taskmgr_open()),
         // sante, services, jeux en cours, inactivite
         "health_get" => json(health::health_get()),

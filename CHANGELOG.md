@@ -4,6 +4,14 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.11 — 2026-10-18
+
+- **Gestionnaire des tâches, chiffres justes** : CPU, mémoire et disque sont lus comme le fait le Gestionnaire des tâches de Windows, pour tous les processus. Les services qui affichaient 0 % (svchost, bases de données, indexation…) ont maintenant leurs vrais chiffres, et la mémoire n'est plus surévaluée. Plus de débits disque absurdes à l'ouverture de l'onglet. Le débit réseau total ne compte plus deux fois le trafic des cartes virtuelles (WSL, Hyper-V).
+- **Détail d'un programme** : un clic sur un programme qui a plusieurs processus (« Chrome (30) ») affiche un processus par ligne, avec son PID, le titre de sa fenêtre, ses chiffres et sa propre fin de tâche.
+- **Clic droit sur un programme** : menu avec « Fin de tâche », « Ouvrir l’emplacement du fichier » et « Rechercher en ligne ». Un clic sur l'en-tête d'une colonne (CPU, Mémoire, Disque, GPU, Réseau, Programme) trie la liste.
+- **Plus fluide** : la liste ne remonte plus en haut toutes les 2 s, les lignes sont mises à jour sur place au lieu d'être recréées, et l'ordre ne saute plus entre deux rafraîchissements. Onglet fermé, plus rien n'est gardé en mémoire.
+- **Fin de tâche** plus rapide (plus de lancement de `taskkill`), avec le nombre de processus concernés et un message si Windows refuse (programme lancé en administrateur). Échap vide le filtre ; « Aucun résultat » quand le filtre ne trouve rien ; nombres avec une virgule.
+
 ## 0.4.10 — 2026-10-18
 
 - **Claude Code dans l'îlot** : pendant que Claude travaille, une petite animation orange (quatre points en orbite qui fusionnent en étoile, puis se séparent) s'affiche à gauche de l'heure, avec le temps écoulé à droite. Quand il a fini, l'animation s'efface et un petit « pop » retentit si la tâche a duré au moins 30 s. Ça marche pour toutes les sessions Claude Code, quel que soit le dossier.
