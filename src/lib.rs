@@ -314,6 +314,7 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         // theme, fonds
         "win_theme_get" => json(theme::win_theme_get()),
         "win_theme_apply" => json(theme::win_theme_apply(a!("light"), a!("palette"))),
+        "theme_source" => json(theme::theme_source(a!("url"), a!("max"))),
         "walls_get" => json(wall::walls_get()),
         "wall_current" => json(wall::wall_current()),
         "wall_set" => json(wall::wall_set(a!("path"))),

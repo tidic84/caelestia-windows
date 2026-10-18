@@ -37,7 +37,7 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MOD_ALT, MOD_CONTROL, MOD_SHIFT, VIRTUAL_KEY, VK_CONTROL,
+    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, MOD_ALT, MOD_CONTROL, MOD_SHIFT, VIRTUAL_KEY, VK_CAPITAL, VK_CONTROL,
     VK_ESCAPE, VK_F24, VK_L, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
 };
 use windows::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
@@ -142,6 +142,11 @@ fn is_modifier(vk: u32) -> bool {
     matches!(vk, 0x10..=0x12 | 0x14 | 0x5B | 0x5C | 0xA0..=0xA5)
 }
 
+/// Crochet clavier installe (il previent des appuis sur Verr. Maj)
+pub fn running() -> bool {
+    STARTED.load(Ordering::Relaxed)
+}
+
 fn start(app: &AppHandle) {
     if STARTED.swap(true, Ordering::Relaxed) {
         return;
@@ -218,6 +223,9 @@ unsafe extern "system" fn hook(code: i32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     let vk = VIRTUAL_KEY(kb.vkCode as u16);
     let msg = wp.0 as u32;
     let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
+    if (vk == VK_CAPITAL && !down) || (down && matches!(kb.vkCode, 0x10 | 0xA0 | 0xA1)) {
+        crate::events::CAPS.notify();
+    }
     // touche Windows remappee en F24 par le pilote
     let remapped = vk == VK_F24 && kb.scanCode == F24_SC;
     let is_win = remapped || vk == VK_LWIN || vk == VK_RWIN;

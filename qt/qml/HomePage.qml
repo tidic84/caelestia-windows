@@ -243,6 +243,7 @@ Item {
                 IconBtn {
                     small: true
                     icon: "chevron_left"
+                    tip: "Mois précédent"
                     onClicked: cal.offset--
                 }
                 Txt {
@@ -254,6 +255,7 @@ Item {
                     anchors.right: parent.right
                     small: true
                     icon: "chevron_right"
+                    tip: "Mois suivant"
                     onClicked: cal.offset++
                 }
             }
@@ -360,6 +362,7 @@ Item {
                 IconBtn {
                     small: true
                     icon: "arrow_back"
+                    tip: "Retour"
                     onClicked: cal.dayOpen = false
                 }
                 Txt {
@@ -680,6 +683,7 @@ Item {
             x: 10
             anchors.verticalCenter: parent.verticalCenter
             icon: Ilot.vol.muted || volCard.v === 0 ? "volume_off" : volCard.v > 100 ? "campaign" : volCard.v < 50 ? "volume_down" : "volume_up"
+            tip: "Couper / rétablir"
             onClicked: Ilot.setVolume(undefined, !Ilot.vol.muted)
         }
         M3Slider {

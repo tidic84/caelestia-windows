@@ -274,7 +274,6 @@ Item {
                                     anchors.verticalCenter: parent.verticalCenter
                                     color: hovered ? Theme.surfaceHigh : "transparent"
                                     tip: modelData.tip
-                                    onHoveredChanged: if (hovered) Tray.click(modelData.id, "hover")
                                     onClicked: Tray.click(modelData.id, "left")
                                     onRightClicked: Tray.click(modelData.id, "right")
                                     doubleClick: true

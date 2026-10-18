@@ -79,7 +79,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── display.rs    Luminosité (WMI, DDC/CI) + OSD
 ├── net.rs        Wi-Fi, Bluetooth, réseau
 ├── notif.rs      Notifications Windows (wpndatabase.db en lecture seule)
-├── theme.rs      Clair/sombre et accent        ├── wall.rs  Fonds d'écran      ├── we.rs  Wallpaper Engine
+├── theme.rs      Clair/sombre, accent, source  ├── wall.rs  Fonds d'écran      ├── we.rs  Wallpaper Engine
 ├── apps.rs       Lanceur (shell:AppsFolder)    ├── games.rs Jeux Steam/Epic/Ubisoft/GOG, sélecteurs de fichiers
 ├── files.rs      Fichiers déposés (conversion, zip, presse-papiers)
 ├── tasks.rs      Gestionnaire des tâches       ├── pdh.rs   Compteurs PDH (CPU, GPU, disque)
@@ -107,11 +107,11 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ```text
 ├── CMakeLists.txt  Module QML "Ilot" (glob qml/*), singletons Theme/Ilot/Api/Watch, shader, polices, compile_commands.json
 ├── build.cmd       cargo build --release → CMake/Ninja (MSVC via vswhere) → windeployqt
-├── ilot.rc, fonts/ (Rubik, Material Symbols), shaders/round.frag (image arrondie en une passe), shaders/claude.frag (animation Claude Code)
+├── ilot.rc, fonts/ (Rubik, Material Symbols), shaders/round.frag (image arrondie en une passe), shaders/claude.frag (animation Claude Code), shaders/vizbars.frag (visualiseur de l'onglet Média)
 └── src/
     ├── main.cpp      Démarrage, instance unique, journal ILOT_QT_LOG
     ├── core.h        Prototypes C du cœur Rust
-    ├── backend.*     Pont QML↔Rust : invoke/invokeSync, onEmit, provider image://ilot, imagePixels, quit/restart
+    ├── backend.*     Pont QML↔Rust : invoke/invokeSync, onEmit, provider image://ilot (décodé à la taille demandée), quit/restart
     ├── shell.*       Fenêtres, placement et réservation, menu de notification, Ctrl+Alt+Espace
     ├── tray.*        Hôte de la zone de notification (fausse Shell_TrayWnd), provider image://tray
     ├── winctl.*      Élément QML WinCtl : zones cliquables, flou, plein écran, focus
@@ -133,5 +133,5 @@ Décor         Aurora · WxFx (météo animée) · Glow · Eq · VizBars
 Composants    Btn · IconBtn · TextBtn · M3Switch · M3Slider · Seg · Field · Area · CtxMenu · Card · Chip · Empty
               Gauge · Spinner · Scroller · Tip · Txt · Ms · ClaudeMark · RoundImage · ArtImage · RoundArt · MediaControls
               NotifRow · TimerBody
-Modules JS    calc · emoji · ical · rank (frécence du lanceur) · quant (couleur du thème) · mcu (material-color-utilities)
+Modules JS    calc · emoji · ical · rank (frécence du lanceur) · mcu (material-color-utilities)
 ```

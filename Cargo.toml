@@ -1,6 +1,6 @@
 ﻿[package]
 name = "ilot"
-version = "0.4.11"
+version = "0.4.12"
 edition = "2021"
 rust-version = "1.89"
 description = "Ilot facon Caelestia pour Windows"
@@ -15,6 +15,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "bmp", "webp", "gif"] }
+# couleur source du theme (QuantizerCelebi + Score, comme material-color-utilities)
+material-colors = "0.4"
 sysinfo = "0.33"
 arboard = { version = "3", default-features = false, features = ["image-data"] }
 windows-core = "0.61"
@@ -92,6 +94,6 @@ windows = { version = "0.61", features = [
 ] }
 
 [profile.release]
-opt-level = "s"
+opt-level = 3
 lto = true
 strip = true

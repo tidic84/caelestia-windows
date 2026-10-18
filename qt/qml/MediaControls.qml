@@ -8,6 +8,7 @@ Row {
         big: parent.big
         icon: "skip_previous"
         anchors.verticalCenter: parent.verticalCenter
+        tip: "Précédent"
         onClicked: Ilot.mediaAction("prev")
     }
     IconBtn {
@@ -17,12 +18,14 @@ Row {
         radius: hovered ? 18 : parent.big ? 18 : 12
         icon: Ilot.media.playing ? "pause" : "play_arrow"
         anchors.verticalCenter: parent.verticalCenter
+        tip: Ilot.media.playing ? "Pause" : "Lecture"
         onClicked: Ilot.mediaAction("toggle")
     }
     IconBtn {
         big: parent.big
         icon: "skip_next"
         anchors.verticalCenter: parent.verticalCenter
+        tip: "Suivant"
         onClicked: Ilot.mediaAction("next")
     }
 }

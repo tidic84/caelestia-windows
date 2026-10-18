@@ -89,6 +89,7 @@ Item {
                     filled: true
                     width: 56
                     icon: Ilot.tmr.running ? "pause" : "play_arrow"
+                    tip: Ilot.tmr.running ? "Pause" : Ilot.timerLeft < Ilot.tmr.total ? "Reprendre" : "Démarrer"
                     onClicked: Ilot.timerToggle()
                 }
                 IconBtn {

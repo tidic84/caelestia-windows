@@ -461,12 +461,30 @@ pub fn watch_keys(app: AppHandle) {
     std::thread::spawn(move || {
         let caps = || unsafe { GetKeyState(VK_CAPITAL.0 as i32) & 1 != 0 };
         let mut last = caps();
+        let mut seen = crate::events::CAPS.seq();
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(120));
-            let now = caps();
-            if now != last {
-                last = now;
-                let _ = app.emit("activity", serde_json::json!({ "kind": "caps", "on": now }));
+            // attentes avant chaque releve
+            let mut checks: &[u64] = &[0];
+            if crate::winkey::running() {
+                // le crochet clavier previent ; releve de securite toutes les 2 s
+                let now = crate::events::CAPS.wait(seen, std::time::Duration::from_secs(2));
+                if now != seen {
+                    seen = now;
+                    // l'etat lu ici peut suivre l'appui avec retard (appli au
+                    // premier plan occupee) : plusieurs releves
+                    checks = &[20, 130, 250];
+                }
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(120));
+            }
+            for &ms in checks {
+                std::thread::sleep(std::time::Duration::from_millis(ms));
+                let now = caps();
+                if now != last {
+                    last = now;
+                    let _ = app.emit("activity", serde_json::json!({ "kind": "caps", "on": now }));
+                    break;
+                }
             }
         }
     });

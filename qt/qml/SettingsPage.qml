@@ -40,11 +40,15 @@ Item {
         keyRec = ""
         appPick = false
     }
+    // page dechargeable (Panel) : l'ecouteur part avec elle
+    property var keyrecFn: null
     Component.onCompleted: {
         if (shown)
             load()
-        Api.listen("keyrec", r => page.recorded(r))
+        keyrecFn = r => page.recorded(r)
+        Api.listen("keyrec", keyrecFn)
     }
+    Component.onDestruction: Api.unlisten("keyrec", keyrecFn)
     function load() {
         Api.invoke("settings_get").then(s => {
             page.autostart = s.autostart

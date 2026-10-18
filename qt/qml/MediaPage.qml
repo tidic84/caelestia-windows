@@ -517,6 +517,7 @@ Rectangle {
                         anchors.right: parent.right
                         small: true
                         icon: "close"
+                        tip: "Fermer"
                         onClicked: lists.visible = false
                     }
                 }

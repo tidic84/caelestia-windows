@@ -4,6 +4,12 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.12 — 2026-10-18
+
+- **Infobulles** : tous les boutons sans texte en ont une (calendrier, retour et fermeture des panneaux, lecture / pause, précédent / suivant, minuteur, volume, connexion Wi-Fi…).
+- **Barre** : survoler une icône des applications en arrière-plan n'ouvre plus l'infobulle propre à certaines applis, qui restait ensuite affichée sans jamais disparaître. L'îlot affiche toujours le nom de l'appli.
+- **Plus léger** : le visualiseur de l'onglet Média est dessiné en une seule passe par la carte graphique ; la couleur du thème tirée du fond d'écran ou de la pochette est calculée par le cœur de l'îlot, sans second moteur JavaScript ; les images sont décodées directement à leur taille d'affichage ; les pages rarement ouvertes (Réglages, Fonds, Tâches…) sont libérées après 5 minutes de panneau fermé ; Verr. Maj n'est plus relue en boucle quand l'îlot est sur la touche Windows ; cœur compilé pour la vitesse.
+
 ## 0.4.11 — 2026-10-18
 
 - **Gestionnaire des tâches, chiffres justes** : CPU, mémoire et disque sont lus comme le fait le Gestionnaire des tâches de Windows, pour tous les processus. Les services qui affichaient 0 % (svchost, bases de données, indexation…) ont maintenant leurs vrais chiffres, et la mémoire n'est plus surévaluée. Plus de débits disque absurdes à l'ouverture de l'onglet. Le débit réseau total ne compte plus deux fois le trafic des cartes virtuelles (WSL, Hyper-V).

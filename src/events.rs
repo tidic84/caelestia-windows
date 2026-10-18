@@ -104,6 +104,10 @@ pub fn start() {
 
 // --------------------------------------------------------- presse-papiers
 
+/// Verr. Maj relachee, ou Maj enfoncee (option de Windows « Maj desactive
+/// Verr. Maj ») : crochet clavier de `winkey`, s'il tourne
+pub static CAPS: Wake = Wake::new();
+
 /// Presse-papiers modifie (WM_CLIPBOARDUPDATE)
 pub static CLIPBOARD: Wake = Wake::new();
 /// La fenetre d'ecoute du presse-papiers est en place (sinon : sondage)

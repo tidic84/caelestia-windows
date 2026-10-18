@@ -32,6 +32,13 @@ QtObject {
         api.listeners[name].push(fn)
     }
 
+    // pour une page dechargee (sinon fn appellerait un objet detruit)
+    function unlisten(name, fn) {
+        const fns = api.listeners[name]
+        if (fns)
+            api.listeners[name] = fns.filter(f => f !== fn)
+    }
+
     property Connections conn: Connections {
         target: Backend
         function onReply(id, json) {

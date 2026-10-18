@@ -14,6 +14,8 @@ Item {
         else if (Ilot.overlay === "sheet")
             Ilot.overlay = ""
     }
+    // page dechargee (Panel) : Echap ne doit plus viser la feuille
+    Component.onDestruction: if (Ilot.overlay === "sheet") Ilot.overlay = ""
     Connections {
         target: Ilot
         function onCloseSheets() { page.sheet = "" }
@@ -702,6 +704,7 @@ Item {
                 width: 28
                 height: parent.height
                 color: hovered ? Theme.alpha(tile.fg, 0.08) : "transparent"
+                tip: "Plus de réglages"
                 onClicked: tile.moreClicked()
                 Rectangle {
                     width: 1
@@ -745,6 +748,7 @@ Item {
             IconBtn {
                 small: true
                 icon: "arrow_back"
+                tip: "Retour"
                 onClicked: sh.back()
             }
             Txt {
@@ -889,6 +893,7 @@ Item {
                 filled: true
                 icon: "arrow_forward"
                 anchors.verticalCenter: parent.verticalCenter
+                tip: "Se connecter"
                 onClicked: net.connect(pass.text)
             }
         }

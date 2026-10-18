@@ -18,6 +18,8 @@ Item {
         else if (Ilot.overlay === "reader")
             Ilot.overlay = ""
     }
+    // page dechargee (Panel) : Echap ne doit plus viser le lecteur
+    Component.onDestruction: if (Ilot.overlay === "reader") Ilot.overlay = ""
     Connections {
         target: Ilot
         function onEscapeOverlay(what) { if (what === "reader") page.view = "list" }

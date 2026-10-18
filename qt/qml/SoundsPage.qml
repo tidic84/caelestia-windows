@@ -84,19 +84,23 @@ Item {
         Api.invoke("sb_play", { id: s.id, volume: s.vol === undefined ? 1 : s.vol, exclusive: sb.cfg.exclusive !== false })
     }
 
+    // page dechargeable (Panel) : l'ecouteur part avec elle
+    property var playingFn: null
     Component.onCompleted: {
-        Api.listen("sb-playing", l => {
+        playingFn = l => {
             const p = {}
             for (const id of l)
                 p[id] = true
             page.playing = p
-        })
+        }
+        Api.listen("sb-playing", playingFn)
         Api.invoke("store_get", { key: "sounds" }).then(v => {
             if (v && typeof v === "object")
                 page.sb = { list: v.list || [], cfg: Object.assign({}, page.sb.cfg, v.cfg || {}) }
             return page.refreshDevices()
         }).then(() => page.sendCfg())
     }
+    Component.onDestruction: Api.unlisten("sb-playing", playingFn)
 
     // ------------------------------------------------------------- en-tete
     Item {
@@ -315,6 +319,7 @@ Item {
                         anchors.right: parent.right
                         small: true
                         icon: "close"
+                        tip: "Fermer"
                         onClicked: page.setupOpen = false
                     }
                 }

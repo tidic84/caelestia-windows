@@ -21,9 +21,6 @@ public:
     // Meme chose sans thread (commandes instantanees, au demarrage)
     Q_INVOKABLE QString invokeSync(const QString &label, const QString &cmd, const QString &args = QStringLiteral("{}"));
 
-    // Pixels ARGB opaques d'une image reduite a `maxSide` (couleur source du theme)
-    Q_INVOKABLE QVariantList imagePixels(const QString &url, int maxSide = 128) const;
-
     // `--open <onglet>` : panneau ouvert au demarrage (tests, captures)
     Q_INVOKABLE QString startupTab() const;
     Q_INVOKABLE void setIslandOpen(bool open);
@@ -44,7 +41,6 @@ public:
     // appele par le coeur Rust, depuis n'importe quel thread
     static void onEmit(const char *name, const char *json);
 
-    static QByteArray imageBytes(const QString &url);
 
 Q_SIGNALS:
     void reply(int id, const QString &json);

@@ -1,8 +1,10 @@
 #include "backend.h"
 #include "core.h"
 
+#include <QBuffer>
 #include <QCoreApplication>
 #include <QImage>
+#include <QImageReader>
 #include <QThreadPool>
 #include <QUrl>
 
@@ -72,50 +74,6 @@ int Backend::invoke(const QString &label, const QString &cmd, const QString &arg
 QString Backend::invokeSync(const QString &label, const QString &cmd, const QString &args)
 {
     return call(label, cmd, args);
-}
-
-QByteArray Backend::imageBytes(const QString &url)
-{
-    static const QString prefix = QStringLiteral("image://ilot/");
-    if (url.startsWith(prefix)) {
-        size_t len = 0;
-        uint8_t *p = ilot_image(url.mid(prefix.size()).toUtf8().constData(), &len);
-        if (!p)
-            return {};
-        QByteArray b(reinterpret_cast<const char *>(p), qsizetype(len));
-        ilot_free_bytes(p, len);
-        return b;
-    }
-    return {};
-}
-
-static QImage load(const QString &url)
-{
-    QByteArray b = Backend::imageBytes(url);
-    if (!b.isEmpty())
-        return QImage::fromData(b);
-    QUrl u(url);
-    return QImage(u.isLocalFile() ? u.toLocalFile() : url);
-}
-
-QVariantList Backend::imagePixels(const QString &url, int maxSide) const
-{
-    QImage img = load(url);
-    QVariantList out;
-    if (img.isNull())
-        return out;
-    if (img.width() > maxSide || img.height() > maxSide)
-        img = img.scaled(maxSide, maxSide, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    img = img.convertToFormat(QImage::Format_ARGB32);
-    out.reserve(img.width() * img.height());
-    for (int y = 0; y < img.height(); ++y) {
-        const QRgb *line = reinterpret_cast<const QRgb *>(img.constScanLine(y));
-        for (int x = 0; x < img.width(); ++x) {
-            if (qAlpha(line[x]) == 255)
-                out.append(double(line[x]));
-        }
-    }
-    return out;
 }
 
 QString Backend::startupTab() const
@@ -222,19 +180,32 @@ void Backend::restart()
 
 QImage IlotImages::requestImage(const QString &id, QSize *size, const QSize &requested)
 {
-    size_t len = 0;
-    uint8_t *p = ilot_image(id.toUtf8().constData(), &len);
-    QImage img;
-    if (p) {
-        img = QImage::fromData(QByteArrayView(p, qsizetype(len)));
-        ilot_free_bytes(p, len);
-    }
-    if (size)
-        *size = img.size();
     // une seule dimension demandee (sourceSize.width seul) : traitee comme un
     // carre, le petit cote reste assez grand pour un affichage en cover
     const int rw = requested.width(), rh = requested.height();
     const int bw = rw > 0 ? rw : rh, bh = rh > 0 ? rh : rw;
+    size_t len = 0;
+    uint8_t *p = ilot_image(id.toUtf8().constData(), &len);
+    QImage img;
+    QSize full;
+    if (p) {
+        // taille voulue donnee au decodeur (QImageReader::setScaledSize) : il
+        // reduit pendant ou juste apres le decodage, sans seconde copie
+        QByteArray bytes = QByteArray::fromRawData(reinterpret_cast<const char *>(p), qsizetype(len));
+        QBuffer buf(&bytes);
+        buf.open(QIODevice::ReadOnly);
+        QImageReader reader(&buf);
+        full = reader.size();
+        if (full.isValid() && bw > 0 && bw < full.width() && bh < full.height())
+            reader.setScaledSize(full.scaled(bw, bh, Qt::KeepAspectRatioByExpanding));
+        img = reader.read();
+        ilot_free_bytes(p, len);
+        if (!full.isValid())
+            full = img.size();
+    }
+    if (size)
+        *size = full;
+    // format dont la taille ne se lit pas avant decodage : reduction apres coup
     if (!img.isNull() && bw > 0 && bw < img.width() && bh < img.height())
         img = img.scaled(img.size().scaled(bw, bh, Qt::KeepAspectRatioByExpanding), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     return img;

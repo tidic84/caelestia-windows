@@ -156,6 +156,12 @@ Il suffit d'un `Ring` de plus (`img::ART`, 8 à 16 entrées), comme `THUMBS` et
 - disques : place libre relue toutes les 2 s seulement panneau ouvert, sinon
   toutes les 30 s (piste 12).
 
+Faits ensuite (2026-10-18, voir `docs/dev/ETAT.md`) : visualiseur de
+l'onglet Média en shader (piste 7), Verr. Maj réveillée par le crochet
+clavier (piste 11), pages déchargées après 5 min (piste 13), décodage à la
+taille demandée (piste 14), couleur du thème en Rust (piste 15),
+`opt-level = 3` (piste 16).
+
 Restent : piste 8 (fenêtre repliée plus petite), Verr. Maj et plein écran
 (piste 11), et le relevé `sys` complet quand rien ne l'affiche.
 

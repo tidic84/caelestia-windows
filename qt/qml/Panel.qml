@@ -337,6 +337,7 @@ Item {
         // tout le catalogue (et non les seuls onglets affiches) : activer un
         // addon ne recree pas les pages deja ouvertes
         Repeater {
+            id: pageRep
             model: Ilot.catalog
             Loader {
                 id: page
@@ -345,8 +346,10 @@ Item {
                 readonly property bool on: Ilot.currentTab === modelData.id
                 readonly property bool shown: on && !Watch.shareOpen
                 // une page n'est creee qu'a sa premiere ouverture, puis gardee
-                // tant que son addon reste active
+                // tant que son addon reste active (sauf dechargement, plus bas)
                 property bool wanted: false
+                // gardees : frequentes (lanceur), ou avec du texte en cours
+                readonly property bool keep: ["home", "media", "apps", "clips", "assist"].indexOf(modelData.id) >= 0
                 readonly property bool allowed: Ilot.tabs.indexOf(modelData.id) >= 0
                 active: wanted && allowed
                 onAllowedChanged: if (!allowed) wanted = false
@@ -365,6 +368,26 @@ Item {
                     x: page.dx
                     Behavior on x { NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
                 }
+            }
+        }
+
+        // apres 5 min de panneau ferme, les autres pages (Reglages, Fonds...)
+        // sont dechargees, sauf l'onglet en cours : elles seront recreees a
+        // leur prochaine ouverture
+        Timer {
+            interval: 5 * 60 * 1000
+            running: Ilot.mode !== "open"
+            onTriggered: {
+                let freed = false
+                for (let i = 0; i < pageRep.count; i++) {
+                    const p = pageRep.itemAt(i)
+                    if (p && p.wanted && !p.keep && !p.on) {
+                        p.wanted = false
+                        freed = true
+                    }
+                }
+                if (freed)
+                    gc()
             }
         }
 

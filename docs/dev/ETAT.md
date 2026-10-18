@@ -6,8 +6,8 @@ reprendre.
 
 ## Où on en est (mis à jour le 2026-10-18)
 
-- **Version** : 0.4.11 dans `Cargo.toml` (gestionnaire des tâches retravaillé),
-  installée sur le poste, publiée le 2026-10-18 par le tag `v0.4.11`
+- **Version** : 0.4.12 dans `Cargo.toml` (infobulles, optimisations),
+  installée sur le poste, publiée le 2026-10-18 par le tag `v0.4.12`
   (GitHub Action `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
   dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
@@ -21,6 +21,64 @@ reprendre.
   Ensuite, piocher dans `BACKLOG.md`.
 
 ## Journal
+
+### 2026-10-18 : optimisations (pistes 7, 11, 13 à 16 de `perf-pistes.md`)
+
+- **Visualiseur de l'onglet Média** : un seul `ShaderEffect`
+  (`qt/shaders/vizbars.frag`) remplace les 48 `Rectangle`, qui refaisaient
+  chacun leur `Gradient` en JS à chaque trame. Les 24 niveaux passent en 6
+  `vector4d`. Le dégradé est interpolé en prémultiplié, comme avant. Les
+  barres de l'accueil (24, couleur unie) ne changent pas. Les **3 bandes
+  repliées ne sont pas faites** (voir `BACKLOG.md`). Le 15 trames/s replié
+  existait déjà.
+- **Verr. Maj** : quand le crochet clavier de `winkey` tourne, il réveille le
+  relevé (`events::CAPS`) au relâchement de Verr. Maj et à l'appui sur Maj.
+  Le relevé relit alors l'état à 20, 150 et 400 ms, avec un relevé de
+  sécurité toutes les 2 s. Sans crochet, on garde le sondage à 120 ms. La
+  luminosité, le registre, le presse-papiers et Steam étaient **déjà** passés
+  en événements. Le tube Discord en vocal (60 ms) reste à faire
+  (`BACKLOG.md`).
+- **Pages déchargées** (`Panel.qml`) : après 5 min de panneau fermé, les
+  pages autres qu'Accueil, Média, Applications, Presse-papiers et Assistant
+  sont déchargées, sauf l'onglet en cours, puis `gc()` est appelé. Ajout
+  d'`Api.unlisten`, utilisé par Réglages et Soundboard. Mail et Contrôles
+  remettent `Ilot.overlay` à zéro quand ils sont détruits.
+- **Images** : `IlotImages::requestImage` décode avec
+  `QImageReader::setScaledSize`. La qualité JPEG reste par défaut, sans la
+  réduction DCT rapide, qui demande une qualité inférieure à 50.
+- **Couleur du thème** : la commande `theme_source` (`src/theme.rs`,
+  crate `material-colors` 0.4.2, car la 0.5 demande rustc 1.97) remplace
+  `Backend::imagePixels`, le `WorkerScript` et `quant.mjs` (supprimé).
+  L'algorithme est le même : QuantizerCelebi à 128 couleurs puis Score, sur
+  l'image réduite à 128 px (fond) ou 64 px (pochette).
+- **`opt-level = 3`** : la DLL passe de 9,0 à 12,2 Mo.
+- **Propriétés QML typées : non fait.** Le singleton `Ilot` porte le nom du
+  module, donc les outils ne voient pas ses membres (`BACKLOG.md`).
+- **Vérifié** : `cargo test` 6/6, clippy sans nouvel avertissement (56,
+  comme avant), Rust, C++, QML et shader compilés. Relu par un agent
+  généraliste, ses remarques sont appliquées : dégradé prémultiplié, bord
+  du shader en `fwidth`, Maj et relevés multiples pour Verr. Maj, overlay de
+  Mail et de Contrôles. Compilé, lancé sur l'onglet Média sans erreur
+  QML ni shader au journal, installé et publié en 0.4.12. **À
+  regarder à l'usage** : le rendu du visualiseur de l'onglet Média, la
+  couleur du thème après un changement de fond (elle doit être identique),
+  et Verr. Maj.
+
+### 2026-10-18 : infobulles
+
+- Ajout de `tip:` sur les boutons-icônes qui n'en avaient pas : flèches du
+  calendrier, retour et fermeture des panneaux, contrôles média (îlot et
+  pastille), minuteur (Pause, Reprendre ou Démarrer), volume de l'accueil,
+  chevron des tuiles de contrôle, connexion Wi-Fi. Les pastilles de couleur
+  des réglages n'en ont pas.
+- Barre : le survol d'une icône de la zone de notification n'envoie plus
+  `WM_MOUSEMOVE` à l'appli (`Tray.click(..., "hover")`). Certaines applis
+  ouvraient leur propre infobulle, qui ne se fermait jamais. Notre infobulle
+  affiche déjà `modelData.tip`. La branche `"hover"` de `Tray::click` n'est
+  plus appelée.
+- **Vérifié** : qmllint ne signale rien de nouveau, relu par un agent
+  généraliste (`relecteur` indisponible), sa remarque sur le minuteur est
+  appliquée. Compilé et publié avec la 0.4.12.
 
 ### 2026-10-18 : 0.4.11, processus « principal »
 

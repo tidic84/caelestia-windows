@@ -1,6 +1,5 @@
 pragma Singleton
 import QtQuick
-import QtQml.WorkerScript
 import IlotCore
 import "rank.mjs" as Rank
 
@@ -971,46 +970,31 @@ Item {
             }
         }
     }
+    // couleur source tiree d'une image (miniature du fond d'ecran), calculee
+    // par le coeur (theme_source : quantification de material-color-utilities)
     property int quantId: 0
-    property WorkerScript quant: WorkerScript {
-        source: "quant.mjs"
-        onMessage: m => {
-            if (m.source === null)
-                return
-            if (m.id === root.artQuantId) {
-                root.artArgb = m.source
-                return
-            }
-            if (m.id !== root.quantId)
-                return
-            root.sourceArgb = m.source
-            root.saveUi({ source: m.source })
-            root.applyTheme()
-        }
-    }
-    // couleur source tiree d'une image (miniature du fond d'ecran)
     function themeFrom(src) {
         if (!src)
             return
-        // reduite a 128 px : la quantification en JavaScript (V4) est lente
-        const px = Backend.imagePixels(src, 128)
-        if (!px.length)
-            return
-        quantId++
-        quant.sendMessage({ id: quantId, pixels: px })
+        const id = ++quantId
+        Api.invoke("theme_source", { url: src, max: 128 }).then(argb => {
+            if (argb === null || id !== root.quantId)
+                return
+            root.sourceArgb = argb
+            root.saveUi({ source: argb })
+            root.applyTheme()
+        })
     }
     // couleur de la pochette, seulement si elle sert (Apparence > Couleur : Pochette)
-    property int artQuantId: -1
     property int artSeq: 0
     function artColor() {
         if (cfg.color !== "art" || !art)
             return
-        const px = Backend.imagePixels(art, 64)
-        if (!px.length)
-            return
-        // identifiants a part : ceux du fond d'ecran restent valables
-        artQuantId = 1000000 + ++artSeq
-        quant.sendMessage({ id: artQuantId, pixels: px })
+        const id = ++artSeq
+        Api.invoke("theme_source", { url: art, max: 64 }).then(argb => {
+            if (argb !== null && id === root.artSeq)
+                root.artArgb = argb
+        })
     }
     onArtChanged: artColor()
 

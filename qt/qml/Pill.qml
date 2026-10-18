@@ -395,6 +395,7 @@ Item {
                 filled: true
                 icon: Ilot.media.playing ? "pause" : "play_arrow"
                 anchors.verticalCenter: parent.verticalCenter
+                tip: Ilot.media.playing ? "Pause" : "Lecture"
                 onClicked: Ilot.mediaAction("toggle")
             }
         }

@@ -13,19 +13,16 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🟢 **Infobulle au-dessus d'un menu natif** : `Btn.qml`. Après un clic sur
+  une icône de la zone de notification, le menu de l'appli capture la souris.
+  Notre infobulle peut rester affichée jusqu'au prochain mouvement sur la
+  barre. Correction possible : masquer le `Tip` à l'appui.
+
 - 🔴 **Réglages qui reviennent en arrière** : `qt/qml/Ilot.qml:30` (`setCfg`).
   Les réponses `settings_set` passent par le pool de threads, donc elles
   peuvent arriver dans le désordre. Chacune contient la configuration complète
   et écrase `cfg`. Correction possible : un numéro de séquence, ou fusionner
   seulement les clés du `patch`.
-- 🔴 **Écouteurs `Api.listen` jamais retirés** : `SoundsPage.qml:88`,
-  `SettingsPage.qml:46`. Si on désactive puis réactive un module, les erreurs
-  TypeError s'accumulent. Correction : `Api.unlisten` dans
-  `Component.onDestruction`.
-- 🟠 **Décodage synchrone sur le thread GUI** : `Ilot.qml` (`artColor()`,
-  `themeFrom()`) décode la pochette ou le fond d'écran à chaque `setCfg`. Il
-  faudrait décoder seulement si `color` ou `art` change, avec
-  `QImageReader::setScaledSize`.
 - 🟠 **Animations d'ouverture** : `Main.qml:101-106,137`. `setHit` et
   `setBackdrop` sont appelés à chaque image, ce qui recrée D2D,
   `SetWindowRgn` et `SetWindowPos`. Il faudrait les limiter.
@@ -40,6 +37,17 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   `updateBackdrop` est dupliqué entre `Main.qml` et `Bar.qml`.
 - 🟢 Les 311 `property var` empêchent la compilation AOT (`qmlsc`) des
   liaisons concernées.
+
+- 🟢 **Propriétés QML typées sans effet tant que `Ilot` n'est pas résolu** :
+  le singleton `Ilot` porte le nom du module QML (`URI Ilot`). qmllint ne
+  trouve donc aucun de ses membres (182 avertissements dans `Pill.qml`), et
+  qmlcachegen ne compile pas les liaisons qui le lisent. Typer `shown`, `cfg`
+  ou `media` ne servira qu'après avoir levé ce conflit, en renommant le
+  module ou le singleton (touche presque tous les fichiers QML).
+- 🟢 **Visualiseur replié en 3 bandes** : non fait. `Aurora` (graves 0-3,
+  médiums 3-12, aigus 12-24) et `Pet` lisent les 24 bandes quand l'îlot est
+  replié. Le gain (21 octets de JSON par trame, à 15 trames/s) ne vaut pas
+  de changer leur rendu.
 
 ## Rust (`src/`), à voir selon l'usage
 
@@ -75,6 +83,16 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 - 🟢 `ilot.exe --claude` lancé à la main depuis mintty (Git Bash) attend
   stdin. Ce n'est pas un problème avec Claude Code, qui ferme stdin.
 
+## Relevés encore sondés
+
+- 🟠 **Tube Discord en vocal** : `discord.rs:395`, lu toutes les 60 ms. Une
+  lecture bloquante dans un autre thread bloquerait les écritures sur le même
+  handle synchrone. Il faudrait passer le tube en E/S asynchrones
+  (`FILE_FLAG_OVERLAPPED` + événement), à tester en vocal.
+- 🟢 **Verr. Maj sans crochet clavier** : quand ni l'îlot sur la touche
+  Windows, ni ses raccourcis, ni le remappage ne sont actifs, le crochet
+  n'est pas installé. Verr. Maj est alors encore sondée toutes les 120 ms.
+
 ## Gestionnaire des tâches (0.4.11) : restes
 
 - 🟢 Pas d'état « Ne répond pas » (`IsHungAppWindow`). Les applis du Store
@@ -92,6 +110,9 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Fait
 
+- 2026-10-18, après 0.4.11 : écouteurs `Api.listen` retirés à la
+  destruction (`Api.unlisten`, Réglages et Soundboard) ; couleur source du
+  thème calculée par le cœur (`theme_source`), hors du thread de l'interface.
 - 0.4.10 : Claude Code dans l'îlot (hooks, animation L4, son de fin).
   Voir `docs/design/claude-code/`.
 - 0.4.8 : consommation au repos (animations à 25 images/s mises en pause,

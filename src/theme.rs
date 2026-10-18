@@ -123,3 +123,28 @@ pub fn watch(app: AppHandle) {
         }
     });
 }
+
+/// Couleur source du theme tiree d'une image de l'ilot (`image://ilot/...` :
+/// miniature du fond d'ecran, pochette), en ARGB. Meme calcul que
+/// `sourceColorFromImage` de material-color-utilities (QuantizerCelebi a
+/// 128 couleurs, puis Score), sur l'image reduite a `max` px de cote.
+pub fn theme_source(url: String, max: u32) -> Option<u32> {
+    let bytes = crate::img::bytes(&url)?;
+    let img = image::load_from_memory(&bytes).ok()?;
+    let max = max.max(1);
+    let img = if img.width() > max || img.height() > max { img.thumbnail(max, max) } else { img };
+    use material_colors::{color::Argb, quantize::{Quantizer, QuantizerCelebi}, score::Score};
+    // pixels opaques seulement
+    let pixels: Vec<Argb> = img
+        .to_rgba8()
+        .pixels()
+        .filter(|p| p[3] == 255)
+        .map(|p| Argb::new(255, p[0], p[1], p[2]))
+        .collect();
+    if pixels.is_empty() {
+        return None;
+    }
+    let q = QuantizerCelebi::quantize(&pixels, 128);
+    let c = *Score::score(&q.color_to_count, None, None, None).first()?;
+    Some(0xff00_0000 | u32::from(c.red) << 16 | u32::from(c.green) << 8 | u32::from(c.blue))
+}
