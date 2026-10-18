@@ -7,7 +7,7 @@ reprendre.
 ## Où on en est (mis à jour le 2026-10-18)
 
 - **Version** : 0.4.11 dans `Cargo.toml` (gestionnaire des tâches retravaillé),
-  installée sur le poste et commitée, **pas encore publiée**. Dernière publiée :
+  installée sur le poste, publiée le 2026-10-18 par le tag `v0.4.11`. Dernière publiée :
   0.4.10, par le tag `v0.4.10` (GitHub Action
   `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
   dans la 0.4.9.
@@ -17,8 +17,7 @@ reprendre.
 - **Consigne de l'utilisateur** : ne corriger que l'essentiel, sans rien qui
   change l'usage. Le Rust se traite « selon l'usage », et les bugs au fur et à
   mesure. Ce qui reste à faire est dans `BACKLOG.md`.
-- **Prochaine étape** : publier la 0.4.11 (tag `v0.4.11`) quand
-  l'utilisateur aura essayé l'onglet. Option encore en attente de son
+- **Prochaine étape** : aucune n'est imposée. Option encore en attente de son
   accord : « Redémarrer » dans le clic droit de la ligne `explorer`.
   Ensuite, piocher dans `BACKLOG.md`.
 
