@@ -55,6 +55,21 @@ Window {
         id: root
         anchors.fill: parent
         focus: true
+        // survol de l'ilot (hoverZone, plus bas) : vu depuis la racine, qui
+        // recoit le survol de tous ses enfants sans le leur prendre. Un
+        // HoverHandler sur hoverZone, au-dessus de tout, privait les boutons
+        // du panneau de survol (ni info-bulle, ni surbrillance).
+        HoverHandler {
+            id: rootHover
+        }
+        readonly property bool overIsland: {
+            if (!rootHover.hovered)
+                return false
+            const p = rootHover.point.position
+            return p.x >= hoverZone.x && p.x < hoverZone.x + hoverZone.width
+                && p.y >= hoverZone.y && p.y < hoverZone.y + hoverZone.height
+        }
+        onOverIslandChanged: Ilot.setHovered(overIsland)
 
         // Echap : referme la feuille, le jour du calendrier, puis l'ilot.
         // Touche Windows remappee (F24) : quand l'ilot a le clavier, elle
@@ -106,11 +121,10 @@ Window {
             onEarTopChanged: Qt.callLater(win.updateBackdrop)
         }
 
-        // survol : l'ilot (et ses coins) d'apres sa taille cible, avec un peu
-        // de marge sous l'ilot replie pour l'attraper facilement
+        // zone de survol : l'ilot (et ses coins) d'apres sa taille cible, avec
+        // un peu de marge sous l'ilot replie pour l'attraper facilement
         Item {
             id: hoverZone
-            z: 1000
             readonly property var s: Ilot.size
             // Apparence > Taille de la pilule
             readonly property real k: Ilot.pillK
@@ -118,9 +132,6 @@ Window {
             y: 0
             width: (s.w + Ilot.ear * 2) * k
             height: (s.h + (Ilot.mode === "collapsed" ? 6 : 2)) * k
-            HoverHandler {
-                onHoveredChanged: Ilot.setHovered(hovered)
-            }
         }
     }
 

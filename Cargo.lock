@@ -927,7 +927,7 @@ dependencies = [
 
 [[package]]
 name = "ilot"
-version = "0.4.12"
+version = "0.4.13"
 dependencies = [
  "aes",
  "aes-gcm",

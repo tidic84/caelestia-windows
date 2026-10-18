@@ -1,15 +1,32 @@
 import QtQuick
 
-// Fenetre unique des info-bulles (Ilot.tip : texte et position a l'ecran)
+// Fenetre unique des info-bulles (Ilot.tip : texte et position a l'ecran).
+// Placee avant d'etre affichee, puis remise au premier plan.
 Window {
     id: w
     flags: Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowStaysOnTopHint | Qt.NoDropShadowWindowHint
     color: "transparent"
-    visible: Ilot.tip !== null && label.text !== ""
+    visible: false
     width: bubble.width
     height: bubble.height
-    x: Ilot.tip ? Math.round(Ilot.tip.x - width / 2) : 0
-    y: Ilot.tip ? Math.round(Ilot.tip.y) : 0
+
+    Connections {
+        target: Ilot
+        function onTipChanged() { w.place() }
+    }
+    function place() {
+        const t = Ilot.tip
+        if (!t || !t.text) {
+            visible = false
+            return
+        }
+        label.text = t.text
+        // reste centree si sa taille change pendant l'affichage
+        x = Qt.binding(() => Math.round(t.x - w.width / 2))
+        y = Math.round(t.y)
+        visible = true
+        raise()
+    }
 
     Rectangle {
         id: bubble
@@ -22,7 +39,6 @@ Window {
         Txt {
             id: label
             anchors.centerIn: parent
-            text: Ilot.tip ? Ilot.tip.text : ""
             px: 11.5
         }
     }

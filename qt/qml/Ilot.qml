@@ -246,6 +246,9 @@ Item {
         if (mode === "open")
             releaseFocus()
         mode = s
+        // la souris peut quitter l'ilot sans que Qt le voie (zones
+        // cliquables reduites) : l'info-bulle ne doit pas rester
+        tip = null
         Backend.setIslandOpen(s === "open")
         if (s !== "open") {
             pinned = false

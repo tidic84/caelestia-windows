@@ -6,8 +6,8 @@ reprendre.
 
 ## Où on en est (mis à jour le 2026-10-18)
 
-- **Version** : 0.4.12 dans `Cargo.toml` (infobulles, optimisations),
-  installée sur le poste, publiée le 2026-10-18 par le tag `v0.4.12`
+- **Version** : 0.4.13 dans `Cargo.toml` (survol et infobulles du panneau),
+  installée sur le poste, publiée le 2026-10-19 par le tag `v0.4.13`
   (GitHub Action `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
   dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
@@ -21,6 +21,27 @@ reprendre.
   Ensuite, piocher dans `BACKLOG.md`.
 
 ## Journal
+
+### 2026-10-19 : survol et infobulles du panneau (après 0.4.12)
+
+Retour d'usage : aucune infobulle (boutons de session, onglets…), y compris
+après 0.4.12. Diagnostic par `console.log` temporaires et `ILOT_QT_LOG`. La
+fenêtre d'infobulle s'affichait bien (test forcé au démarrage), mais les
+boutons du panneau ne recevaient jamais le survol. **Cause** : `hoverZone`
+(`Main.qml`), un `Item` en z 1000 qui couvre tout l'îlot, panneau ouvert
+compris, portait un `HoverHandler`. Il prenait le survol à tous les boutons
+du panneau : pas d'info-bulle, pas de surbrillance. Un bouton survolé avant
+que la zone grandisse ne voyait jamais la souris partir, d'où les
+infobulles bloquées.
+
+- `Main.qml` : le survol de l'îlot est détecté par un `HoverHandler` sur
+  `root` (ancêtre de tout, il ne bloque personne) et un test du point dans
+  `hoverZone`. `hoverZone` ne garde que sa géométrie (`updateHit`).
+- `TipWindow.qml` : placée à chaque `Ilot.tipChanged`, puis `raise()`.
+- `Ilot.qml` (`setMode`) : `tip = null` à chaque changement d'état.
+- **Vérifié par l'utilisateur** : survol et infobulles dans le panneau, la
+  pilule grandit toujours au survol. Le simulateur de souris en PowerShell
+  est bloqué par l'antivirus : ne pas réessayer (mémoire).
 
 ### 2026-10-18 : optimisations (pistes 7, 11, 13 à 16 de `perf-pistes.md`)
 

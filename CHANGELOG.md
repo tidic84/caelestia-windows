@@ -4,6 +4,11 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.13 — 2026-10-19
+
+- **Survol et infobulles dans le panneau** : les boutons du panneau ouvert (Verrouiller, Veille, Déconnexion, Redémarrer, Éteindre, onglets, commandes…) réagissent de nouveau au survol de la souris (surbrillance) et affichent leur infobulle. Une zone invisible au-dessus de l'îlot leur prenait le survol.
+- **Infobulles bloquées** : une infobulle ne peut plus rester affichée après la fermeture du panneau.
+
 ## 0.4.12 — 2026-10-18
 
 - **Infobulles** : tous les boutons sans texte en ont une (calendrier, retour et fermeture des panneaux, lecture / pause, précédent / suivant, minuteur, volume, connexion Wi-Fi…).
