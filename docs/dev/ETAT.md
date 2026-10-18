@@ -7,9 +7,8 @@ reprendre.
 ## Où on en est (mis à jour le 2026-10-18)
 
 - **Version** : 0.4.11 dans `Cargo.toml` (gestionnaire des tâches retravaillé),
-  installée sur le poste, publiée le 2026-10-18 par le tag `v0.4.11`. Dernière publiée :
-  0.4.10, par le tag `v0.4.10` (GitHub Action
-  `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
+  installée sur le poste, publiée le 2026-10-18 par le tag `v0.4.11`
+  (GitHub Action `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
   dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
   un raccourci dans le dossier Démarrage. Elle a été construite depuis les
