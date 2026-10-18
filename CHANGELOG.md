@@ -11,6 +11,7 @@ description à chaque version publiée sur GitHub.
 - **Clic droit sur un programme** : menu avec « Fin de tâche », « Ouvrir l’emplacement du fichier » et « Rechercher en ligne ». Un clic sur l'en-tête d'une colonne (CPU, Mémoire, Disque, GPU, Réseau, Programme) trie la liste.
 - **Plus fluide** : la liste ne remonte plus en haut toutes les 2 s, les lignes sont mises à jour sur place au lieu d'être recréées, et l'ordre ne saute plus entre deux rafraîchissements. Onglet fermé, plus rien n'est gardé en mémoire.
 - **Fin de tâche** plus rapide (plus de lancement de `taskkill`), avec le nombre de processus concernés et un message si Windows refuse (programme lancé en administrateur). Échap vide le filtre ; « Aucun résultat » quand le filtre ne trouve rien ; nombres avec une virgule.
+- **Noms de programmes** : certains noms s'affichaient avec des caractères parasites (« Spotify\b8…FileV » au lieu de « Spotify »). Corrigé dans le gestionnaire des tâches et partout où l'îlot lit le nom d'un programme.
 
 ## 0.4.10 — 2026-10-18
 

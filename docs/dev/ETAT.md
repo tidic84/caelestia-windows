@@ -24,6 +24,14 @@ reprendre.
 
 ## Journal
 
+### 2026-10-18 : 0.4.11, nom de Spotify
+
+`apps::file_description` coupe maintenant au premier `\0`. Pour Spotify
+(paquet Store), `VerQueryValueW` annonce une longueur qui va plus loin que
+le zéro final, d'où « Spotify\b8…FileV ». Vérifié par un test temporaire sur
+le vrai `Spotify.exe`, qui renvoie « Spotify » (test retiré ensuite : il
+dépend du poste). Compilé et installé.
+
 ### 2026-10-18 : 0.4.11, groupes développés dans le gestionnaire des tâches
 
 - **Rust** (`src/tasks.rs`). `tasks_get` prend `expanded` (noms des groupes

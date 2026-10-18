@@ -199,7 +199,9 @@ pub(crate) fn file_description(path: &str) -> Option<String> {
             return None;
         }
         let s = String::from_utf16_lossy(std::slice::from_raw_parts(ptr as *const u16, len as usize));
-        let s = s.trim_end_matches('\0').trim().to_string();
+        // la longueur annoncee deborde parfois apres le zero final (Spotify) :
+        // on coupe au premier zero
+        let s = s.split('\0').next().unwrap_or_default().trim().to_string();
         (!s.is_empty()).then_some(s)
     }
 }
