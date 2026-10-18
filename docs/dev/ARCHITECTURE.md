@@ -57,6 +57,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── .github/workflows/release.yml  Sur un tag v* : compile et publie ilot-<ver>-win64.zip
 ├── icons/          icon.ico, icon.png
 └── docs/           Captures, perf-ilot.md (mesures), perf-pistes.md (optimisations), dev/ (ce dossier)
+                    design/claude-code/ : maquette et spécification de l'animation Claude Code
 ```
 
 ## `src/` : cœur Rust
@@ -91,6 +92,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── discord.rs    RPC Discord (pipe IPC), identifiants DPAPI
 ├── soundboard.rs Soundboard vers câble virtuel ├── decode.rs  Décodage audio (symphonia)
 ├── captions.rs   Sous-titres (LiveCaptions via UI Automation)
+├── claude.rs     Hooks Claude Code dans ~/.claude/settings.json (installer, retirer, état)
 ├── translate.rs  Traduction Google « gtx »
 ├── mail.rs       IMAP (mots de passe DPAPI)    ├── google.rs  OAuth 2 Gmail (PKCE)
 ├── update.rs     Mises à jour GitHub Releases (toutes les 6 h)
@@ -105,7 +107,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ```text
 ├── CMakeLists.txt  Module QML "Ilot" (glob qml/*), singletons Theme/Ilot/Api/Watch, shader, polices, compile_commands.json
 ├── build.cmd       cargo build --release → CMake/Ninja (MSVC via vswhere) → windeployqt
-├── ilot.rc, fonts/ (Rubik, Material Symbols), shaders/round.frag (image arrondie en une passe)
+├── ilot.rc, fonts/ (Rubik, Material Symbols), shaders/round.frag (image arrondie en une passe), shaders/claude.frag (animation Claude Code)
 └── src/
     ├── main.cpp      Démarrage, instance unique, journal ILOT_QT_LOG
     ├── core.h        Prototypes C du cœur Rust
@@ -129,7 +131,7 @@ Cartes PC     PcCard · ServicesCard · HealthCard · ShutdownCard · SensCard
 Compagnon     Pet (10 espèces, expressions, tours)
 Décor         Aurora · WxFx (météo animée) · Glow · Eq · VizBars
 Composants    Btn · IconBtn · TextBtn · M3Switch · M3Slider · Seg · Field · Area · CtxMenu · Card · Chip · Empty
-              Gauge · Spinner · Scroller · Tip · Txt · Ms · RoundImage · ArtImage · RoundArt · MediaControls
+              Gauge · Spinner · Scroller · Tip · Txt · Ms · ClaudeMark · RoundImage · ArtImage · RoundArt · MediaControls
               NotifRow · TimerBody
 Modules JS    calc · emoji · ical · rank (frécence du lanceur) · quant (couleur du thème) · mcu (material-color-utilities)
 ```

@@ -56,6 +56,14 @@ Item {
         if (!changelog.length)
             Api.invoke("changelog").then(l => { page.changelog = l })
         Api.invoke("update_get").then(u => { Watch.upd = u })
+        Api.invoke("cc_hooks_status").then(v => { page.ccHooks = v; page.ccHooksErr = "" }, e => { page.ccHooksErr = String(e) })
+    }
+    // hooks Claude Code (src/claude.rs) : null tant que l'etat n'est pas lu
+    property var ccHooks: null
+    property string ccHooksErr: ""
+    function ccHooksSet(on) {
+        Api.invoke(on ? "cc_hooks_install" : "cc_hooks_remove").then(v => { page.ccHooks = v; page.ccHooksErr = "" },
+            e => { page.ccHooksErr = String(e) })
     }
     function refreshWinKey() {
         Api.invoke("winkey_status").then(st => { page.winkey = st })
@@ -1539,6 +1547,57 @@ Item {
                                 }
                             }
                         }
+                    }
+                }
+
+                SubTitle { text: "Claude Code" }
+                SetRow {
+                    subRow: true
+                    title: "Claude Code dans l'îlot"
+                    sub: "Animation et temps écoulé dans la pilule pendant que Claude travaille"
+                    toggle: true
+                    checked: page.cfg.cc_on !== false
+                    onToggled: on => Ilot.setCfg({ cc_on: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Son à la fin"
+                    sub: "Quand la tâche a duré au moins :"
+                    toggle: true
+                    disabled: page.cfg.cc_on === false
+                    checked: page.cfg.cc_sound !== false
+                    onToggled: on => Ilot.setCfg({ cc_sound: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Écouter le son"
+                    sub: "Le petit « pop » joué à la fin d'une tâche"
+                    TextBtn {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: "volume_up"
+                        text: "Tester"
+                        onClicked: Backend.bubble()
+                    }
+                }
+                Chips {
+                    model: [[10, "10 s"], [30, "30 s"], [60, "1 min"], [120, "2 min"]]
+                    current: page.cfg.cc_min !== undefined ? page.cfg.cc_min : 30
+                    onPicked: v => Ilot.setCfg({ cc_min: v })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Hooks Claude Code"
+                    sub: page.ccHooksErr || (page.ccHooks === null ? "…" : page.ccHooks
+                        ? "Installés dans ~/.claude/settings.json"
+                        : "Pas installés : sans eux, l'îlot ne sait pas quand Claude travaille")
+                    TextBtn {
+                        visible: page.ccHooks !== null
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: page.ccHooks ? "delete" : "download"
+                        text: page.ccHooks ? "Retirer" : "Installer"
+                        onClicked: page.ccHooksSet(!page.ccHooks)
                     }
                 }
             }

@@ -7,6 +7,10 @@
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 
+// WM_COPYDATA envoye par `ilot.exe --claude` (hooks Claude Code, main.cpp) a
+// la fenetre cachee « IlotTray » de l'instance en cours
+constexpr uintptr_t kClaudeCopyData = 0x494C4343; // 'ILCC'
+
 // Fenetres de l'application : l'ilot (Main.qml) sur l'ecran choisi, une
 // barre (Bar.qml) sur chacun des autres ecrans, l'icone de la zone de
 // notification et le raccourci Ctrl+Alt+Espace.

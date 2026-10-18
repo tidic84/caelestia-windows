@@ -63,8 +63,22 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   `cargo clippy --fix`. La dépendance `imap-proto 0.10.2` sera refusée par
   une future version de Rust.
 
+## Claude Code dans l'îlot (0.4.10) : restes
+
+- 🟢 Son définitif à choisir : seule la « bulle » est codée, dans
+  `Backend::bubble`.
+- 🟢 Le son joue même si on regarde encore le terminal (choix de
+  l'utilisateur). `hwnd` est toujours transmis par le hook, au cas où.
+- 🟢 Clic sur la pilule pour revenir au terminal : pas fait.
+- 🟢 Après Échap, l'animation ne s'arrête qu'avec la notification
+  `idle_prompt` (≈ 1 min). Sans elle, elle s'arrête au bout de 3 h.
+- 🟢 `ilot.exe --claude` lancé à la main depuis mintty (Git Bash) attend
+  stdin. Ce n'est pas un problème avec Claude Code, qui ferme stdin.
+
 ## Fait
 
+- 0.4.10 : Claude Code dans l'îlot (hooks, animation L4, son de fin).
+  Voir `docs/design/claude-code/`.
 - 0.4.8 : consommation au repos (animations à 25 images/s mises en pause,
   événements Windows au lieu des sondages). Voir `docs/perf-pistes.md`.
 - Session du 2026-10-17, après 0.4.8 :

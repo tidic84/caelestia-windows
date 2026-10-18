@@ -283,6 +283,16 @@ intptr_t __stdcall Shell::wndProc(void *h, unsigned msg, uintptr_t wp, intptr_t 
         Backend::instance()->invoke(QStringLiteral("island"), QStringLiteral("bar_open"), QStringLiteral("{\"tab\":\"launcher\"}"));
         return 0;
     }
+    if (msg == WM_COPYDATA) {
+        // hook Claude Code (`ilot.exe --claude`) : evenement `claude` pour Watch.qml
+        const auto *cds = reinterpret_cast<const COPYDATASTRUCT *>(lp);
+        if (cds && cds->dwData == kClaudeCopyData && cds->lpData && cds->cbData > 0 && cds->cbData < 65536) {
+            const QByteArray json(static_cast<const char *>(cds->lpData), int(cds->cbData));
+            Backend::onEmit("claude", json.constData());
+            return TRUE;
+        }
+        return FALSE;
+    }
     if (s_taskbarCreated && msg == s_taskbarCreated) {
         // l'Explorateur a redemarre : l'icone est a remettre
         s_shell->createTray();
@@ -302,8 +312,7 @@ void Shell::createTray()
         RegisterClassW(&wc);
         // fenetre invisible (pas HWND_MESSAGE : le menu doit pouvoir passer au premier plan)
         m_msgWnd = CreateWindowExW(WS_EX_TOOLWINDOW, L"IlotTray", L"Ilot", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, inst, nullptr);
-        s_taskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
-        RegisterHotKey(HWND(m_msgWnd), 1, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_SPACE);
+        s_taskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");        RegisterHotKey(HWND(m_msgWnd), 1, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_SPACE);
     }
     NOTIFYICONDATAW nid{sizeof(nid)};
     nid.hWnd = HWND(m_msgWnd);

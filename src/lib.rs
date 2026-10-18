@@ -10,6 +10,7 @@ mod audio;
 mod bar;
 mod boost;
 mod captions;
+mod claude;
 mod decode;
 mod discord;
 mod display;
@@ -388,6 +389,10 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "services_get" => json(status::services_get(app, a!("fresh"))),
         "game_focus" => json(activity::game_focus()),
         "valorant_focus" => json(valorant::valorant_focus()),
+        // Claude Code : hooks dans ~/.claude/settings.json
+        "cc_hooks_status" => json(claude::hooks_status()?),
+        "cc_hooks_install" => json(claude::hooks_install()?),
+        "cc_hooks_remove" => json(claude::hooks_remove()?),
         // soundboard
         "sb_devices" => json(soundboard::sb_devices()),
         "sb_config" => json(soundboard::sb_config(app, a!("cfg"))),

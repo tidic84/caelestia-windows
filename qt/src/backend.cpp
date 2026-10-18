@@ -6,8 +6,10 @@
 #include <QThreadPool>
 #include <QUrl>
 
+#include <cmath>
 #include <thread>
 #include <windows.h>
+#include <mmsystem.h>
 
 static Backend *s_instance = nullptr;
 
@@ -153,6 +155,54 @@ void Backend::chime()
         Beep(1175, 150);
         Beep(1568, 320);
     }).detach();
+}
+
+// WAV 16 bits mono : sinus de 380 a 950 Hz en 90 ms, montee en 8 ms puis
+// extinction exponentielle jusqu'a 220 ms (maquette docs/design/claude-code)
+static QByteArray bubbleWav()
+{
+    const int rate = 44100, n = rate * 24 / 100;
+    QByteArray pcm(n * 2, Qt::Uninitialized);
+    auto *out = reinterpret_cast<qint16 *>(pcm.data());
+    double phase = 0;
+    for (int i = 0; i < n; ++i) {
+        const double t = double(i) / rate;
+        const double f = t < 0.09 ? 380.0 * std::pow(950.0 / 380.0, t / 0.09) : 950.0;
+        phase += 6.283185307179586 * f / rate;
+        double g = t < 0.008 ? 0.3 * t / 0.008 : 0.3 * std::pow(0.0001 / 0.3, (t - 0.008) / 0.212);
+        if (t > 0.22)
+            g = 0;
+        out[i] = qint16(std::sin(phase) * g * 32767);
+    }
+    QByteArray wav;
+    auto u32 = [&](quint32 v) { wav.append(reinterpret_cast<const char *>(&v), 4); };
+    auto u16 = [&](quint16 v) { wav.append(reinterpret_cast<const char *>(&v), 2); };
+    wav.append("RIFF");
+    u32(quint32(36 + pcm.size()));
+    wav.append("WAVEfmt ");
+    u32(16);
+    u16(1); // PCM
+    u16(1); // mono
+    u32(rate);
+    u32(rate * 2);
+    u16(2);
+    u16(16);
+    wav.append("data");
+    u32(quint32(pcm.size()));
+    wav.append(pcm);
+    return wav;
+}
+
+void Backend::bubble()
+{
+    // garde en memoire : SND_ASYNC lit le tampon pendant la lecture
+    static const QByteArray wav = bubbleWav();
+    PlaySoundW(reinterpret_cast<LPCWSTR>(wav.constData()), nullptr, SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+}
+
+QString Backend::foreground() const
+{
+    return QString::number(quintptr(GetForegroundWindow()));
 }
 
 void Backend::winResize(qreal w, qreal h)

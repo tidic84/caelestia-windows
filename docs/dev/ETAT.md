@@ -4,9 +4,9 @@
 chaque session : ce qui a été fait, ce qui a été vérifié ou non, et où
 reprendre.
 
-## Où on en est (mis à jour le 2026-10-17)
+## Où on en est (mis à jour le 2026-10-18)
 
-- **Version** : 0.4.9, publiée par le tag `v0.4.9` (GitHub Action
+- **Version** : 0.4.10, publiée par le tag `v0.4.10` (GitHub Action
   `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
   dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
@@ -19,6 +19,60 @@ reprendre.
   puis piocher dans `BACKLOG.md` (les 🔴 Qt d'abord).
 
 ## Journal
+
+### 2026-10-18 : 0.4.10, Claude Code dans l'îlot + plantages de Tidic, publiée
+
+**Fonctionnement.** Les hooks Claude Code (`UserPromptSubmit`, `Stop`,
+`SessionEnd`, `Notification idle_prompt`) lancent `ilot.exe --claude`. Ce
+processus est traité en tête de `main.cpp`, avant le mutex : il lit le JSON du
+hook sur stdin et l'envoie par `WM_COPYDATA` (`'ILCC'`) à la fenêtre
+`IlotTray`. `shell.cpp` le relaie en événement `claude`, qui arrive dans
+`Watch.qml` (`onClaude`).
+
+**Fichiers.**
+- Nouveaux : `src/claude.rs`, `qt/qml/ClaudeMark.qml`,
+  `qt/shaders/claude.frag`.
+- Modifiés : `main.cpp`, `shell.cpp/.h`, `backend.cpp/.h` (`bubble`,
+  `foreground`), `Watch.qml`, `Pill.qml`, `Ilot.qml`, `SettingsPage.qml`.
+- `serde_json` passe en `preserve_order`.
+
+**Vérifié.**
+- Le build passe, `cargo test` aussi (2 tests).
+- Le passage par stdin fonctionne : animation et minuteur affichés puis
+  effacés, vus sur des captures d'écran.
+- Une seule instance tourne, et `--claude` met environ 80 ms.
+- Relecture par l'agent `relecteur`. Ses points ont été corrigés : hook
+  `idle_prompt`, ordre des clés gardé, filtre de messages retiré, id de
+  session validé, largeur pendant le fondu, BOM, sauvegarde unique.
+
+**Ensuite, avec l'utilisateur.**
+- Le son jouait trop rarement : la condition « terminal plus au premier
+  plan » est retirée. Ajout d'un bouton « Tester ».
+- L'animation a été atténuée (halos × 0,4, couleurs plus sourdes).
+- Ajout d'un journal des hooks dans `%TEMP%\ilot-claude.log`.
+- Vérifié avec `claude -p` : UserPromptSubmit, puis Stop, puis SessionEnd
+  arrivent ; l'animation s'affiche puis s'efface. Hooks installés par le
+  bouton : les clés de `settings.json` sont intactes. L'utilisateur a validé.
+
+**Fusionné** : le commit fdf06a6 de Tidic (plantages, voir l'entrée plus
+bas), mis avant le nôtre. Release `v0.4.10`.
+
+**Non vérifié** : la consommation au repos sans session (la mesure stricte
+reste à faire).
+
+### 2026-10-18 : maquette de l'animation Claude Code
+
+- Tâche de Tyz dans le tableau de suivi de l'équipe (Google Sheets).
+- Plusieurs variantes essayées en maquette web. Retenu : **L4**. Ce sont
+  4 nœuds orange en orbite qui fusionnent en étoile Claude, en boucle de 5 s.
+  À la fin, un son court, puis l'animation et le minuteur s'effacent.
+- Ajouté : `docs/design/claude-code/README.md` (spécification, minutage,
+  couleurs, pistes de portage QML et hooks) et `maquette.html` (référence).
+- Vérifié : le script de la maquette passe `node --check`. Le rendu visuel a
+  été validé par l'utilisateur sur la maquette en ligne. **Rien n'est codé
+  dans l'appli.**
+- Prochaine étape : planifier l'implémentation (hooks, tube nommé dans
+  `main.cpp`, `ShaderEffect` dans la pilule) et choisir le son.
 
 ### 2026-10-18 : plantages de l'îlot (dumps du 16 et du 17)
 

@@ -324,6 +324,78 @@ Item {
         onTriggered: w.matchFlash = false
     }
 
+    // ================================================== Claude Code
+    // hooks Claude Code (src/claude.rs) : `ilot.exe --claude` transmet chaque
+    // evenement (qt/src/main.cpp, evenement `claude`). Pendant une tache :
+    // animation et temps ecoule dans la pilule ; a la fin, un son si la tache
+    // a assez dure (cfg.cc_min).
+    // session -> { since, hwnd (fenetre du prompt), cwd }
+    property var ccSessions: ({})
+    readonly property var ccOldest: {
+        let o = null
+        for (const k in ccSessions)
+            if (!o || ccSessions[k].since < o.since)
+                o = ccSessions[k]
+        return o
+    }
+    readonly property bool ccShown: cfg.cc_on !== false && !!ccOldest
+    // largeur gardee pendant le fondu de sortie (350 ms, Pill.qml)
+    property bool ccWide: false
+    onCcShownChanged: {
+        if (ccShown)
+            ccWide = true
+        else
+            ccWideTimer.restart()
+    }
+    Timer {
+        id: ccWideTimer
+        interval: 360
+        onTriggered: w.ccWide = w.ccShown
+    }
+    // garde la derniere valeur pendant le fondu de sortie
+    property string ccText: "0:00"
+    Timer {
+        interval: 1000
+        running: w.ccShown
+        repeat: true
+        onTriggered: w.ccRefresh()
+    }
+    function ccRefresh() {
+        // une tache interrompue (Ctrl+C) ne previent pas : oubliee apres 3 h
+        const old = Object.keys(ccSessions).filter(k => Date.now() - ccSessions[k].since > 3 * 3600000)
+        if (old.length) {
+            const s = Object.assign({}, ccSessions)
+            old.forEach(k => delete s[k])
+            ccSessions = s
+        }
+        if (ccOldest)
+            ccText = Ilot.fmtTime((Date.now() - ccOldest.since) / 1000)
+    }
+    function onClaude(e) {
+        if (!e || typeof e.event !== "string" || typeof e.session !== "string" || !/^[\w-]{1,64}$/.test(e.session))
+            return
+        // prefixe : une cle comme « __proto__ » ne touche pas a l'objet
+        const id = "s:" + e.session
+        const s = Object.assign({}, ccSessions)
+        if (e.event === "UserPromptSubmit") {
+            s[id] = { since: Date.now(), hwnd: String(e.hwnd || ""), cwd: String(e.cwd || "") }
+        } else if (e.event === "Stop" || e.event === "SessionEnd" || e.event === "Notification") {
+            // Notification (idle_prompt) : Claude attend une saisie, sans doute apres Echap
+            const cur = s[id]
+            if (!cur)
+                return
+            delete s[id]
+            const min = cfg.cc_min !== undefined ? cfg.cc_min : 30
+            if (e.event === "Stop" && cfg.cc_on !== false && cfg.cc_sound !== false && !cfg.dnd
+                && Date.now() - cur.since >= min * 1000)
+                Backend.bubble()
+        } else {
+            return
+        }
+        ccSessions = s
+        ccRefresh()
+    }
+
     // ================================================== Valorant
     // src/valorant.rs (evenement `valorant`, null quand le jeu est ferme) :
     // file d'attente, partie trouvee (notification), selection des agents
@@ -946,6 +1018,7 @@ Item {
                 body: "Mise à jour terminée", action: "Jouer", url: "steam://rungameid/" + d.appid, ms: 12000 })
         })
         Api.listen("valorant", v => w.onValo(v))
+        Api.listen("claude", e => w.onClaude(e))
         Api.listen("match-found", name => {
             // Valorant suivi a part (src/valorant.rs)
             if (w.valo && w.cfg.valorant !== false)

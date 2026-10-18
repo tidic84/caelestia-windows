@@ -40,7 +40,7 @@ qt_add_resources(ilot "fonts" PREFIX "/" FILES ${FONT_FILES})
 
 qt_add_shaders(ilot "shaders"
     PREFIX "/"
-    FILES shaders/round.frag
+    FILES shaders/round.frag shaders/claude.frag
 )
 
 # coeur Rust (cargo build --release a la racine du depot)
@@ -53,7 +53,7 @@ set_target_properties(ilot_core PROPERTIES
 target_include_directories(ilot PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_definitions(ilot PRIVATE QT_NO_KEYWORDS WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 target_compile_options(ilot PRIVATE /permissive- /EHsc /utf-8)
-target_link_libraries(ilot PRIVATE Qt6::Gui Qt6::Quick ilot_core user32 shell32 dwmapi d2d1 windowsapp CoreMessaging)
+target_link_libraries(ilot PRIVATE Qt6::Gui Qt6::Quick ilot_core user32 shell32 dwmapi d2d1 windowsapp CoreMessaging winmm)
 
 add_custom_command(TARGET ilot POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CORE_DIR}/ilot_core.dll $<TARGET_FILE_DIR:ilot>)

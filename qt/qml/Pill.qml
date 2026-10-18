@@ -105,8 +105,28 @@ Item {
             color: Theme.tertiary
             anchors.verticalCenter: parent.verticalCenter
         }
+        // Claude Code au travail : animation a gauche de l'heure, temps a droite
+        ClaudeMark {
+            opacity: Watch.ccShown ? 1 : 0
+            scale: 0.6 + 0.4 * opacity
+            visible: opacity > 0
+            anchors.verticalCenter: parent.verticalCenter
+            Behavior on opacity { NumberAnimation { duration: 350 } }
+        }
         PillClock {
             anchors.verticalCenter: parent.verticalCenter
+        }
+        Txt {
+            text: Watch.ccText
+            px: 12
+            weight: Font.Medium
+            tnum: true
+            color: Theme.inkVariant
+            opacity: Watch.ccShown ? 1 : 0
+            scale: 0.6 + 0.4 * opacity
+            visible: opacity > 0
+            anchors.verticalCenter: parent.verticalCenter
+            Behavior on opacity { NumberAnimation { duration: 350 } }
         }
         // activite : telechargement Steam, jeu en cours, GPU charge
         Row {

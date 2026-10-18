@@ -23,6 +23,8 @@ Item {
         game_perf: true, game_notif: false, match_alert: true, valorant: true, mix_auto: true, away: "on", pet: "blob",
         pet_walk: true, clock: "digital", privacy: true, wxfx: true, dc_pill: true, media_bg: "art", pill_size: "m",
         assist_tr: true, assist_claude: true, bar_titles: true,
+        // Claude Code (hooks) : animation, son de fin, duree minimale (s)
+        cc_on: true, cc_sound: true, cc_min: 30,
         // compagnon (Reglages > Compagnon)
         pet_color: "nature", pet_eyes: "dot", pet_hat: "none", pet_face: "none", pet_neck: "none", pet_name: "",
         pet_trail: "sparkle", pet_afk: 90, pet_size: "m"
@@ -222,7 +224,7 @@ Item {
             w += 70
         // compagnon, activite (telechargement, jeu), Discord, voyant, extinction
         w += (Watch.petShown ? 24 : 0) + (Watch.actShown ? 72 : 0) + (Watch.dcShown ? 26 : 0)
-            + (Watch.privShown ? 18 : 0) + (Watch.offShown ? 62 : 0)
+            + (Watch.privShown ? 18 : 0) + (Watch.offShown ? 62 : 0) + (Watch.ccWide ? (Watch.ccText.length > 4 ? 90 : 80) : 0)
         return { w: w, h: 30 }
     }
     // rayon des coins bas
@@ -403,7 +405,7 @@ Item {
     // clavier ni souris) ou en plein ecran.
     readonly property bool ambient: !fullscreen && !Theme.reduced && Watch.idle < 60
     readonly property bool ambientUsed: Watch.petShown || !!cfg.wxfx || cfg.island_bg === "aurora"
-        || cfg.border === "rgb" || cfg.border === "pulse" || cfg.clock === "neon"
+        || cfg.border === "rgb" || cfg.border === "pulse" || cfg.clock === "neon" || Watch.ccShown
     readonly property int ambStep: 40
     // millisecondes d'ambiance ecoulees
     property real amb: 0

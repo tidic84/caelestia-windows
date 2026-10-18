@@ -8,6 +8,8 @@
 #include <QFile>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QQmlEngine>
 #include <QQuickWindow>
 
@@ -23,8 +25,60 @@ static void toFile(QtMsgType, const QMessageLogContext &, const QString &msg)
     s_log->flush();
 }
 
+// `ilot.exe --claude` : lance par les hooks Claude Code (src/claude.rs), avec
+// le JSON du hook sur stdin. Transmet l'evenement a l'ilot deja lance, puis
+// quitte sans rien ecrire (la sortie d'UserPromptSubmit irait a Claude).
+// Ne lance jamais l'ilot.
+static int claudeHook()
+{
+    QByteArray in;
+    HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+    if (h && h != INVALID_HANDLE_VALUE) {
+        // pas de console : la lecture attendrait une saisie
+        DWORD type = GetFileType(h);
+        if (type == FILE_TYPE_PIPE || type == FILE_TYPE_DISK) {
+            char buf[8192];
+            DWORD n = 0;
+            while (in.size() < (1 << 20) && ReadFile(h, buf, sizeof buf, &n, nullptr) && n > 0)
+                in.append(buf, int(n));
+        }
+    }
+    const QJsonObject hook = QJsonDocument::fromJson(in).object();
+    const QString event = hook.value(QStringLiteral("hook_event_name")).toString();
+    HWND ilot = FindWindowW(L"IlotTray", L"Ilot");
+    // journal des derniers hooks recus (diagnostic) : %TEMP%\ilot-claude.log, 64 Ko au plus
+    {
+        QFile log(QDir::tempPath() + QStringLiteral("/ilot-claude.log"));
+        if (log.size() > 65536)
+            log.remove();
+        if (log.open(QIODevice::Append | QIODevice::Text))
+            log.write((QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss ")) + (event.isEmpty() ? QStringLiteral("?") : event) + QLatin1Char(' ')
+                       + hook.value(QStringLiteral("session_id")).toString().left(8) + (ilot ? QString() : QStringLiteral(" (ilot absent)")) + QLatin1Char('\n'))
+                          .toUtf8());
+    }
+    if (event.isEmpty())
+        return 0;
+    if (!ilot)
+        return 0;
+    // fenetre au premier plan : le terminal ou l'on vient de taper le prompt
+    const QJsonObject msg{
+        {QStringLiteral("event"), event},
+        {QStringLiteral("session"), hook.value(QStringLiteral("session_id")).toString()},
+        {QStringLiteral("cwd"), hook.value(QStringLiteral("cwd")).toString()},
+        {QStringLiteral("hwnd"), QString::number(quintptr(GetForegroundWindow()))},
+    };
+    QByteArray data = QJsonDocument(msg).toJson(QJsonDocument::Compact);
+    COPYDATASTRUCT cds{kClaudeCopyData, DWORD(data.size()), data.data()};
+    SendMessageTimeoutW(ilot, WM_COPYDATA, 0, LPARAM(&cds), SMTO_ABORTIFHUNG | SMTO_BLOCK, 1000, nullptr);
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
+    for (int i = 1; i < argc; ++i)
+        if (!strcmp(argv[i], "--claude"))
+            return claudeHook();
+
     // diagnostics en ligne de commande (`--check-all`...), sans interface
     int code = ilot_cli();
     if (code >= 0)

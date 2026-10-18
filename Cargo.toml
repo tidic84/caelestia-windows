@@ -1,6 +1,6 @@
 ﻿[package]
 name = "ilot"
-version = "0.4.9"
+version = "0.4.10"
 edition = "2021"
 rust-version = "1.89"
 description = "Ilot facon Caelestia pour Windows"
@@ -11,7 +11,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# preserve_order : ~/.claude/settings.json garde l'ordre de ses cles (claude.rs)
+serde_json = { version = "1", features = ["preserve_order"] }
 base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "bmp", "webp", "gif"] }
 sysinfo = "0.33"

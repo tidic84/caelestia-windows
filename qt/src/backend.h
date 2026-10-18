@@ -31,6 +31,10 @@ public:
     Q_INVOKABLE void beep();
     // Partie trouvee : trois notes montantes
     Q_INVOKABLE void chime();
+    // Fin d'une tache Claude Code : petit « pop » (son genere, sans fichier)
+    Q_INVOKABLE void bubble();
+    // Fenetre au premier plan (HWND en texte), comparee a celle des hooks Claude Code
+    Q_INVOKABLE QString foreground() const;
     // Panneau agrandi : taille de la fenetre de l'ilot, en pixels logiques
     Q_INVOKABLE void winResize(qreal w, qreal h);
     Q_INVOKABLE void quit();

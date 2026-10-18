@@ -4,6 +4,12 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.10 — 2026-10-18
+
+- **Claude Code dans l'îlot** : pendant que Claude travaille, une petite animation orange (quatre points en orbite qui fusionnent en étoile, puis se séparent) s'affiche à gauche de l'heure, avec le temps écoulé à droite. Quand il a fini, l'animation s'efface et un petit « pop » retentit si la tâche a duré au moins 30 s. Ça marche pour toutes les sessions Claude Code, quel que soit le dossier.
+- À activer dans Réglages › Addons › Claude Code : bouton « Installer » (ajoute les hooks dans `~/.claude/settings.json` sans toucher au reste, avec une copie de sauvegarde), son, durée minimale et bouton « Tester » pour écouter le son. Les terminaux Claude Code déjà ouverts sont à relancer une fois.
+- **Stabilité** : deux plantages corrigés, retrouvés dans les rapports de Windows. L'îlot pouvait planter en se fermant ou en se rechargeant (réglage reçu pendant la fermeture), et en sortie de veille ou au rebranchement d'un écran (bug de Qt dans la synchronisation de l'affichage).
+
 ## 0.4.9 — 2026-10-17
 
 - **Confidentialité** : les copies marquées privées par l'application (mots de passe copiés depuis KeePass, Bitwarden ou un autre gestionnaire) n'apparaissent plus dans l'historique du presse-papiers, comme dans celui de Windows.

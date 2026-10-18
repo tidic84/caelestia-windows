@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Îlot × Claude Code : maquette L4</title>
+<!--
+  Maquette de référence de l'animation « Claude travaille » de l'îlot (variante L4 retenue le 2026-10-18).
+  S'ouvre directement dans un navigateur. Toute la spécification est dans README.md (même dossier).
+  Les réglages de l'animation sont regroupés dans l'objet ANIM ci-dessous : les modifier ici avant de
+  reporter les valeurs dans le QML.
+-->
+<style>
+:root {
+  --bg: #121117; --panel: #1b1a21; --fg: #e6e0e9; --muted: #a59fae; --line: #2f2c36; --accent: #cfbdfe;
+  --desk-a: #241e33; --desk-b: #15131c; --isl: #0a0a0f; --isl-ink: #e6e0e9;
+  --hot: #ffb27a; --deep: #ff6a2b; --core: #fff1e6;
+  color-scheme: dark;
+}
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; padding: 28px 16px 48px; }
+.wrap { max-width: 900px; margin: 0 auto; display: grid; gap: 24px; }
+h1 { font-size: 24px; margin: 0; }
+p { margin: 0; color: var(--muted); max-width: 70ch; }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.hud { position: relative; height: 180px; display: grid; place-items: center; background:
+  radial-gradient(circle, rgba(255,106,43,.13), transparent 60%),
+  linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 16px 16px,
+  linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 16px 16px, #07070b; }
+.desk { position: relative; height: 180px; background: linear-gradient(160deg, var(--desk-a), var(--desk-b)); }
+.island { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: var(--isl); color: var(--isl-ink);
+  border-radius: 0 0 18px 18px; height: 34px; width: 200px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; font-size: 13px; box-sizing: border-box; }
+.island.idle { justify-content: center; }
+.island .clock { font-variant-numeric: tabular-nums; font-weight: 500; }
+.island .timer { font: 12px Consolas, monospace; color: var(--deep); min-width: 34px; text-align: right; }
+.island .side { width: 30px; display: grid; place-items: center; transition: opacity .35s, transform .35s; }
+.island .side:last-child { justify-items: end; }
+.island.leaving .side { opacity: 0; transform: scale(.6); }
+canvas { display: block; }
+button { justify-self: start; font: inherit; font-weight: 500; padding: 10px 18px; border-radius: 999px; border: 0; background: var(--fg); color: var(--bg); cursor: pointer; }
+button:disabled { opacity: .5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Îlot × Claude Code : maquette L4</h1>
+  <p>4 nœuds en orbite avec traînée → spirale vers le centre → fusion en étoile (10 rayons déployés un par un) → respiration → repli → nœuds relâchés en spirale. Boucle continue de 5 s. Fin de tâche : son « bulle », puis l'animation et le minuteur s'effacent.</p>
+  <div class="row">
+    <div class="box hud"><span data-anim="120"></span></div>
+    <div class="box desk"><div class="island idle" id="live"><span class="clock" data-clock>14:32</span></div></div>
+  </div>
+  <button id="go">Simuler : Claude travaille 6 s puis termine</button>
+</div>
+<script>
+// ------------------------------------------------------------------ réglages
+const ANIM = {
+  nodes: 4,          // nombre de nœuds (3 = variante L3)
+  period: 5,         // durée d'une boucle (s)
+  orbitSpeed: 1.5,   // vitesse angulaire de base (rad/s)
+  // jalons de la boucle (s), voir README.md
+  spiralIn: [1.7, 2.4], star: [2.35, 3.9], spiralOut: [3.9, 4.5],
+  rays: 10, shortRay: .7, rayStagger: .035, rayOpen: .4,
+  starSpin: 26,      // rotation de l'étoile (degrés/s)
+  trail: 12, trailSmall: 7, trailStep: .018,  // traînée : nombre d'échos et écart (s)
+};
+// ---------------------------------------------------------------------------
+
+function hhmm() { const d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+document.querySelectorAll("[data-clock]").forEach(e => e.textContent = hhmm());
+function fmt(s) { return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+
+const css = getComputedStyle(document.documentElement);
+const HOT = css.getPropertyValue("--hot").trim(), DEEP = css.getPropertyValue("--deep").trim(), CORE = css.getPropertyValue("--core").trim();
+const TAU = Math.PI * 2;
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const io = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;   // InOutCubic
+const inQ = x => x * x * x;                                                // InCubic
+const outB = x => { const c = 1.4, c3 = c + 1; return 1 + c3 * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); }; // OutBack
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+
+// rayon (1 = orbite, 0 = au centre) et angle des nœuds à l'instant t
+function phase(t) {
+  const T = ANIM.period, u = ((t % T) + T) % T, cyc = Math.floor(t / T);
+  const kin = seg(u, ...ANIM.spiralIn), kout = seg(u, ...ANIM.spiralOut);
+  let r = 1;
+  if (u >= ANIM.spiralIn[0] && u < ANIM.spiralIn[1]) r = 1 - inQ(kin);
+  else if (u >= ANIM.spiralIn[1] && u < ANIM.spiralOut[0]) r = 0;
+  else if (u >= ANIM.spiralOut[0] && u < ANIM.spiralOut[1]) r = outB(kout);
+  // un tour complet ajouté par boucle (½ en entrant, ½ en sortant) : la boucle se raccorde sans saut
+  const extra = (io(kin) * .5 + io(kout) * .5 + cyc) * TAU;
+  return { r, ang: t * ANIM.orbitSpeed + extra };
+}
+function nodePos(t, i) { const p = phase(t), a = p.ang + i / ANIM.nodes * TAU; return [Math.cos(a) * p.r, Math.sin(a) * p.r, p.r]; }
+function starState(t) {
+  const T = ANIM.period, u = ((t % T) + T) % T, [s0] = ANIM.star, end = ANIM.spiralOut[0];
+  const rays = [];
+  for (let i = 0; i < ANIM.rays; i++) {
+    const open = outB(seg(u, s0 + i * ANIM.rayStagger, s0 + ANIM.rayOpen + i * ANIM.rayStagger));
+    const close = io(seg(u, end - .05 + i * .02, end + .3 + i * .02));
+    rays.push(u < s0 || u > end + .55 ? 0 : clamp(open, 0, 1.3) * (1 - close));
+  }
+  const live = u >= s0 - .05 && u < end + .55;
+  return {
+    rays,
+    breathe: live ? .9 + .1 * Math.sin((u - s0) * 4.2) : 1,
+    core: live ? clamp(seg(u, s0 - .05, s0 + .1) * (1 - seg(u, end + .2, end + .5))) : 0,
+    shock: u >= s0 && u < s0 + .6 ? seg(u, s0, s0 + .6) : -1,
+    rot: t * ANIM.starSpin,
+  };
+}
+
+const items = [];
+function makeAnim(holder, size) {
+  const c = document.createElement("canvas"), dpr = Math.max(1, devicePixelRatio || 1);
+  c.width = size * dpr; c.height = size * dpr; c.style.width = c.style.height = size + "px"; holder.appendChild(c);
+  const it = { g: c.getContext("2d"), size, dpr, alive: true, t0: performance.now() }; items.push(it); return it;
+}
+function render(it, now) {
+  const { g, size, dpr } = it, t = (now - it.t0) / 1000;
+  const small = size < 40, R = size * (small ? .36 : .32), cx = size / 2, cy = size / 2;
+  const nodeR = Math.max(small ? 1.8 : 2.2, size * .065);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, size, size);
+  g.globalCompositeOperation = "lighter";   // les lueurs s'additionnent
+  const TRAIL = small ? ANIM.trailSmall : ANIM.trail;
+  for (let i = 0; i < ANIM.nodes; i++) for (let k = TRAIL; k >= 0; k--) {
+    const [x, y, r] = nodePos(t - k * ANIM.trailStep, i); if (r < .04) continue;
+    const f = 1 - k / (TRAIL + 1), rad = nodeR * (k ? .25 + .6 * f : 1) * clamp(r * 1.6, .35, 1);
+    g.globalAlpha = k ? f * f * .55 : 1; g.fillStyle = k ? DEEP : HOT; g.shadowColor = DEEP; g.shadowBlur = k ? 0 : size * .18;
+    g.beginPath(); g.arc(cx + x * R, cy + y * R, rad, 0, TAU); g.fill();
+    if (!k && !small) { g.fillStyle = CORE; g.shadowBlur = 0; g.beginPath(); g.arc(cx + x * R, cy + y * R, rad * .42, 0, TAU); g.fill(); }
+  }
+  const s = starState(t);
+  if (s.core > 0 || s.rays.some(v => v > 0)) {
+    g.save(); g.translate(cx, cy); g.rotate(s.rot * Math.PI / 180);
+    const Rin = R * .12, Rout = R * 1.08 * s.breathe, w = Math.max(small ? 1.7 : 2.2, size * .078);
+    const grad = g.createRadialGradient(0, 0, 0, 0, 0, Rout); grad.addColorStop(0, CORE); grad.addColorStop(.3, HOT); grad.addColorStop(1, DEEP);
+    g.strokeStyle = grad; g.lineWidth = w; g.lineCap = "round"; g.shadowColor = DEEP; g.shadowBlur = size * .2; g.globalAlpha = 1;
+    s.rays.forEach((v, i) => {
+      if (v <= .01) return;
+      const a = i / ANIM.rays * TAU, L = Rin + (Rout - Rin) * (i % 2 ? ANIM.shortRay : 1) * v;
+      g.beginPath(); g.moveTo(Math.cos(a) * Rin, Math.sin(a) * Rin); g.lineTo(Math.cos(a) * L, Math.sin(a) * L); g.stroke();
+    });
+    if (s.core > 0) { g.globalAlpha = s.core; g.fillStyle = CORE; g.shadowBlur = size * .3; g.beginPath(); g.arc(0, 0, Rin * 1.15, 0, TAU); g.fill(); }
+    if (s.shock >= 0) { const k = io(s.shock); g.globalAlpha = (1 - k) * .7; g.strokeStyle = HOT; g.lineWidth = Math.max(.8, size * .018); g.shadowBlur = size * .15;
+      g.beginPath(); g.arc(0, 0, R * (.3 + 1.1 * k), 0, TAU); g.stroke(); }
+    g.restore();
+  }
+  g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; g.shadowBlur = 0;
+}
+(function frame(now) { for (const it of items) if (it.alive) render(it, now); requestAnimationFrame(frame); })(performance.now());
+document.querySelectorAll("[data-anim]").forEach(h => makeAnim(h, +h.dataset.anim));
+
+// son de fin « bulle » : sinus 380 → 950 Hz en 90 ms, enveloppe 8 ms / 220 ms
+let ctx;
+function bubble() {
+  ctx = ctx || new AudioContext(); ctx.resume();
+  const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+  o.frequency.setValueAtTime(380, t); o.frequency.exponentialRampToValueAtTime(950, t + .09);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.3, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + .22);
+  o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + .3);
+}
+const live = document.getElementById("live"), go = document.getElementById("go");
+let liveIt = null;
+go.onclick = () => {
+  go.disabled = true; ctx = ctx || new AudioContext(); ctx.resume();
+  live.className = "island";
+  live.innerHTML = '<span class="side"></span><span class="clock">' + hhmm() + '</span><span class="side"><span class="timer">0:00</span></span>';
+  liveIt = makeAnim(live.querySelector(".side"), 20);
+  let sec = 0; const tm = live.querySelector(".timer");
+  const iv = setInterval(() => { sec = Math.min(252, sec + 7); tm.textContent = fmt(sec); }, 166);
+  setTimeout(() => {
+    clearInterval(iv); bubble(); live.classList.add("leaving");
+    setTimeout(() => { liveIt.alive = false; live.className = "island idle"; live.innerHTML = '<span class="clock">' + hhmm() + '</span>'; go.disabled = false; }, 400);
+  }, 6000);
+};
+</script>
+</body>
+</html>
