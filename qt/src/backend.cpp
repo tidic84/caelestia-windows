@@ -105,16 +105,6 @@ void Backend::beep()
     }).detach();
 }
 
-void Backend::chime()
-{
-    // comme le carillon de la version web (la, re, sol)
-    std::thread([] {
-        Beep(880, 150);
-        Beep(1175, 150);
-        Beep(1568, 320);
-    }).detach();
-}
-
 // WAV 16 bits mono : sinus de 380 a 950 Hz en 90 ms, montee en 8 ms puis
 // extinction exponentielle jusqu'a 220 ms (maquette docs/design/claude-code)
 static QByteArray bubbleWav()

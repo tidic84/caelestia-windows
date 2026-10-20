@@ -26,9 +26,7 @@ public:
     Q_INVOKABLE void setIslandOpen(bool open);
     // Fin du minuteur
     Q_INVOKABLE void beep();
-    // Partie trouvee : trois notes montantes
-    Q_INVOKABLE void chime();
-    // Fin d'une tache Claude Code : petit « pop » (son genere, sans fichier)
+    // Fin d'une tache Claude Code, partie trouvee : petit « pop » (son genere, sans fichier)
     Q_INVOKABLE void bubble();
     // Fenetre au premier plan (HWND en texte), comparee a celle des hooks Claude Code
     Q_INVOKABLE QString foreground() const;

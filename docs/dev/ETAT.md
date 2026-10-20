@@ -22,6 +22,26 @@ reprendre.
 
 ## Journal
 
+### 2026-10-20 : alerte « partie trouvée » au lancement d'un jeu, son
+
+Retour d'usage : l'assistant de jeu sonnait aussi au lancement du jeu, et
+le carillon (bips `Beep`) ne plaisait pas.
+
+- **Cause** : pendant le launcher et le chargement, la fenêtre du jeu n'est
+  pas encore au premier plan. Le joueur est donc vu « hors du jeu ».
+  `MatchWatch` prenait alors la lecture disque du chargement initial (ou un
+  clignotement de fenêtre) pour une partie trouvée.
+- `src/activity.rs` : `seen` retient l'id du jeu déjà vu au premier plan.
+  La veille « partie trouvée » ne s'arme qu'après ça. `seen` est remis à zéro
+  quand plus aucun jeu ne tourne.
+- `Watch.qml` : partie trouvée et rappel Valorant jouent `Backend.bubble()`,
+  le son de l'assistant Claude. `Backend::chime` est supprimé.
+- Compilé (`build.cmd`), relu par un agent. Pas testé en jeu.
+- Limites relevées à la relecture :
+  - un jeu relancé en moins de 3 s garde `seen` ;
+  - si `playing()` retient un processus sans fenêtre du dossier du jeu,
+    l'alerte ne part jamais. Avant, ce cas donnait de fausses alertes.
+
 ### 2026-10-19 : survol et infobulles du panneau (après 0.4.12)
 
 Retour d'usage : aucune infobulle (boutons de session, onglets…), y compris

@@ -427,7 +427,7 @@ Item {
             partyUntil = Date.now() + 8000
             // son et clignotement seulement hors du jeu
             if (cfg.match_alert && v.away) {
-                Backend.chime()
+                Backend.bubble()
                 matchFlash = true
                 matchTimer.restart()
             }
@@ -447,7 +447,7 @@ Item {
                 return
             w.valoWarned = true
             if (w.cfg.match_alert)
-                Backend.chime()
+                Backend.bubble()
             w.notify({ app: "Valorant", sym: "timer", title: "Plus que " + left + " s pour choisir ton agent",
                 body: v.agent ? v.agent + " n’est pas verrouillé" : "Aucun agent choisi", action: "Y aller", cmd: ["valorant_focus"], ms: 8000, force: true })
         }
@@ -1026,7 +1026,7 @@ Item {
             w.partyUntil = Date.now() + 8000
             if (!w.cfg.match_alert)
                 return
-            Backend.chime()
+            Backend.bubble()
             w.matchFlash = true
             matchTimer.restart()
             w.notify({ app: name, sym: "sports_esports", icon: w.gaming.game ? w.cover(w.gaming.game.id) : "", title: "Partie trouvée !",

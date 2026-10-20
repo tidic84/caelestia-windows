@@ -576,6 +576,9 @@ pub fn watch(app: AppHandle) {
         let mut updating: HashMap<String, String> = HashMap::new();
         let mut session = Session::default();
         let mut watch_mm = MatchWatch::new(0);
+        // jeu deja vu au premier plan : avant, le joueur n'est pas « sorti du
+        // jeu », il attend qu'il se lance (launcher, chargement initial)
+        let mut seen: Option<String> = None;
         flash_hook();
         // CPU en « utilite », comme le Gestionnaire des taches
         let pdh = crate::pdh::Query::new(&[r"\Processor Information(_Total)\% Processor Utility"]);
@@ -663,6 +666,9 @@ pub fn watch(app: AppHandle) {
                     session = Session::default();
                 }
                 game = now;
+                if game.is_none() {
+                    seen = None;
+                }
                 if game.is_some() {
                     sys.refresh_memory();
                     let cpu = pdh
@@ -690,6 +696,10 @@ pub fn watch(app: AppHandle) {
             if let Some(g) = game.as_mut() {
                 let pid = GAME_PID.load(Ordering::Relaxed);
                 let away = pid != 0 && fg_pid() != pid;
+                if pid != 0 && !away {
+                    seen = Some(g.id.clone());
+                }
+                let away = away && seen.as_ref() == Some(&g.id);
                 if away && g.away == 0 {
                     g.away = now_ms();
                     watch_mm = MatchWatch::new(pid);
