@@ -22,6 +22,21 @@ reprendre.
 
 ## Journal
 
+### 2026-10-20 : « Fin de tâche » dans le menu clic droit de la barre
+
+- `BarContent.qml` : entrée « Fin de tâche », sans confirmation comme la
+  barre des tâches Windows. Message « Fin de tâche refusée » s'il y a un refus.
+- `src/bar.rs` `task_end(ids)` : tue le processus de chaque fenêtre (pid
+  dédoublonné). Pour une UWP (ApplicationFrameHost), il vise le pid d'une
+  fenêtre enfant ; une UWP réduite compte comme refusée. Le nom est lu sur le
+  handle qui sert à terminer. Sont refusés : l'îlot, `explorer` et
+  `tasks::PROTECTED` (devenu `pub(crate)`). `exe_of` est découpé en
+  `exe_of_pid` / `image_name`.
+- Piège : `qt/fonts/MaterialSymbolsRounded.ttf` est un sous-ensemble
+  (303 icônes). `dangerous` et `block` n'y sont pas : il faut vérifier les
+  ligatures (fontTools, table GSUB) avant d'utiliser une nouvelle icône.
+- Compilé, relu par un agent. Pas testé à la souris.
+
 ### 2026-10-20 : onglet Tâches regroupé comme Windows
 
 Reprise du plan de la session du 19 (non commitée) : commit, puis rebase sur

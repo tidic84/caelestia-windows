@@ -506,6 +506,17 @@ Item {
             for (const w of (g ? g.wins : []))
                 Api.invoke("task_close", { id: w.id })
         } })
+        // comme la barre des taches : tue le processus, sans confirmation
+        list.push({ icon: "do_not_disturb_on", label: "Fin de tâche", run: () => {
+            const g = bar.menuGroup()
+            menu.hide()
+            if (g)
+                Api.invoke("task_end", { ids: g.wins.map(w => w.id) }).then(r => {
+                    if (r && r.denied)
+                        Ilot.simpleActivity("error", "Fin de tâche refusée",
+                            r.killed ? r.killed + " fermé(s), " + r.denied + " refusé(s)" : exe, { ms: 4000 })
+                })
+        } })
         menu.show(item.mapToItem(bar, 0, 0).x, Ilot.barH + 4, list)
     }
     CtxMenu {

@@ -39,7 +39,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Processus vitaux de Windows : jamais de fin de tache depuis l'ilot.
-const PROTECTED: &[&str] = &[
+pub(crate) const PROTECTED: &[&str] = &[
     "system", "registry", "smss", "csrss", "wininit", "winlogon", "services", "lsass",
     "svchost", "dwm", "fontdrvhost", "memory compression", "secure system", "lsaiso",
     "sihost", "ctfmon", "audiodg", "ilot",

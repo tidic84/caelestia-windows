@@ -10,7 +10,7 @@ use std::time::Duration;
 use serde::Serialize;
 use crate::host::{AppHandle, WebviewWindow};
 use windows::core::{BOOL, GUID, HSTRING, PWSTR};
-use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, PROPERTYKEY, RECT, WPARAM};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, HWND, LPARAM, PROPERTYKEY, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits, ReleaseDC,
@@ -22,8 +22,8 @@ use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
 use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_BINARY};
 use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::Threading::{
-    GetCurrentProcessId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
-    PROCESS_QUERY_LIMITED_INFORMATION,
+    GetCurrentProcessId, OpenProcess, QueryFullProcessImageNameW, TerminateProcess, PROCESS_NAME_WIN32,
+    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_EXTENDEDKEY,
@@ -37,7 +37,7 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     GetClassLongPtrW, GetIconInfo, SendMessageTimeoutW, GCLP_HICON, GCLP_HICONSM, HICON, ICONINFO, ICON_BIG,
     ICON_SMALL, ICON_SMALL2, SMTO_ABORTIFHUNG, WM_GETICON,
-    EnumWindows, GetClassNameW, GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowRect,
+    EnumChildWindows, EnumWindows, GetClassNameW, GetForegroundWindow, GetWindow, GetWindowLongPtrW, GetWindowRect,
     GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible,
     PostMessageW, SetForegroundWindow, ShowWindow, GWL_EXSTYLE, GW_OWNER, SW_HIDE, SW_MINIMIZE,
     SW_RESTORE, SW_SHOWNA, WM_APP, WM_CLOSE, WS_EX_APPWINDOW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
@@ -142,18 +142,25 @@ pub(crate) fn is_task(h: HWND) -> bool {
 }
 
 fn exe_of(h: HWND) -> String {
+    exe_of_pid(pid_of(h))
+}
+
+fn exe_of_pid(pid: u32) -> String {
     unsafe {
-        let mut pid = 0u32;
-        GetWindowThreadProcessId(h, Some(&mut pid));
         let Ok(p) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
             return String::new();
         };
-        let mut buf = [0u16; 1024];
-        let mut len = buf.len() as u32;
-        let ok = QueryFullProcessImageNameW(p, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len).is_ok();
+        let name = image_name(p);
         let _ = CloseHandle(p);
-        if ok { String::from_utf16_lossy(&buf[..len as usize]) } else { String::new() }
+        name
     }
+}
+
+fn image_name(p: HANDLE) -> String {
+    let mut buf = [0u16; 1024];
+    let mut len = buf.len() as u32;
+    let ok = unsafe { QueryFullProcessImageNameW(p, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len) }.is_ok();
+    if ok { String::from_utf16_lossy(&buf[..len as usize]) } else { String::new() }
 }
 
 /// AppUserModelID de la fenetre (applis UWP, Chrome...), s'il y en a un.
@@ -368,6 +375,67 @@ pub fn task_close(id: isize) {
     unsafe {
         let _ = PostMessageW(Some(hwnd(id)), WM_CLOSE, WPARAM(0), LPARAM(0));
     }
+}
+
+#[derive(Serialize)]
+pub struct EndReport {
+    killed: usize,
+    /// refuses : droits admin, Explorateur, processus systeme
+    denied: usize,
+}
+
+fn pid_of(h: HWND) -> u32 {
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(h, Some(&mut pid)) };
+    pid
+}
+
+/// Clic droit > Fin de tache : termine le processus de chaque fenetre, comme
+/// la barre des taches. Une appli UWP est affichee par ApplicationFrameHost :
+/// on vise le processus de sa fenetre enfant.
+pub fn task_end(ids: Vec<isize>) -> EndReport {
+    let mut r = EndReport { killed: 0, denied: 0 };
+    let me = unsafe { GetCurrentProcessId() };
+    let mut pids: Vec<u32> = Vec::new();
+    for id in ids {
+        let h = hwnd(id);
+        let mut pid = pid_of(h);
+        if exe_of(h).to_ascii_lowercase().ends_with("\\applicationframehost.exe") {
+            let mut kids: Vec<HWND> = Vec::new();
+            unsafe {
+                let _ = EnumChildWindows(Some(h), Some(collect), LPARAM(&mut kids as *mut _ as isize));
+            }
+            pid = kids.into_iter().map(pid_of).find(|&p| p != pid).unwrap_or(0);
+            // reduite ou suspendue : sa fenetre n'est plus un enfant
+            if pid == 0 {
+                r.denied += 1;
+                continue;
+            }
+        }
+        if pid != 0 && !pids.contains(&pid) {
+            pids.push(pid);
+        }
+    }
+    for pid in pids {
+        // nom lu sur le handle qui sert a terminer : un pid reutilise entre
+        // les deux ne peut pas passer la verification
+        let Ok(p) = (unsafe { OpenProcess(PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }) else {
+            r.denied += 1;
+            continue;
+        };
+        let name = image_name(p);
+        let base = name.rsplit('\\').next().unwrap_or_default().to_ascii_lowercase();
+        let base = base.strip_suffix(".exe").unwrap_or(&base);
+        let allowed = pid != me && !base.is_empty() && base != "explorer" && !crate::tasks::PROTECTED.contains(&base);
+        let ok = allowed && unsafe { TerminateProcess(p, 1) }.is_ok();
+        let _ = unsafe { CloseHandle(p) };
+        if ok {
+            r.killed += 1;
+        } else {
+            r.denied += 1;
+        }
+    }
+    r
 }
 
 /// Clic droit > Nouvelle fenetre, appli hors du dossier AppsFolder : relance
