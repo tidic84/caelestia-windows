@@ -30,11 +30,13 @@ mod pc;
 mod pdh;
 mod prefs;
 mod privacy;
+mod procgroup;
 mod settings;
 mod quickshare;
 mod soundboard;
 mod status;
 mod store;
+mod svc;
 mod system;
 mod tasks;
 mod theme;
@@ -383,7 +385,7 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "procs_running" => json(pc::procs_running(a!("names"))),
         "tasks_get" => json(tasks::tasks_get(app.state(), a!("expanded"))),
         "tasks_stop" => json(tasks::tasks_stop(app.state())),
-        "task_kill" => json(tasks::task_kill(app.state(), a!("name"), a!("pid"), a!("created"))),
+        "task_kill" => json(tasks::task_kill(app.state(), a!("key"), a!("members"))),
         "taskmgr_open" => json(tasks::taskmgr_open()),
         // sante, services, jeux en cours, inactivite
         "health_get" => json(health::health_get()),

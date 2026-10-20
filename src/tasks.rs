@@ -18,17 +18,22 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use sysinfo::Networks;
 use crate::host::State;
+use crate::procgroup::{self, created_ms};
+use crate::svc;
 use windows::core::{BOOL, HSTRING};
-use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM};
+use windows::Win32::Foundation::{CloseHandle, ERROR_INVALID_PARAMETER, FILETIME, HANDLE, HWND, LPARAM, STILL_ACTIVE};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
 use windows::Win32::NetworkManagement::IpHelper::{GetExtendedTcpTable, TCP_TABLE_OWNER_PID_ALL};
 use windows::Win32::Networking::WinSock::{AF_INET, AF_INET6};
 use windows::Win32::Storage::FileSystem::QueryDosDeviceW;
-use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE};
+use windows::Win32::System::Threading::{
+    GetExitCodeProcess, GetProcessInformation, GetProcessTimes, OpenProcess, ProcessPowerThrottling, TerminateProcess, PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+    PROCESS_POWER_THROTTLING_EXECUTION_SPEED, PROCESS_POWER_THROTTLING_STATE, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
+};
 use windows::Win32::UI::Shell::{IShellItem, SHCreateItemFromParsingName};
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetWindow, GetWindowLongW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible, GWL_EXSTYLE,
-    GW_OWNER, WS_EX_TOOLWINDOW,
+    EnumChildWindows, EnumWindows, GetClassNameW, GetWindow, GetWindowLongW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
+    IsHungAppWindow, IsWindowVisible, GWL_EXSTYLE, GW_OWNER, WS_EX_TOOLWINDOW,
 };
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -42,7 +47,9 @@ const PROTECTED: &[&str] = &[
 
 #[derive(Serialize)]
 pub struct Task {
-    /// nom de l'executable sans .exe (cle pour la fin de tache)
+    /// cle stable du groupe (voir `procgroup`) : tri, developpement, fin de tache
+    key: String,
+    /// nom de l'executable sans .exe (celui de la racine du groupe)
     name: String,
     /// nom affiche par le Gestionnaire des taches (description du fichier)
     label: String,
@@ -63,6 +70,13 @@ pub struct Task {
     /// chemin de l'executable (« Ouvrir l'emplacement »), vide si inconnu
     path: String,
     protected: bool,
+    /// "", "suspended", "hung" ou "eco" (voir `status_of`)
+    status: &'static str,
+    /// (pid, creation en ms) de tous les processus du groupe, racines d'abord
+    members: Vec<(u32, u64)>,
+    /// noms affiches des services, seulement pour un hote de service
+    #[serde(skip_serializing_if = "Option::is_none")]
+    services: Option<Vec<String>>,
     /// detail par processus, seulement pour les groupes developpes
     #[serde(skip_serializing_if = "Vec::is_empty")]
     procs: Vec<Sub>,
@@ -79,13 +93,22 @@ pub struct Sub {
     main: bool,
     #[serde(skip)]
     ppid: u32,
+    /// nom, nom affiche, icone et chemin propres au processus (une app peut
+    /// contenir des enfants d'autres executables)
+    name: String,
+    label: String,
+    icon: String,
+    path: String,
     /// titre de sa fenetre principale, vide s'il n'en a pas
     title: String,
+    /// exe vital (PROTECTED) : pas de fin de tache, meme dans une app
+    protected: bool,
     cpu: f32,
     mem: u64,
     disk: u64,
     gpu: f32,
     net: u32,
+    status: &'static str,
 }
 
 #[derive(Serialize)]
@@ -169,22 +192,52 @@ struct SpInfo {
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(std::mem::size_of::<SpInfo>() == 256);
 
+/// SYSTEM_THREAD_INFORMATION : `number_of_threads` entrees juste apres `SpInfo`.
+#[repr(C)]
+#[allow(dead_code)]
+struct ThreadInfo {
+    kernel_time: i64,
+    user_time: i64,
+    create_time: i64,
+    wait_time: u32,
+    start_address: usize,
+    client_id: [usize; 2],
+    priority: i32,
+    base_priority: i32,
+    context_switches: u32,
+    thread_state: u32,
+    wait_reason: u32,
+}
+
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(
+    std::mem::size_of::<ThreadInfo>() == 80
+        && std::mem::offset_of!(ThreadInfo, thread_state) == 68
+        && std::mem::offset_of!(ThreadInfo, wait_reason) == 72
+);
+
+/// KTHREAD_STATE Waiting et KWAIT_REASON Suspended (valent 5 toutes les deux).
+const THREAD_WAITING: u32 = 5;
+const WAIT_SUSPENDED: u32 = 5;
+
 /// Un processus tel que vu par le noyau a l'instant du releve.
-struct Proc {
-    pid: u32,
+pub(crate) struct Proc {
+    pub(crate) pid: u32,
     /// pid du parent a la creation (peut avoir ete reutilise depuis)
-    ppid: u32,
-    name: String,
-    create: i64,
+    pub(crate) ppid: u32,
+    pub(crate) name: String,
+    pub(crate) create: i64,
     /// temps processeur noyau + utilisateur, en unites de 100 ns
-    cpu: i64,
-    mem: u64,
-    io: u64,
+    pub(crate) cpu: i64,
+    pub(crate) mem: u64,
+    pub(crate) io: u64,
+    /// au moins un thread, et tous en attente pour cause de suspension
+    pub(crate) suspended: bool,
 }
 
 /// Releve de tous les processus. `buf` est garde d'un appel a l'autre
 /// (quelques centaines de Ko) pour ne pas le reallouer a chaque tick.
-fn snapshot(buf: &mut Vec<u64>) -> Option<Vec<Proc>> {
+pub(crate) fn snapshot(buf: &mut Vec<u64>) -> Option<Vec<Proc>> {
     if buf.is_empty() {
         buf.resize(64 * 1024, 0);
     }
@@ -225,6 +278,21 @@ fn snapshot(buf: &mut Vec<u64>) -> Option<Vec<Proc>> {
                 String::new()
             }
         };
+        // threads : bornes verifiees (tampon et entree suivante) avant lecture
+        let suspended = {
+            let n = e.number_of_threads as usize;
+            let size = std::mem::size_of::<ThreadInfo>();
+            let start = off + std::mem::size_of::<SpInfo>();
+            let end = if e.next_entry_offset == 0 { total } else { (off + e.next_entry_offset as usize).min(total) };
+            let fits = n.checked_mul(size).and_then(|b| start.checked_add(b)).is_some_and(|x| x <= end);
+            n > 0
+                && fits
+                && (0..n).all(|i| {
+                    // SAFETY : l'entree i tient dans [start, end), verifie par `fits`
+                    let t = unsafe { std::ptr::read_unaligned(base.add(start + i * size) as *const ThreadInfo) };
+                    t.thread_state == THREAD_WAITING && t.wait_reason == WAIT_SUSPENDED
+                })
+        };
         out.push(Proc {
             pid: e.unique_process_id as u32,
             ppid: e.inherited_from_unique_process_id as u32,
@@ -233,6 +301,7 @@ fn snapshot(buf: &mut Vec<u64>) -> Option<Vec<Proc>> {
             cpu: e.kernel_time.saturating_add(e.user_time),
             mem: e.working_set_private_size.max(0) as u64,
             io: (e.read_transfer_count.max(0) as u64).saturating_add(e.write_transfer_count.max(0) as u64),
+            suspended,
         });
         if e.next_entry_offset == 0 {
             break;
@@ -362,7 +431,36 @@ fn pids_with_window() -> HashMap<u32, HWND> {
         }
         let mut pid = 0u32;
         GetWindowThreadProcessId(h, Some(&mut pid));
-        set.entry(pid).or_insert(h);
+        // appli du Store : le cadre appartient a ApplicationFrameHost, la
+        // vraie appli est le processus de sa fenetre enfant CoreWindow
+        // (GetClassNameW n'envoie pas de message : sans risque sur nos fenetres)
+        // On garde la CoreWindow : IsHungAppWindow interroge alors le thread
+        // de l'appli, pas celui d'ApplicationFrameHost.
+        let mut win = h;
+        if class_is(h, "ApplicationFrameWindow") {
+            let mut found = (pid, 0u32, HWND::default());
+            let _ = EnumChildWindows(Some(h), Some(core_cb), LPARAM(&mut found as *mut _ as isize));
+            if found.1 != 0 {
+                pid = found.1;
+                win = found.2;
+            }
+        }
+        set.entry(pid).or_insert(win);
+        true.into()
+    }
+    /// (pid du cadre, pid trouve, sa fenetre) : s'arrete sur la premiere
+    /// CoreWindow d'un autre processus.
+    unsafe extern "system" fn core_cb(h: HWND, l: LPARAM) -> BOOL {
+        let found = &mut *(l.0 as *mut (u32, u32, HWND));
+        if class_is(h, "Windows.UI.Core.CoreWindow") {
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(h, Some(&mut pid));
+            if pid != 0 && pid != found.0 {
+                found.1 = pid;
+                found.2 = h;
+                return false.into();
+            }
+        }
         true.into()
     }
     let mut set = HashMap::new();
@@ -370,6 +468,49 @@ fn pids_with_window() -> HashMap<u32, HWND> {
         let _ = EnumWindows(Some(cb), LPARAM(&mut set as *mut _ as isize));
     }
     set
+}
+
+fn class_is(h: HWND, class: &str) -> bool {
+    let mut buf = [0u16; 64];
+    let n = unsafe { GetClassNameW(h, &mut buf) }.max(0) as usize;
+    String::from_utf16_lossy(&buf[..n.min(buf.len())]) == class
+}
+
+/// Fenetre qui ne traite plus ses messages (depuis 5 s), sans lui en envoyer.
+fn is_hung(h: HWND) -> bool {
+    unsafe { IsHungAppWindow(h) }.as_bool()
+}
+
+/// Mode efficacite (Windows 11) : limitation de la vitesse d'execution
+/// demandee et active. Faux si le processus ne s'ouvre pas.
+pub(crate) fn eco(pid: u32) -> bool {
+    unsafe {
+        let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
+            return false;
+        };
+        let mut s = PROCESS_POWER_THROTTLING_STATE { Version: PROCESS_POWER_THROTTLING_CURRENT_VERSION, ..Default::default() };
+        let r = GetProcessInformation(
+            h,
+            ProcessPowerThrottling,
+            &mut s as *mut _ as _,
+            std::mem::size_of::<PROCESS_POWER_THROTTLING_STATE>() as u32,
+        );
+        let _ = CloseHandle(h);
+        r.is_ok() && s.ControlMask & s.StateMask & PROCESS_POWER_THROTTLING_EXECUTION_SPEED != 0
+    }
+}
+
+/// Statut affiche, par priorite : ne repond pas > suspendu > efficacite.
+pub(crate) fn status_of(hung: bool, suspended: bool, eco: bool) -> &'static str {
+    if hung {
+        "hung"
+    } else if suspended {
+        "suspended"
+    } else if eco {
+        "eco"
+    } else {
+        ""
+    }
 }
 
 fn window_title(h: HWND) -> String {
@@ -391,6 +532,22 @@ pub(crate) fn exe_path(pid: u32) -> Option<String> {
         r.ok()?;
         Some(String::from_utf16_lossy(&buf[..len as usize]))
     }
+}
+
+/// Identite d'un exe pour le regroupement : son chemin en minuscules, ou
+/// « pkg:<famille> » pour une appli du Store (tous les exe du paquet forment
+/// une seule ligne, comme le Gestionnaire des taches).
+fn ident_of(path: &str) -> String {
+    let low = path.to_lowercase();
+    if let Some(i) = low.find(r"\windowsapps\") {
+        // Nom_Version_Archi_Ressource_Editeur -> famille Nom_Editeur
+        let dir = low[i + 13..].split('\\').next().unwrap_or("");
+        let parts: Vec<&str> = dir.split('_').collect();
+        if parts.len() >= 5 {
+            return format!("pkg:{}_{}", parts[0], parts[parts.len() - 1]);
+        }
+    }
+    low
 }
 
 fn base_name(s: &str) -> String {
@@ -437,9 +594,40 @@ struct Live {
     buf: Vec<u64>,
     prev: HashMap<u32, Prev>,
     last: Option<Instant>,
-    /// chemin de l'exe par pid (avec l'heure de creation, contre la reutilisation des pid)
-    paths: HashMap<u32, (i64, Option<PathBuf>)>,
+    /// chemin de l'exe par pid (avec l'heure de creation, contre la
+    /// reutilisation des pid, et l'heure de lecture : un echec est retente)
+    paths: HashMap<u32, (i64, Option<PathBuf>, Instant)>,
+    /// mode efficacite par pid : (creation, heure de lecture, valeur)
+    eco: HashMap<u32, (i64, Instant, bool)>,
 }
+
+impl Live {
+    /// Mode efficacite en cache, relu au plus toutes les `ECO_TTL`.
+    pub(crate) fn eco(&mut self, pid: u32, create: i64) -> bool {
+        let now = Instant::now();
+        match self.eco.get(&pid) {
+            Some(&(c, t, v)) if c == create && now.duration_since(t) < ECO_TTL => v,
+            old => {
+                // premiere lecture : date etalee selon le pid, pour que les
+                // relectures ne tombent pas toutes sur le meme releve
+                let t = match old {
+                    Some(&(c, _, _)) if c == create => now,
+                    _ => now.checked_sub(Duration::from_secs((pid as u64 / 4) % ECO_TTL.as_secs())).unwrap_or(now),
+                };
+                let v = eco(pid);
+                self.eco.insert(pid, (create, t, v));
+                v
+            }
+        }
+    }
+}
+
+/// Duree de validite du cache du mode efficacite.
+const ECO_TTL: Duration = Duration::from_secs(5);
+/// Delai avant de retenter un chemin d'exe illisible.
+const PATH_RETRY: Duration = Duration::from_secs(10);
+/// Taille maximale des caches d'icones et de noms : vides au-dela.
+const CACHE_MAX: usize = 512;
 
 #[derive(Default)]
 pub struct Tasks {
@@ -468,6 +656,9 @@ fn pdh_query() -> Option<crate::pdh::Query> {
         r"\PhysicalDisk(*)\% Idle Time",
         r"\GPU Engine(*)\Utilization Percentage",
         r"\PhysicalDisk(_Total)\Disk Bytes/sec",
+        // ligne « Interruptions systeme » (a la suite : ne pas decaler les index)
+        r"\Processor Information(_Total)\% Interrupt Time",
+        r"\Processor Information(_Total)\% DPC Time",
     ])
 }
 
@@ -478,10 +669,41 @@ fn counted_net(name: &str) -> bool {
     !n.contains("loopback") && !n.starts_with("vethernet")
 }
 
-/// `expanded` : noms des groupes developpes dans l'interface, les seuls pour
+/// Chiffres d'un processus pour ce releve (avant regroupement).
+struct Row<'a> {
+    p: &'a Proc,
+    cpu: f32,
+    disk: u64,
+    gpu: f32,
+    net: u32,
+    path: Option<PathBuf>,
+    hwnd: Option<HWND>,
+    hung: bool,
+    eco: bool,
+}
+
+/// Nom d'une ligne « Hote de service » : son premier service, et le nombre
+/// des autres.
+fn svc_label(services: &[String]) -> String {
+    match services {
+        [] => "Hôte de service".into(),
+        [a] => format!("Hôte de service : {a}"),
+        [a, rest @ ..] => format!("Hôte de service : {a} +{}", rest.len()),
+    }
+}
+
+/// Membre dont le chemin donne l'icone et le nom du groupe : la racine,
+/// sinon un processus avec fenetre, sinon le plus petit pid.
+fn path_member(rows: &[Row], members: &[usize]) -> Option<usize> {
+    members.first().copied().filter(|&i| rows[i].path.is_some()).or_else(|| {
+        members.iter().copied().filter(|&i| rows[i].path.is_some()).min_by_key(|&i| (rows[i].hwnd.is_none(), rows[i].p.pid))
+    })
+}
+
+/// `expanded` : cles des groupes developpes dans l'interface, les seuls pour
 /// lesquels le detail par processus est envoye.
 pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport {
-    let expanded: HashSet<String> = expanded.unwrap_or_default().iter().map(|s| s.to_lowercase()).collect();
+    let expanded: HashSet<String> = expanded.unwrap_or_default().into_iter().collect();
     let mut live = lock(&st.live);
     let live = &mut *live;
 
@@ -508,7 +730,7 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
     }
 
     // compteurs Windows : CPU, disques, GPU
-    let (cpu_total, disk_active, gpu_vals, phys) = match live.pdh.as_ref() {
+    let (cpu_total, disk_active, gpu_vals, phys, interrupts) = match live.pdh.as_ref() {
         Some(q) => {
             q.collect();
             let active = q
@@ -517,9 +739,11 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
                 .filter(|(n, _)| n != "_Total")
                 .map(|(_, v)| (100.0 - v).clamp(0.0, 100.0))
                 .fold(0.0, f64::max);
-            (q.value(0, "_Total"), active, q.values(2), q.value(3, "_Total"))
+            let (i, d) = (q.value(4, "_Total"), q.value(5, "_Total"));
+            let interrupts = (i.is_some() || d.is_some()).then(|| (i.unwrap_or(0.0) + d.unwrap_or(0.0)).clamp(0.0, 100.0) as f32);
+            (q.value(0, "_Total"), active, q.values(2), q.value(3, "_Total"), interrupts)
         }
-        None => (None, 0.0, Vec::new(), None),
+        None => (None, 0.0, Vec::new(), None, None),
     };
     let (gpu_pid, gpu_total) = crate::pdh::gpu_by_pid(&gpu_vals);
 
@@ -541,16 +765,9 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
     let windir = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into()).to_lowercase();
     let mut devs: Option<Vec<(String, String)>> = None;
 
-    // regroupement par nom d'executable ; le chemin retenu pour l'icone et le
-    // nom est celui d'un processus avec fenetre, sinon du plus petit pid
-    struct Group {
-        task: Task,
-        path: Option<PathBuf>,
-        path_pid: u32,
-        path_win: bool,
-    }
-    let mut groups: HashMap<String, Group> = HashMap::new();
-    let mut procs = 0;
+    // chiffres par processus, puis noeuds pour le regroupement (meme ordre)
+    let mut rows: Vec<Row> = Vec::with_capacity(procs_now.len());
+    let mut nodes: Vec<procgroup::Node> = Vec::with_capacity(procs_now.len());
     let mut cpu_sum = 0.0f32;
     let mut io_sum = 0.0f64;
     let mut next_prev = HashMap::with_capacity(procs_now.len());
@@ -558,7 +775,6 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
         if p.pid == 0 {
             continue;
         }
-        procs += 1;
         let (dcpu, dio) = match live.prev.get(&p.pid) {
             Some(o) if o.create == p.create => ((p.cpu - o.cpu).max(0), p.io.saturating_sub(o.io)),
             // nouveau processus (ou pid reutilise) : pas encore d'ecart
@@ -568,7 +784,7 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
 
         // chemin de l'exe, une seule fois par processus
         let path = match live.paths.get(&p.pid) {
-            Some((c, path)) if *c == p.create => path.clone(),
+            Some((c, path, t)) if *c == p.create && (path.is_some() || t.elapsed() < PATH_RETRY) => path.clone(),
             _ => {
                 let mut nt_dos = || {
                     let nt = nt_image_path(p.pid)?;
@@ -584,74 +800,41 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
                     None => nt_dos(),
                 };
                 let path = path.map(PathBuf::from);
-                live.paths.insert(p.pid, (p.create, path.clone()));
+                live.paths.insert(p.pid, (p.create, path.clone(), Instant::now()));
                 path
             }
         };
 
-        let name = base_name(&p.name);
-        let key = name.to_lowercase();
-        let g = groups.entry(key.clone()).or_insert_with(|| Group {
-            task: Task {
-                label: String::new(),
-                name,
-                kind: "bg",
-                count: 0,
-                cpu: 0.0,
-                mem: 0,
-                disk: 0,
-                gpu: 0.0,
-                net: 0,
-                icon: String::new(),
-                path: String::new(),
-                protected: PROTECTED.contains(&key.as_str()),
-                procs: Vec::new(),
-            },
-            path: None,
-            path_pid: u32::MAX,
-            path_win: false,
-        });
-        let t = &mut g.task;
-        t.net += tcp.get(&p.pid).copied().unwrap_or(0);
-        t.count += 1;
         // temps CPU brut / (duree x coeurs logiques), comme le Gestionnaire :
         // la somme des lignes rejoint l'en-tete (« % Processor Time »)
-        let c = (dcpu as f64 / (secs * 1e7 * cores) * 100.0) as f32;
-        cpu_sum += c;
-        t.cpu += c;
-        t.mem += p.mem;
-        t.gpu = t.gpu.max(gpu_pid.get(&p.pid).copied().unwrap_or(0.0) as f32);
+        let cpu = (dcpu as f64 / (secs * 1e7 * cores) * 100.0) as f32;
+        cpu_sum += cpu;
         let disk = (dio as f64 / secs) as u64;
         io_sum += disk as f64;
-        t.disk += disk;
         let hwnd = windowed.get(&p.pid).copied();
-        if expanded.contains(&key) {
-            t.procs.push(Sub {
-                pid: p.pid,
-                created: created_ms(p.create),
-                main: false,
-                ppid: p.ppid,
-                // pas notre propre fenetre : GetWindowTextW lui enverrait un message
-                title: hwnd.filter(|_| p.pid != std::process::id()).map(window_title).unwrap_or_default(),
-                cpu: c.min(100.0),
-                mem: p.mem,
-                disk,
-                gpu: (gpu_pid.get(&p.pid).copied().unwrap_or(0.0) as f32).min(100.0),
-                net: tcp.get(&p.pid).copied().unwrap_or(0),
-            });
-        }
-        let win = hwnd.is_some();
-        if win {
-            t.kind = "app";
-        }
-        if path.is_some() && (g.path.is_none() || (win && !g.path_win) || (win == g.path_win && p.pid < g.path_pid)) {
-            g.path = path;
-            g.path_pid = p.pid;
-            g.path_win = win;
-        }
+        // un processus suspendu ne traite plus ses messages : c'est la
+        // suspension qu'on affiche, pas « ne repond pas »
+        let hung = !p.suspended && hwnd.is_some_and(is_hung);
+        let eco = live.eco(p.pid, p.create);
+        let exe = base_name(&p.name).to_lowercase();
+        let ident = path.as_ref().map_or_else(|| exe.clone(), |x| ident_of(&x.to_string_lossy()));
+        nodes.push(procgroup::Node { pid: p.pid, ppid: p.ppid, create: p.create, exe, ident, window: hwnd.is_some() });
+        rows.push(Row {
+            p,
+            cpu,
+            disk,
+            gpu: gpu_pid.get(&p.pid).copied().unwrap_or(0.0) as f32,
+            net: tcp.get(&p.pid).copied().unwrap_or(0),
+            path,
+            hwnd,
+            hung,
+            eco,
+        });
     }
     live.prev = next_prev;
     live.paths.retain(|pid, _| live.prev.contains_key(pid));
+    live.eco.retain(|pid, _| live.prev.contains_key(pid));
+    let procs = rows.len();
 
     // les compteurs d'E/S des processus comptent aussi les tubes et les
     // lectures servies par le cache ; Windows ne montre que le disque reel
@@ -659,74 +842,161 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
     if let Some(phys) = phys {
         let k = (phys / io_sum.max(1.0)).clamp(0.0, 1.0);
         if k < 1.0 {
-            for g in groups.values_mut() {
-                g.task.disk = (g.task.disk as f64 * k) as u64;
-                for s in &mut g.task.procs {
-                    s.disk = (s.disk as f64 * k) as u64;
-                }
+            for r in &mut rows {
+                r.disk = (r.disk as f64 * k) as u64;
             }
         }
     }
 
-    // icones et noms des executables pas encore vus
+    // regroupement comme le Gestionnaire des taches (voir procgroup)
+    let groups = procgroup::group(&nodes);
+    let services = svc::services_by_pid();
+
+    // icones et noms des executables pas encore vus : chemin de chaque groupe,
+    // et de chaque processus des groupes developpes
     let mut icons = lock(&st.icons);
     let mut labels = lock(&st.labels);
-    let missing: Vec<PathBuf> = groups
-        .values()
-        .filter_map(|g| g.path.clone())
-        .filter(|p| !icons.contains_key(p))
-        .collect();
+    if icons.len() > CACHE_MAX || labels.len() > CACHE_MAX {
+        icons.clear();
+        labels.clear();
+    }
+    let heads: Vec<Option<usize>> = groups.iter().map(|g| path_member(&rows, &g.members)).collect();
+    let mut missing: HashSet<PathBuf> = HashSet::new();
+    for (g, head) in groups.iter().zip(&heads) {
+        let open = expanded.contains(&g.key);
+        let paths = head.iter().chain(g.members.iter().filter(|_| open)).filter_map(|&i| rows[i].path.as_ref());
+        missing.extend(paths.filter(|p| !icons.contains_key(*p)).cloned());
+    }
+    let missing: Vec<PathBuf> = missing.into_iter().collect();
     for p in &missing {
         labels.entry(p.clone()).or_insert_with(|| crate::apps::file_description(&p.to_string_lossy()));
     }
     if !missing.is_empty() {
         icons.extend(icons_for(missing));
     }
-    // principal : racine du groupe qui a au moins un enfant dans le groupe
-    // (des instances independantes, comme plusieurs notepad, ne le sont pas)
-    for g in groups.values_mut() {
-        let procs = &g.task.procs;
-        let born: HashMap<u32, u64> = procs.iter().map(|s| (s.pid, s.created)).collect();
-        // parent du groupe ne avant l'enfant : sinon le pid a ete reutilise
-        let has_parent = |s: &Sub| s.ppid != s.pid && born.get(&s.ppid).is_some_and(|&c| c <= s.created);
-        let parents: HashSet<u32> = procs.iter().filter(|s| has_parent(s)).map(|s| s.ppid).collect();
-        let mains: Vec<bool> = procs.iter().map(|s| !has_parent(s) && parents.contains(&s.pid)).collect();
-        for (s, m) in g.task.procs.iter_mut().zip(mains) {
-            s.main = m;
-        }
+    let label_of = |path: Option<&PathBuf>, name: &str| {
+        path.and_then(|p| labels.get(p).cloned().flatten()).filter(|l| !l.is_empty()).unwrap_or_else(|| name.to_string())
+    };
+    let icon_of = |path: Option<&PathBuf>| path.and_then(|p| icons.get(p).cloned()).unwrap_or_default();
+
+    let mut list: Vec<Task> = Vec::with_capacity(groups.len() + 1);
+    for (g, head) in groups.into_iter().zip(heads) {
+        let Some(&root) = g.members.first() else { continue };
+        let ms = &g.members;
+        let name = base_name(&rows[root].p.name);
+        let path = head.and_then(|i| rows[i].path.as_ref());
+        let protected = PROTECTED.contains(&nodes[root].exe.as_str()) || g.key.starts_with("svc:") || g.key.starts_with("one:");
+        let kind = if g.app {
+            "app"
+        } else if protected || path.is_none_or(|p| p.to_string_lossy().to_lowercase().starts_with(&windir)) {
+            // pas de chemin lisible : processus systeme protege
+            "win"
+        } else {
+            "bg"
+        };
+        let svcs = g.key.starts_with("svc:").then(|| services.get(&rows[root].p.pid).cloned().unwrap_or_default());
+        let label = match &svcs {
+            Some(s) => svc_label(s),
+            None => label_of(path, &name),
+        };
+        // statut du groupe : ne repond pas si l'une de ses fenetres, suspendu
+        // si tous ses membres, efficacite si sa racine
+        let status = status_of(ms.iter().any(|&i| rows[i].hung), ms.iter().all(|&i| rows[i].p.suspended), rows[root].eco);
+        let procs = if expanded.contains(&g.key) { subs(&rows, ms, &label_of, &icon_of) } else { Vec::new() };
+        list.push(Task {
+            key: g.key,
+            name,
+            label,
+            kind,
+            count: ms.len(),
+            cpu: ms.iter().map(|&i| rows[i].cpu).sum::<f32>().min(100.0),
+            mem: ms.iter().map(|&i| rows[i].p.mem).sum(),
+            disk: ms.iter().map(|&i| rows[i].disk).sum(),
+            gpu: ms.iter().map(|&i| rows[i].gpu).fold(0.0, f32::max).min(100.0),
+            net: ms.iter().map(|&i| rows[i].net).sum(),
+            icon: icon_of(path),
+            path: path.map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
+            protected,
+            status,
+            members: ms.iter().map(|&i| (rows[i].p.pid, created_ms(rows[i].p.create))).collect(),
+            services: svcs,
+            procs,
+        });
     }
-    let mut list: Vec<Task> = groups
-        .into_values()
-        .map(|Group { task: mut t, path, .. }| {
-            t.cpu = t.cpu.min(100.0);
-            t.gpu = t.gpu.min(100.0);
-            match &path {
-                Some(p) => {
-                    t.icon = icons.get(p).cloned().unwrap_or_default();
-                    let s = p.to_string_lossy();
-                    if t.kind != "app" && s.to_lowercase().starts_with(&windir) {
-                        t.kind = "win";
-                    }
-                    t.label = labels.get(p).cloned().flatten().unwrap_or_default();
-                    t.path = s.into_owned();
-                }
-                // pas de chemin lisible : processus systeme protege
-                None if t.kind != "app" => t.kind = "win",
-                None => {}
-            }
-            if t.protected && t.kind != "app" {
-                t.kind = "win";
-            }
-            if t.label.is_empty() {
-                t.label = t.name.clone();
-            }
-            t
-        })
-        .collect();
+    // temps passe en interruptions et DPC : une ligne a part, comme Windows
+    // (comptee dans la somme, pas dans le nombre de processus)
+    if let Some(c) = interrupts {
+        cpu_sum += c;
+        list.push(Task {
+            key: "sys:interrupts".into(),
+            name: "Interruptions système".into(),
+            label: "Interruptions système".into(),
+            kind: "win",
+            count: 0,
+            cpu: c,
+            mem: 0,
+            disk: 0,
+            gpu: 0.0,
+            net: 0,
+            icon: String::new(),
+            path: String::new(),
+            protected: true,
+            status: "",
+            members: Vec::new(),
+            services: None,
+            procs: Vec::new(),
+        });
+    }
     // ordre stable d'un appel a l'autre (l'interface trie ensuite)
-    list.sort_by_key(|t| t.name.to_lowercase());
+    list.sort_by(|a, b| a.key.cmp(&b.key));
     let cpu = cpu_total.map_or(cpu_sum, |v| v as f32).clamp(0.0, 100.0);
     TasksReport { list, cpu, gpu: gpu_total as f32, disk_active: disk_active as f32, procs, net_down, net_up }
+}
+
+/// Detail par processus d'un groupe developpe, dans l'ordre des membres.
+fn subs(
+    rows: &[Row],
+    members: &[usize],
+    label_of: &dyn Fn(Option<&PathBuf>, &str) -> String,
+    icon_of: &dyn Fn(Option<&PathBuf>) -> String,
+) -> Vec<Sub> {
+    let mut procs: Vec<Sub> = members
+        .iter()
+        .map(|&i| {
+            let r = &rows[i];
+            let name = base_name(&r.p.name);
+            Sub {
+                pid: r.p.pid,
+                created: created_ms(r.p.create),
+                main: false,
+                ppid: r.p.ppid,
+                label: label_of(r.path.as_ref(), &name),
+                icon: icon_of(r.path.as_ref()),
+                path: r.path.as_ref().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
+                protected: PROTECTED.contains(&name.to_lowercase().as_str()),
+                name,
+                // pas notre propre fenetre : GetWindowTextW lui enverrait un message
+                title: r.hwnd.filter(|_| r.p.pid != std::process::id()).map(window_title).unwrap_or_default(),
+                cpu: r.cpu.min(100.0),
+                mem: r.p.mem,
+                disk: r.disk,
+                gpu: r.gpu.min(100.0),
+                net: r.net,
+                status: status_of(r.hung, r.p.suspended, r.eco),
+            }
+        })
+        .collect();
+    // principal : racine du groupe qui a au moins un enfant dans le groupe
+    // (des instances independantes, comme plusieurs notepad, ne le sont pas)
+    let born: HashMap<u32, u64> = procs.iter().map(|s| (s.pid, s.created)).collect();
+    // parent du groupe ne avant l'enfant : sinon le pid a ete reutilise
+    let has_parent = |s: &Sub| s.ppid != s.pid && born.get(&s.ppid).is_some_and(|&c| c <= s.created);
+    let parents: HashSet<u32> = procs.iter().filter(|s| has_parent(s)).map(|s| s.ppid).collect();
+    let mains: Vec<bool> = procs.iter().map(|s| !has_parent(s) && parents.contains(&s.pid)).collect();
+    for (s, m) in procs.iter_mut().zip(mains) {
+        s.main = m;
+    }
+    procs
 }
 
 /// Onglet cache : libere les compteurs, le tampon et les caches par pid.
@@ -734,40 +1004,60 @@ pub fn tasks_stop(st: State<Tasks>) {
     *lock(&st.live) = Live::default();
 }
 
-fn created_ms(create: i64) -> u64 {
-    create.max(0) as u64 / 10_000
+/// Le processus ouvert est-il ne a `created` (ms, comme `created_ms`) ?
+fn born_at(h: HANDLE, created: u64) -> bool {
+    let (mut c, mut e, mut k, mut u) = (FILETIME::default(), FILETIME::default(), FILETIME::default(), FILETIME::default());
+    if unsafe { GetProcessTimes(h, &mut c, &mut e, &mut k, &mut u) }.is_err() {
+        return false;
+    }
+    created_ms(((c.dwHighDateTime as u64) << 32 | c.dwLowDateTime as u64) as i64) == created
 }
 
-/// Fin de tache pour tous les processus de ce nom, ou pour le seul `pid`
-/// s'il est donne. Les pid sont reutilises : il doit porter toujours ce nom
-/// et, si `created` est donne, avoir ete cree a cette heure-la.
-pub fn task_kill(_st: State<Tasks>, name: String, pid: Option<u32>, created: Option<u64>) -> KillReport {
-    let key = name.to_lowercase();
+/// Fin de tache pour les membres d'un groupe, dans l'ordre recu (racines
+/// d'abord). Les pid sont reutilises : chacun doit exister avec cette heure
+/// de creation, ne pas etre l'ilot, et son exe ne pas etre protege ; sinon
+/// il est saute sans compter. Hotes de service et lignes systeme : refuses.
+pub fn task_kill(_st: State<Tasks>, key: String, members: Vec<(u32, u64)>) -> KillReport {
     let mut r = KillReport { killed: 0, denied: 0 };
-    if PROTECTED.contains(&key.as_str()) {
+    if key.starts_with("svc:") || key.starts_with("sys:") {
         return r;
     }
     let me = std::process::id();
     // tampon a part : ne pas attendre un `tasks_get` en cours (amorce, icones)
     let procs = snapshot(&mut Vec::new()).unwrap_or_default();
-    let wanted = |p: &&Proc| p.pid != 0 && p.pid != me && pid.is_none_or(|w| w == p.pid)
-        && created.is_none_or(|c| pid.is_some() && c == created_ms(p.create))
-        && base_name(&p.name).to_lowercase() == key;
-    for p in procs.iter().filter(wanted) {
-        let ok = unsafe {
-            match OpenProcess(PROCESS_TERMINATE, false, p.pid) {
+    let by_pid: HashMap<u32, &Proc> = procs.iter().map(|p| (p.pid, p)).collect();
+    let mut done = HashSet::new();
+    for (pid, created) in members {
+        let Some(p) = by_pid.get(&pid) else { continue };
+        let exe = base_name(&p.name).to_lowercase();
+        if pid == 0 || pid == me || created_ms(p.create) != created || PROTECTED.contains(&exe.as_str()) || !done.insert(pid) {
+            continue;
+        }
+        // racines d'abord : leurs enfants peuvent sortir pendant la boucle ;
+        // un processus deja sorti n'est ni termine ni refuse
+        let res = unsafe {
+            match OpenProcess(PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+                // pid reutilise entre le releve et l'ouverture : saute
+                Ok(h) if !born_at(h, created) => {
+                    let _ = CloseHandle(h);
+                    None
+                }
                 Ok(h) => {
                     let ok = TerminateProcess(h, 1).is_ok();
+                    let mut code = 0u32;
+                    let gone = !ok && GetExitCodeProcess(h, &mut code).is_ok() && code != STILL_ACTIVE.0 as u32;
                     let _ = CloseHandle(h);
-                    ok
+                    if gone { None } else { Some(ok) }
                 }
-                Err(_) => false,
+                // pid disparu depuis le releve
+                Err(e) if e.code() == ERROR_INVALID_PARAMETER.to_hresult() => None,
+                Err(_) => Some(false),
             }
         };
-        if ok {
-            r.killed += 1;
-        } else {
-            r.denied += 1;
+        match res {
+            Some(true) => r.killed += 1,
+            Some(false) => r.denied += 1,
+            None => {}
         }
     }
     r
@@ -797,27 +1087,39 @@ mod tests {
         assert!(dos.eq_ignore_ascii_case(&exe_path(me.pid).unwrap()), "{dos}");
     }
 
+    /// Groupe dont les membres contiennent ce pid.
+    fn group_of(list: &[Task], pid: u32) -> Option<&Task> {
+        list.iter().find(|t| t.members.iter().any(|&(p, _)| p == pid))
+    }
+
     #[test]
     fn groupe_developpe_et_fin_d_un_seul_pid() {
         let spawn = || Command::new("ping").args(["-n", "60", "127.0.0.1"]).creation_flags(CREATE_NO_WINDOW).spawn().unwrap();
         let (mut a, mut b) = (spawn(), spawn());
         let tasks = Tasks::default();
-        let r = tasks_get(State::of(&tasks), Some(vec!["PING".into()]));
-        let g = r.list.iter().find(|t| t.name.eq_ignore_ascii_case("ping")).expect("groupe ping");
+        let r = tasks_get(State::of(&tasks), None);
+        let key = group_of(&r.list, a.id()).expect("groupe de ping").key.clone();
+        let r = tasks_get(State::of(&tasks), Some(vec![key.clone()]));
+        let g = group_of(&r.list, a.id()).expect("groupe de ping");
+        assert_eq!(g.key, key);
+        // deux ping sans parent ping : deux arbres, donc deux lignes (comme Windows)
+        assert!(group_of(&r.list, b.id()).is_some_and(|t| t.key != key), "{key}");
         let pids: Vec<u32> = g.procs.iter().map(|s| s.pid).collect();
-        let created = g.procs.iter().find(|s| s.pid == a.id()).unwrap().created;
-        assert!(pids.contains(&a.id()) && pids.contains(&b.id()), "{pids:?}");
-        // deux ping independants, sans enfant : aucun n'est « principal »
-        assert!(g.procs.iter().filter(|s| s.pid == a.id() || s.pid == b.id()).all(|s| !s.main));
+        let sa = g.procs.iter().find(|s| s.pid == a.id()).unwrap();
+        let created = sa.created;
+        assert!(sa.name.eq_ignore_ascii_case("ping") && !sa.label.is_empty() && !sa.path.is_empty());
+        assert_eq!(pids, vec![a.id()]);
+        // seul et sans enfant : pas « principal »
+        assert!(!sa.main);
         // les autres groupes n'envoient pas de detail
-        assert!(r.list.iter().filter(|t| !t.name.eq_ignore_ascii_case("ping")).all(|t| t.procs.is_empty()));
-        // un pid qui ne porte pas ce nom n'est pas termine
-        let k = task_kill(State::of(&tasks), "notepad".into(), Some(a.id()), Some(created));
-        assert_eq!(k.killed, 0);
-        // ni un pid d'une autre heure de creation (pid reutilise)
-        let k = task_kill(State::of(&tasks), "ping".into(), Some(a.id()), Some(created + 1));
-        assert_eq!(k.killed, 0);
-        let k = task_kill(State::of(&tasks), "ping".into(), Some(a.id()), Some(created));
+        assert!(r.list.iter().filter(|t| t.key != key).all(|t| t.procs.is_empty()));
+        // un hote de service ou une ligne systeme : refuses d'emblee
+        let k = task_kill(State::of(&tasks), "svc:1:2".into(), vec![(a.id(), created)]);
+        assert_eq!((k.killed, k.denied), (0, 0));
+        // un pid d'une autre heure de creation (pid reutilise) : saute
+        let k = task_kill(State::of(&tasks), key.clone(), vec![(a.id(), created + 1)]);
+        assert_eq!((k.killed, k.denied), (0, 0));
+        let k = task_kill(State::of(&tasks), key, vec![(a.id(), created)]);
         assert_eq!((k.killed, k.denied), (1, 0));
         assert!(a.wait().is_ok());
         assert!(b.try_wait().unwrap().is_none(), "l'autre ping doit survivre");
@@ -835,28 +1137,152 @@ mod tests {
             .unwrap();
         let tasks = Tasks::default();
         let mut found = None;
+        let mut expanded = None;
         for _ in 0..20 {
-            let r = tasks_get(State::of(&tasks), Some(vec!["cmd".into()]));
-            let g = r.list.into_iter().find(|t| t.name.eq_ignore_ascii_case("cmd")).expect("groupe cmd");
+            let r = tasks_get(State::of(&tasks), expanded.clone());
+            let g = group_of(&r.list, outer.id()).expect("groupe cmd");
+            expanded = Some(vec![g.key.clone()]);
             let o = g.procs.iter().find(|s| s.pid == outer.id()).map(|s| s.main);
             let i = g.procs.iter().find(|s| s.ppid == outer.id()).map(|s| (s.pid, s.main));
             if let (Some(o), Some(i)) = (o, i) {
-                found = Some((o, i));
+                let born = |pid: u32| g.procs.iter().find(|s| s.pid == pid).map_or(0, |s| s.created);
+                found = Some((g.key.clone(), (outer.id(), born(outer.id())), o, (i.0, born(i.0), i.1)));
                 break;
             }
             std::thread::sleep(Duration::from_millis(100));
         }
         let snap = snapshot(&mut Vec::new()).unwrap_or_default();
-        let (outer_main, (inner, inner_main)) = found.expect("cmd imbrique");
-        // menage : le ping lance par le cmd interieur, puis les deux cmd
+        let (key, outer_m, outer_main, (inner, inner_c, inner_main)) = found.expect("cmd imbrique");
+        // menage : seulement les processus du test (le groupe peut contenir
+        // d'autres cmd du poste), le ping du cmd interieur puis les deux cmd
         for p in snap.iter().filter(|p| p.ppid == inner && p.name.eq_ignore_ascii_case("ping.exe")) {
-            task_kill(State::of(&tasks), "ping".into(), Some(p.pid), None);
+            task_kill(State::of(&tasks), "tree:ping".into(), vec![(p.pid, created_ms(p.create))]);
         }
-        task_kill(State::of(&tasks), "cmd".into(), Some(inner), None);
+        task_kill(State::of(&tasks), key.clone(), vec![(inner, inner_c), outer_m]);
         let _ = outer.kill();
         let _ = outer.wait();
-        assert!(outer_main, "le cmd exterieur a un enfant cmd : principal");
+        // le cmd exterieur est la racine de son arbre d'arriere-plan
+        assert!(outer_main || !key.starts_with("tree:"), "le cmd exterieur a un enfant cmd : principal ({key})");
         assert!(!inner_main, "le cmd interieur a son parent dans le groupe");
+    }
+
+    #[test]
+    fn hotes_de_service_et_membres() {
+        let tasks = Tasks::default();
+        let r = tasks_get(State::of(&tasks), None);
+        let svc: Vec<&Task> = r.list.iter().filter(|t| t.key.starts_with("svc:")).collect();
+        assert!(!svc.is_empty());
+        assert!(svc.iter().all(|t| t.label.starts_with("Hôte de service") && t.services.is_some() && t.protected && t.count == 1));
+        assert!(svc.iter().any(|t| t.services.as_ref().is_some_and(|s| !s.is_empty())), "aucun service nomme");
+        assert!(r.list.iter().filter(|t| !t.key.starts_with("svc:")).all(|t| t.services.is_none()));
+        // chaque processus du releve (pid != 0) dans exactement un groupe
+        let mut seen = HashSet::new();
+        for t in &r.list {
+            assert_eq!(t.count, t.members.len(), "{}", t.key);
+            for &(pid, _) in &t.members {
+                assert!(pid != 0 && seen.insert(pid), "pid {pid} en double ({})", t.key);
+            }
+        }
+        assert_eq!(seen.len(), r.procs);
+        // cles uniques, liste triee par cle
+        assert!(r.list.windows(2).all(|w| w[0].key < w[1].key));
+        let json = serde_json::to_value(&r).unwrap();
+        let first = &json["list"].as_array().unwrap().iter().find(|t| t["key"] != "sys:interrupts").unwrap()["members"][0];
+        assert!(first.as_array().is_some_and(|m| m.len() == 2), "{first}");
+    }
+
+    #[test]
+    fn threads_suspendus() {
+        let mut buf = Vec::new();
+        let procs = snapshot(&mut buf).expect("NtQuerySystemInformation");
+        let me = procs.iter().find(|p| p.pid == std::process::id()).expect("processus courant");
+        assert!(!me.suspended, "le processus de test tourne");
+        // CREATE_SUSPENDED : le thread principal attend, raison Suspended
+        let mut child = Command::new("ping")
+            .args(["-n", "60", "127.0.0.1"])
+            .creation_flags(CREATE_NO_WINDOW | 0x4)
+            .spawn()
+            .unwrap();
+        let procs = snapshot(&mut buf).expect("NtQuerySystemInformation");
+        let seen = procs.iter().find(|p| p.pid == child.id()).map(|p| p.suspended);
+        let _ = child.kill();
+        let _ = child.wait();
+        assert_eq!(seen, Some(true), "ping lance suspendu");
+    }
+
+    #[test]
+    fn mode_efficacite() {
+        use windows::Win32::System::Threading::{SetProcessInformation, PROCESS_SET_INFORMATION};
+        let mut child = Command::new("ping").args(["-n", "60", "127.0.0.1"]).creation_flags(CREATE_NO_WINDOW).spawn().unwrap();
+        let before = eco(child.id());
+        let set = unsafe {
+            let h = OpenProcess(PROCESS_SET_INFORMATION, false, child.id()).unwrap();
+            let s = PROCESS_POWER_THROTTLING_STATE {
+                Version: PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+                ControlMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+                StateMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+            };
+            let r = SetProcessInformation(
+                h,
+                ProcessPowerThrottling,
+                &s as *const _ as _,
+                std::mem::size_of::<PROCESS_POWER_THROTTLING_STATE>() as u32,
+            );
+            let _ = CloseHandle(h);
+            r.is_ok()
+        };
+        let after = eco(child.id());
+        let _ = child.kill();
+        let _ = child.wait();
+        assert!(set);
+        assert!(!before && after, "avant {before}, apres {after}");
+        assert!(!eco(u32::MAX - 3), "pid inexistant");
+    }
+
+    #[test]
+    fn ligne_interruptions() {
+        let tasks = Tasks::default();
+        tasks_get(State::of(&tasks), None);
+        let r = tasks_get(State::of(&tasks), None);
+        let t = r.list.iter().find(|t| t.key == "sys:interrupts").expect("ligne interruptions");
+        assert!(t.kind == "win" && t.protected && t.count == 0 && t.procs.is_empty() && t.members.is_empty());
+        assert!((0.0..=100.0).contains(&t.cpu), "{}", t.cpu);
+        // statut toujours renseigne, avec une valeur connue
+        assert!(r.list.iter().all(|t| ["", "suspended", "hung", "eco"].contains(&t.status)));
+    }
+
+    #[test]
+    fn priorite_des_statuts() {
+        assert_eq!(status_of(true, true, true), "hung");
+        assert_eq!(status_of(false, true, true), "suspended");
+        assert_eq!(status_of(false, false, true), "eco");
+        assert_eq!(status_of(false, false, false), "");
+    }
+
+    /// Mesure : `cargo test --release tasks::tests::cout_tasks_get -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn cout_tasks_get() {
+        let tasks = Tasks::default();
+        tasks_get(State::of(&tasks), None);
+        let mut total = Duration::ZERO;
+        for _ in 0..5 {
+            // hors chrono : evite l'attente de MIN_GAP
+            std::thread::sleep(Duration::from_millis(1100));
+            let t = Instant::now();
+            tasks_get(State::of(&tasks), None);
+            total += t.elapsed();
+        }
+        println!("tasks_get : {:?} en moyenne", total / 5);
+    }
+
+    #[test]
+    fn identite_paquet_du_store() {
+        let a = ident_of(r"C:\Program Files\WindowsApps\SpotifyAB.SpotifyMusic_1.296.518.0_x64__zpdnekdrzrea0\Spotify.exe");
+        let b = ident_of(r"C:\Program Files\WindowsApps\SpotifyAB.SpotifyMusic_1.296.518.0_x64__zpdnekdrzrea0\SpotifyLauncher.exe");
+        assert_eq!(a, "pkg:spotifyab.spotifymusic_zpdnekdrzrea0");
+        assert_eq!(a, b);
+        assert_eq!(ident_of(r"C:\Windows\Explorer.EXE"), r"c:\windows\explorer.exe");
     }
 
     #[test]

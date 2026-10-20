@@ -93,37 +93,37 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   Windows, ni ses raccourcis, ni le remappage ne sont actifs, le crochet
   n'est pas installé. Verr. Maj est alors encore sondée toutes les 120 ms.
 
-## Gestionnaire des tâches (0.4.11) : restes
+## Gestionnaire des tâches : restes
 
-- 🟢 Pas d'état « Ne répond pas » (`IsHungAppWindow`). Les applis du Store
-  sont comptées sous `ApplicationFrameHost`. On ne peut pas viser un seul PID.
-- 🟢 `src/tasks.rs` : un chemin d'exe illisible une fois reste `None` en cache
-  pour toute la vie du processus (pas d'icône, et le processus peut être
-  classé « win »).
-- 🟢 Les caches `icons` et `labels` (par chemin) grossissent sans limite. Ça
-  ne compte que pour les exe lancés depuis `%TEMP%` sous des noms aléatoires.
-- 🟢 Colonne « Disque » : depuis le 2026-10-19, les E/S des processus sont
-  ramenées au débit physique total. La somme est juste, mais un programme qui
-  fait beaucoup d'E/S par tube ou depuis le cache prend une part du disque
-  réel d'un autre. Il faudrait ETW, qui demande les droits admin.
-- 🟢 Regroupement par nom d'exe : les ~80 svchost forment une seule ligne,
-  alors que Windows affiche « Hôte de service : X » par service et groupe les
-  applis par arbre de processus. Ce serait une refonte.
+- 🟢 Colonne « Disque » : les E/S des processus sont ramenées au débit
+  physique total. La somme est juste, mais la répartition est approximative.
+  Le débit exact demande ETW noyau : l'essai du 2026-10-20 montre que les
+  fournisseurs Kernel-Disk/Network/File/Process refusent l'accès sans admin,
+  même dans le groupe « Utilisateurs du journal de performances ». Abandonné.
 - 🟢 Colonne Réseau par ligne : un nombre de connexions TCP, pas un débit.
-  Un débit par processus demanderait ETW.
-- 🟢 Pas de ligne « Interruptions système » (≈ 1 % du CPU), d'où un petit
-  écart entre l'en-tête et la somme des lignes.
-- 🟢 Les sous-lignes n'ont pas d'icône, alors que Windows en affiche une, en
-  retrait.
+  Faisable sans admin via `Microsoft-Windows-TCPIP`, mais indirect (octets
+  reçus sous le PID 4, à retrouver par la connexion) et coûteux. Abandonné
+  le 2026-10-20.
+- 🟢 Spotify : 10 processus contre 12 chez Windows (≈ 7 Mo d'écart),
+  probablement des WebView2 hors du dossier du paquet.
+- 🟢 Console sous Windows Terminal (terminal par défaut) : Windows affiche
+  « PowerShell (3) » comme une app ; chez nous pwsh est en arrière-plan, car
+  sa fenêtre appartient à WindowsTerminal.
+- 🟢 Clé `app:` instable si le chemin de l'exe devient lisible plus tard
+  (`app:notepad` → `app:c:\…\notepad.exe`) : le groupe ouvert se replie.
+- 🟢 Titre d'une sous-ligne d'appli du Store : lu sur la CoreWindow, il peut
+  être plus court que celui du cadre.
 - 🟢 Une page détruite pendant un `tasks_get` en cours peut recréer l'état
   Rust après `tasks_stop`. Il est libéré à la prochaine fermeture de
   l'onglet.
-- 🟢 Clic droit sur une sous-ligne (un seul processus) : « Ouvrir
-  l'emplacement » prend le chemin du groupe. Si deux installations ont le
-  même nom d'exe (Chrome et Chrome Canary), il peut viser la mauvaise.
+- 🟢 Liste des services relue toutes les 5 s (≈ 31 ms en release).
 
 ## Fait
 
+- 2026-10-20 : onglet Tâches regroupé comme Windows (`procgroup.rs`) :
+  hôtes de service par ligne, applis du Store par paquet, statuts Suspendu /
+  Ne répond pas / Mode efficacité, ligne Interruptions système, icônes et
+  chemins propres aux sous-lignes, caches bornés, chemin illisible retenté.
 - 2026-10-18, après 0.4.11 : écouteurs `Api.listen` retirés à la
   destruction (`Api.unlisten`, Réglages et Soundboard) ; couleur source du
   thème calculée par le cœur (`theme_source`), hors du thread de l'interface.

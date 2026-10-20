@@ -3,7 +3,7 @@ import QtQuick
 // Gestionnaire des taches : processus regroupes par programme (src/tasks.rs),
 // avec les memes chiffres et sections que l'onglet Processus de Windows,
 // rafraichis chaque seconde (comme Windows) tant que l'onglet est affiche.
-// La liste est un ListModel mis a jour sur place (cle : nom de l'exe), pour
+// La liste est un ListModel mis a jour sur place (cle : `key` du groupe), pour
 // garder le defilement, le survol et les lignes d'un rafraichissement a l'autre.
 Item {
     id: page
@@ -18,8 +18,10 @@ Item {
     property string armed: ""
     property bool busy: false
     property bool loaded: false
-    // groupes developpes (nom en minuscules -> true), gardes d'un affichage a l'autre
+    // groupes developpes (cle du groupe -> true), gardes d'un affichage a l'autre
     property var opened: ({})
+    // dernier releve par cle de groupe (membres lus au moment de la fin de tache)
+    property var groups: ({})
     // un rafraichissement demande pendant un autre : relance a la fin
     property bool again: false
     // message bref dans l'en-tete (resultat d'une fin de tache)
@@ -84,12 +86,15 @@ Item {
             page.tot = { cpu: r.cpu, gpu: r.gpu, disk: r.disk_active, procs: r.procs }
             page.loaded = true
             page.fails = 0
+            const g = {}
+            for (const t of r.list)
+                g[t.key] = t
+            page.groups = g
             // groupes ouverts disparus (programme ferme) : oublies
-            const live = new Set(r.list.map(t => t.name.toLowerCase()))
-            if (Object.keys(page.opened).some(k => !live.has(k))) {
+            if (Object.keys(page.opened).some(k => !g[k])) {
                 const o = {}
                 for (const k in page.opened)
-                    if (live.has(k))
+                    if (g[k])
                         o[k] = true
                 page.opened = o
             }
@@ -108,8 +113,7 @@ Item {
         else if (again)
             refresh()
     }
-    function toggle(name) {
-        const k = name.toLowerCase()
+    function toggle(k) {
         const o = Object.assign({}, opened)
         if (o[k]) {
             delete o[k]
@@ -125,9 +129,13 @@ Item {
     // t : la ligne (copiee, elle peut disparaitre avant la reponse) ;
     // une sous-ligne (pid non nul) ne termine que ce processus
     function kill(c) {
-        const t = { name: c.name, label: c.pid ? "PID " + c.pid : c.label }
+        if (c.nokill)
+            return
+        const g = groups[c.gkey]
+        const t = { key: c.gkey, label: c.pid ? "PID " + c.pid : c.label }
+        const members = c.pid ? [[c.pid, c.created]] : g ? g.members : []
         page.armed = ""
-        Api.invoke("task_kill", c.pid ? { name: t.name, pid: c.pid, created: c.created } : { name: t.name }).then(r => {
+        Api.invoke("task_kill", { key: t.key, members: members }).then(r => {
             if (r.killed === 0)
                 page.say(r.denied ? "Accès refusé : " + t.label : t.label + " est déjà fermé")
             else if (r.denied)
@@ -188,7 +196,7 @@ Item {
             name: () => 0
         }[sort]
         const sign = asc ? -1 : 1
-        const name = (x, y) => x.label.localeCompare(y.label, "fr") || x.name.localeCompare(y.name)
+        const name = (x, y) => x.label.localeCompare(y.label, "fr") || x.name.localeCompare(y.name) || x.key.localeCompare(y.key)
         const by = sort === "name" ? (x, y) => sign * name(x, y) : (x, y) => sign * desc(x, y)
         const cmp = (x, y) => by(x, y) || name(x, y)
         const all = tasks.filter(t => !q || Ilot.norm(t.label).includes(q) || Ilot.norm(t.name).includes(q)).sort(cmp)
@@ -200,29 +208,48 @@ Item {
                 continue
             out.push(row("#" + k[0], k[1] + " (" + part.length + ")", null, null, false))
             for (const t of part) {
-                const key = t.name.toLowerCase()
-                const open = !!opened[key] && t.count > 1
+                const key = t.key
+                const open = !!opened[key] && canOpen(t)
                 out.push(row(key, "", t, null, open))
+                // hote de service developpe : un service par ligne, sans chiffres
+                if (open && isSvc(t))
+                    t.services.forEach((n, i) => out.push(row(key + "/s" + i, "", t, { svc: n }, false)))
                 // groupe developpe : un processus par ligne, juste dessous
-                if (open && t.procs)
+                else if (open && t.procs)
                     for (const s of t.procs.slice().sort((x, y) => (sort === "name" ? 0 : sign * desc(x, y)) || x.pid - y.pid))
                         out.push(row(key + "/" + s.pid, "", t, s, false))
             }
         }
         sync(out)
     }
+    function isSvc(t) {
+        return t.key.startsWith("svc:") && !!t.services
+    }
+    // hote de service : developpable s'il porte au moins 2 services
+    function canOpen(t) {
+        return isSvc(t) ? t.services.length >= 2 : t.count > 1
+    }
     // une ligne du modele : memes roles et memes types pour toutes
-    // s : un processus d'un groupe developpe (sous-ligne), sinon null
+    // s : un processus d'un groupe developpe (sous-ligne), ou { svc: nom }
+    // pour un service d'un hote developpe (pid 0, pas de chiffres), sinon null
     function row(key, header, t, s, open) {
-        const v = s || t
+        const p = s && !s.svc ? s : null
+        const v = p || t
         return {
-            key: key, header: header,
-            name: t ? t.name : "", label: t ? t.label : "", kind: t ? t.kind : "",
+            key: key, header: header, gkey: t ? t.key : "", sub: !!s,
+            name: p ? p.name || t.name : t ? t.name : "",
+            label: s ? (p ? p.label || p.name || "" : s.svc) : t ? t.label : "", kind: t ? t.kind : "",
             n: s ? 1 : t ? t.count : 0, cpu: v ? v.cpu : 0, mem: v ? v.mem : 0, disk: v ? v.disk : 0,
-            gpu: v ? v.gpu : 0, net: v ? v.net : 0, icon: t && !s ? t.icon : "", path: t ? t.path : "",
-            prot: t ? !!t.protected : false,
-            pid: s ? s.pid : 0, created: s ? s.created : 0, main: s ? !!s.main : false,
-            title: s ? s.title : "", expanded: !!open
+            gpu: v ? v.gpu : 0, net: v ? v.net : 0,
+            icon: p ? p.icon || "" : t && !s ? t.icon : "", path: p ? p.path || "" : t && !s ? t.path : "",
+            // lignes de services : ni bouton ni bouclier
+            prot: p ? !!p.protected || !!t.protected : t && !s ? !!t.protected : false,
+            // svc:, sys: et services d'un hote : jamais de fin de tache (refuse aussi par le Rust)
+            nokill: t ? !!t.protected || (!!p && !!p.protected) || t.key.startsWith("svc:") || t.key.startsWith("sys:") || (!!s && !p) : false,
+            canOpen: t && !s ? canOpen(t) : false,
+            status: (p ? p.status : t && !s ? t.status : "") || "",
+            pid: p ? p.pid : 0, created: p ? p.created : 0, main: p ? !!p.main : false,
+            title: p ? p.title || "" : "", expanded: !!open
         }
     }
     function sync(items) {
@@ -252,12 +279,15 @@ Item {
     }
 
     function showMenu(c, p) {
-        const t = { name: c.name, label: c.label, n: c.n, prot: c.prot, path: c.path, pid: c.pid, created: c.created, main: c.main }
+        // service d'un hote developpe : ni processus ni fichier propres
+        if (c.sub && !c.pid)
+            return
+        const t = { gkey: c.gkey, name: c.name, label: c.label, n: c.n, prot: c.prot, nokill: c.nokill, path: c.path, pid: c.pid, created: c.created, main: c.main }
         const title = t.label + (t.pid ? " · PID " + t.pid : t.n > 1 ? " (" + t.n + " processus)" : "")
         let entries = [{ type: "title", label: title }]
         if (t.prot)
             entries.push({ type: "title", label: "Processus Windows protégé" })
-        else
+        else if (!t.nokill)
             entries.push({ icon: "close", label: t.pid ? "Fin du processus" : "Fin de tâche", danger: true, confirm: t.main ? "Tout fermer ?" : t.n > 1 ? "Confirmer (" + t.n + ")" : "Confirmer", run: () => { ctx.hide(); page.kill(t) } })
         if (t.path)
             entries.push({ icon: "folder_open", label: "Ouvrir l’emplacement du fichier", run: () => {
@@ -457,6 +487,11 @@ Item {
         delegate: Item {
             id: cell
             required property string key
+            required property string gkey
+            required property bool sub
+            required property bool nokill
+            required property bool canOpen
+            required property string status
             required property int pid
             required property real created
             required property bool main
@@ -474,8 +509,11 @@ Item {
             required property string icon
             required property string path
             required property bool prot
+            // service d'un hote developpe : un nom, sans chiffres ni actions
+            readonly property bool svcItem: sub && pid === 0
+            readonly property string statusText: status === "suspended" ? "Suspendu" : status === "hung" ? "Ne répond pas" : status === "eco" ? "Mode efficacité" : ""
             width: rows.width
-            height: header ? 30 : pid ? 32 : 40
+            height: header ? 30 : sub ? 32 : 40
             Txt {
                 visible: cell.header !== ""
                 x: 8
@@ -492,19 +530,20 @@ Item {
                 sourceComponent: Btn {
                     id: row
                     radius: 14
-                    color: hovered || kill.hovered ? Theme.surfaceHigh : cell.pid ? Theme.alpha(Theme.surfaceC, 0.5) : Theme.surfaceC
+                    color: hovered || kill.hovered ? Theme.surfaceHigh : cell.sub ? Theme.alpha(Theme.surfaceC, 0.5) : Theme.surfaceC
                     active: true
-                    cursor: cell.n > 1 ? Qt.PointingHandCursor : Qt.ArrowCursor
-                    tip: cell.pid ? "" : cell.label !== cell.name ? cell.name + ".exe" : ""
-                    // clic sur un groupe : un processus par ligne, dessous
-                    onClicked: if (cell.n > 1 && !cell.pid) page.toggle(cell.name)
+                    cursor: cell.canOpen ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    // survol de l'icone de statut : son info-bulle a la place
+                    tip: statusHover.hovered ? cell.statusText : cell.sub ? "" : cell.label !== cell.name ? cell.name + ".exe" : ""
+                    // clic sur un groupe : un processus (ou un service) par ligne, dessous
+                    onClicked: if (cell.canOpen && !cell.sub) page.toggle(cell.gkey)
                     // clic droit : menu comme le Gestionnaire des taches
                     onRightClicked: m => page.showMenu(cell, row.mapToItem(page, m.x, m.y))
+                    // icone du groupe ; sous-ligne : sa propre icone, en retrait sous le nom
                     Item {
-                        visible: !cell.pid
-                        x: 26
-                        width: 22
-                        height: 22
+                        x: cell.sub ? page.colX(1) + 14 : 26
+                        width: cell.sub ? 18 : 22
+                        height: width
                         anchors.verticalCenter: parent.verticalCenter
                         Image {
                             anchors.fill: parent
@@ -517,13 +556,14 @@ Item {
                         Ms {
                             anchors.centerIn: parent
                             visible: cell.icon === ""
-                            name: "memory"
+                            name: cell.svcItem ? "settings" : "memory"
+                            size: cell.sub ? 16 : 20
                             color: Theme.inkVariant
                         }
                     }
-                    // groupe de plusieurs processus : chevron a gauche du nom
+                    // groupe developpable : chevron a gauche du nom
                     Ms {
-                        visible: cell.n > 1 && !cell.pid
+                        visible: cell.canOpen && !cell.sub
                         x: 8
                         anchors.verticalCenter: parent.verticalCenter
                         name: cell.expanded ? "expand_more" : "chevron_right"
@@ -531,16 +571,16 @@ Item {
                         color: Theme.inkVariant
                     }
                     Row {
-                        // sous-ligne : en retrait sous le nom du groupe
-                        x: page.colX(1) + (cell.pid ? 14 : 0)
-                        width: page.nameW - (cell.pid ? 14 : 0)
+                        // sous-ligne : en retrait sous le nom du groupe, apres son icone
+                        x: page.colX(1) + (cell.sub ? 14 + 18 + 6 : 0)
+                        width: page.nameW - (cell.sub ? 14 + 18 + 6 : 0)
                         spacing: 4
                         anchors.verticalCenter: parent.verticalCenter
                         Txt {
                             id: taskName
-                            width: Math.min(implicitWidth, parent.width - (count.visible ? count.implicitWidth + 4 : 0))
-                            text: cell.pid ? (cell.title || cell.label || cell.name) : (cell.label || cell.name)
-                            color: cell.pid && !cell.title ? Theme.inkVariant : Theme.ink
+                            width: Math.min(implicitWidth, parent.width - (count.visible ? count.implicitWidth + 4 : 0) - (statusIcon.visible ? statusIcon.width + 4 : 0))
+                            text: cell.sub ? (cell.title || cell.label || cell.name) : (cell.label || cell.name)
+                            color: cell.sub && !cell.svcItem && !cell.title ? Theme.inkVariant : Theme.ink
                             elide: Text.ElideRight
                         }
                         Txt {
@@ -552,8 +592,21 @@ Item {
                             tnum: true
                             color: Theme.inkVariant
                         }
+                        // statut (suspendu, ne repond pas, mode efficacite) : info-bulle au survol
+                        Ms {
+                            id: statusIcon
+                            visible: cell.statusText !== ""
+                            anchors.verticalCenter: taskName.verticalCenter
+                            name: cell.status === "suspended" ? "pause_circle" : cell.status === "hung" ? "hourglass_empty" : "eco"
+                            size: 15
+                            color: Theme.inkVariant
+                            HoverHandler {
+                                id: statusHover
+                            }
+                        }
                     }
                     HeatCell {
+                        visible: !cell.svcItem
                         height: row.height
                         x: page.colX(2)
                         width: page.cols[2]
@@ -562,6 +615,7 @@ Item {
                         value: page.fmtPct(cell.cpu)
                     }
                     HeatCell {
+                        visible: !cell.svcItem
                         height: row.height
                         x: page.colX(3)
                         width: page.cols[3]
@@ -570,6 +624,7 @@ Item {
                         value: page.fmtMem(cell.mem)
                     }
                     HeatCell {
+                        visible: !cell.svcItem
                         height: row.height
                         x: page.colX(4)
                         width: page.cols[4]
@@ -578,6 +633,7 @@ Item {
                         value: page.fmtRate(cell.disk)
                     }
                     HeatCell {
+                        visible: !cell.svcItem
                         height: row.height
                         x: page.colX(5)
                         width: page.cols[5]
@@ -586,6 +642,7 @@ Item {
                         value: page.fmtPct(cell.gpu)
                     }
                     HeatCell {
+                        visible: !cell.svcItem
                         height: row.height
                         x: page.colX(6)
                         width: page.cols[6]
@@ -598,6 +655,8 @@ Item {
                     Btn {
                         id: kill
                         readonly property bool armed: page.armed === cell.key
+                        // svc:, sys: et services : pas de fin de tache (protege : bouclier)
+                        visible: cell.prot || !cell.nokill
                         anchors.right: parent.right
                         anchors.rightMargin: 4
                         anchors.verticalCenter: parent.verticalCenter

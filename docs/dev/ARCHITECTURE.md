@@ -83,6 +83,8 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── apps.rs       Lanceur (shell:AppsFolder)    ├── games.rs Jeux Steam/Epic/Ubisoft/GOG, sélecteurs de fichiers
 ├── files.rs      Fichiers déposés (conversion, zip, presse-papiers)
 ├── tasks.rs      Gestionnaire des tâches       ├── pdh.rs   Compteurs PDH (CPU, GPU, disque)
+├── procgroup.rs Regroupement des processus comme Windows (algorithme pur, testé)
+├── svc.rs        Services Windows par pid (« Hôte de service : X »)
 ├── pc.rs         Mode d'alimentation, logiciels constructeur, instantané Toolhelp
 ├── health.rs     Disques, nettoyage, pilote NVIDIA, idle_secs
 ├── status.rs     État des services en ligne (toutes les 3 min)

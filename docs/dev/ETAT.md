@@ -12,7 +12,8 @@ reprendre.
   dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
   un raccourci dans le dossier Démarrage. Elle a été construite depuis les
-  sources par `install.ps1`.
+  sources par `install.ps1`. Le poste a en plus, non publié, l'onglet Tâches
+  regroupé comme Windows (commits locaux du 2026-10-20, non poussés).
 - **Consigne de l'utilisateur** : ne corriger que l'essentiel, sans rien qui
   change l'usage. Le Rust se traite « selon l'usage », et les bugs au fur et à
   mesure. Ce qui reste à faire est dans `BACKLOG.md`.
@@ -21,6 +22,70 @@ reprendre.
   Ensuite, piocher dans `BACKLOG.md`.
 
 ## Journal
+
+### 2026-10-20 : onglet Tâches regroupé comme Windows
+
+Reprise du plan de la session du 19 (non commitée) : commit, puis rebase sur
+`origin/main`. Deux autres sessions avaient publié les versions 0.4.12 à
+0.4.14 entre-temps. Le seul conflit était dans `ETAT.md`. Travail fait par
+4 agents en parallèle, puis un intégrateur.
+
+- **ETW abandonné** (choix de l'utilisateur). Le groupe « Utilisateurs du
+  journal de performances » (S-1-5-32-559) est actif sur le compte, mais
+  sans admin les fournisseurs Kernel-Disk, Kernel-Network, Kernel-File et
+  Kernel-Process répondent « Accès refusé ». Seul TCPIP passe. Disque et
+  réseau par ligne restent donc comme avant.
+- **`src/procgroup.rs`** (algorithme pur, 13 tests). Règles vérifiées par
+  captures du Gestionnaire prises au même moment :
+  - une app comprend le processus à fenêtre, ses descendants du **même exe**
+    et son `conhost`. EpicWebHelper sous EpicGamesLauncher, et claude sous
+    pwsh, ont leur propre ligne ;
+  - appli du Store : tout le paquet (`ident_of` → `pkg:<famille>`).
+    « Spotify Launcher » regroupe Spotify, le launcher et crashpad ;
+  - arrière-plan : une ligne par arbre de même exe (`tree:<pid>:<ms>`),
+    **sans** fusion par nom. Deux EpicWebHelper frères font deux lignes,
+    comme chez Windows ;
+  - un svchost par ligne (`svc:`), un csrss par ligne (`one:`).
+- **`src/svc.rs`** : `services_by_pid()` (EnumServicesStatusExW, cache 5 s,
+  ≈ 31 ms par relecture). Lignes « Hôte de service : X » ou « X +N », et
+  services listés quand on déplie la ligne.
+- **`tasks.rs`** :
+  - statuts : Suspendu (threads lus dans `SystemProcessInformation`), Ne
+    répond pas (`IsHungAppWindow`, sur la CoreWindow pour le Store), Mode
+    efficacité (PowerThrottling, cache 5 s) ;
+  - ligne « Interruptions système » ;
+  - fenêtres du Store attribuées à la vraie appli ;
+  - chemin illisible retenté toutes les 10 s, caches bornés à 512 ;
+  - `task_kill(key, members)` revérifie l'heure de création sur le handle
+    (`born_at`) avant `TerminateProcess`.
+- **QML** :
+  - le groupe est identifié par `key` ;
+  - fin de tâche par `members`, refusée pour `svc:` et `sys:` ;
+  - icône, chemin et bouclier propres à chaque sous-ligne ;
+  - icône de statut avec info-bulle.
+- **Vérifié** :
+  - `cargo test` 26/26, clippy propre dans les fichiers touchés, qmllint
+    sans nouvelle catégorie ;
+  - `install.ps1` OK, journal Qt vide au démarrage ;
+  - relu deux fois par `relecteur` : 3 corrections appliquées, le reste est
+    dans le BACKLOG ;
+  - les 10 premières lignes (triées par mémoire) sont identiques au
+    Gestionnaire, dans le même ordre et à 0,7 Mo près : Zen 19, Spotify,
+    Discord 6, EpicWebHelper, DWM, Everything, Claude Code, Defender,
+    EpicGamesLauncher, Explorateur.
+- **Coût** : `tasks_get` passe de 15 à 21-22 ms (la liste des services
+  revient toutes les 5 s), seulement quand l'onglet est ouvert.
+- **Incident** : la première version d'un test de l'intégrateur
+  (`principal_seulement…`) pouvait tuer des `cmd.exe` du poste en
+  arrière-plan. Le test a tourné 2 fois avant d'être corrigé. Il ne vise
+  plus que ses propres pid.
+- **Piège** : depuis le Bash de Claude Code, un heredoc Python qui contient
+  des `\\` ou `\n` dans des chaînes Rust les abîme. Il faut passer par Edit
+  ou par un script `.py` écrit avec Write.
+- **Non vérifié** :
+  - l'onglet affiché dans l'îlot (le clic simulé n'ouvre pas l'îlot) ;
+  - le tri inversé, le menu clic droit, la fin de tâche à l'écran ;
+  - « Ne répond pas » sur une vraie appli bloquée.
 
 ### 2026-10-20 : barre, aperçu qui se fermait, menu clic droit des applis
 
