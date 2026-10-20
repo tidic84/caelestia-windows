@@ -69,6 +69,12 @@ l'appli). Pour publier, pousser un tag `v*` : la CI publie
   `\Processor Information(_Total)\% Processor Time`, pas
   `% Processor Utility`, qui est 12 à 25 % plus haut avec le turbo. Vérifié
   par captures simultanées le 2026-10-19.
+- **Heredoc Python depuis le Bash de Claude Code** : les `\\` et `\n` placés
+  dans des chaînes Rust ou Markdown y sont abîmés. Pour modifier du code qui
+  contient des antislashs, utiliser Edit, ou un script `.py` écrit avec Write.
+- **Tests de `tasks.rs`** : ne jamais passer à `task_kill` tous les membres
+  d'un groupe, qui peut contenir des processus du poste. Ne viser que les pid
+  lancés par le test.
 - **Ne pas passer `panic = "abort"`** : `ilot_invoke` rattrape les paniques
   avec `catch_unwind`.
 - **Effets système de l'appli** :
