@@ -4,6 +4,14 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.15 — 2026-10-20
+
+- **Gestionnaire des tâches, regroupé comme Windows** : chaque hôte de service a sa ligne (« Hôte de service : Audio Windows », « … +2 »), avec la liste de ses services quand on la déplie. Les applis du Store forment une ligne par paquet (Spotify et son lanceur ensemble). Un programme ne regroupe plus que ses propres processus : les assistants lancés par lui (EpicWebHelper, Claude Code sous PowerShell…) ont leur ligne, comme dans Windows.
+- **Statuts** : une icône signale un programme suspendu, qui ne répond pas, ou en mode efficacité.
+- **Interruptions système** : nouvelle ligne, comme dans Windows ; la somme des lignes rejoint le total du CPU.
+- **Chiffres** : le CPU (îlot, barre, accueil, gestionnaire) est le même que celui du Gestionnaire des tâches de Windows, rafraîchi chaque seconde ; le disque des programmes ne dépasse plus le débit réel du disque.
+- **Détail d'un programme** : chaque processus a sa propre icône, et « Ouvrir l'emplacement » ouvre le bon fichier. Un second clic sur une colonne inverse le tri.
+
 ## 0.4.14 — 2026-10-20
 
 - **Barre, clic droit sur une appli** : menu avec « Nouvelle fenêtre » et « Fermer la fenêtre » (ou « Fermer les N fenêtres »). Il reste affiché tant que la souris est sur lui ou sur la barre.

@@ -6,14 +6,13 @@ reprendre.
 
 ## Où on en est (mis à jour le 2026-10-20)
 
-- **Version** : 0.4.14 dans `Cargo.toml` (menu clic droit de la barre, alerte de jeu),
-  installée sur le poste, publiée le 2026-10-20 par le tag `v0.4.14`
+- **Version** : 0.4.15 dans `Cargo.toml` (onglet Tâches regroupé comme Windows),
+  installée sur le poste, publiée le 2026-10-20 par le tag `v0.4.15`
   (GitHub Action `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
   dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
   un raccourci dans le dossier Démarrage. Elle a été construite depuis les
-  sources par `install.ps1`. Le poste a en plus, non publié, l'onglet Tâches
-  regroupé comme Windows (commits locaux du 2026-10-20, non poussés).
+  sources par `install.ps1`.
 - **Consigne de l'utilisateur** : ne corriger que l'essentiel, sans rien qui
   change l'usage. Le Rust se traite « selon l'usage », et les bugs au fur et à
   mesure. Ce qui reste à faire est dans `BACKLOG.md`.
