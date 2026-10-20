@@ -16,7 +16,15 @@ Item {
     readonly property bool islands: !!Ilot.cfg.bar_islands
     readonly property bool showTasks: !!Ilot.cfg.bar_tasks
     signal layoutChanged()
-    readonly property bool previewOpen: preview.open
+    // apercu ou menu d'une appli ouvert : la barre reste affichee
+    readonly property bool previewOpen: preview.open || menu.visible
+    onPreviewOpenChanged: {
+        if (!hasIsland)
+            return
+        Ilot.previewOpen = previewOpen
+        if (!previewOpen && !Ilot.atTop)
+            Ilot.hideBarLater()
+    }
     height: Ilot.barH
 
     // 0 : masquee ; anime, pour garder la barre visible pendant qu'elle sort
@@ -24,8 +32,10 @@ Item {
     Behavior on vis { NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
     onVisChanged: if (vis === 0 || vis === 1) layoutChanged()
     onShownChanged: {
-        if (!shown)
+        if (!shown) {
             preview.hideNow()
+            menu.hide()
+        }
         layoutChanged()
     }
 
@@ -54,6 +64,8 @@ Item {
         }
         if (preview.open)
             out.push(preview.rect())
+        if (menu.visible)
+            out.push({ x: menu.x, y: menu.y, w: menu.width, h: menu.height })
         return out
     }
 
@@ -197,8 +209,10 @@ Item {
                             required property var modelData
                             group: modelData
                             anchors.verticalCenter: parent.verticalCenter
-                            onHoveredChanged: if (hovered) preview.soon(modelData.key, this)
+                            onHoveredChanged: if (hovered && !menu.visible) preview.soon(modelData.key, this)
+                            onRightClicked: bar.taskMenu(modelData, this)
                             onClicked: {
+                                menu.hide()
                                 // plusieurs fenetres : chaque clic passe a la suivante
                                 const wins = modelData.wins
                                 const i = wins.findIndex(w => w.id === Ilot.barWins.active)
@@ -453,6 +467,69 @@ Item {
         y: Ilot.barH - 2
         onOpenChanged: bar.layoutChanged()
         onRectChangedSig: bar.layoutChanged()
+    }
+
+    // ------------------------------------- menu d'une appli (clic droit)
+    // cle de l'appli : les BarTask sont recrees a chaque mise a jour des fenetres
+    property string menuKey: ""
+    function menuGroup() {
+        return Ilot.taskGroups(Ilot.barWins).find(g => g.key === menuKey) || null
+    }
+    // l'appli n'a plus de fenetre : le menu se ferme
+    readonly property bool menuAlive: menuKey === "" || !!Ilot.taskGroups(Ilot.barWins).find(g => g.key === menuKey)
+    onMenuAliveChanged: if (!menuAlive) menu.hide()
+    // AUMID connue du lanceur, sinon l'executable
+    function launchTarget(key) {
+        const lines = key.split("\n")
+        const id = lines[0].startsWith("shell:AppsFolder\\") ? lines[0].slice(17) : ""
+        if (id && Ilot.apps.some(a => a.id === id))
+            return { cmd: "app_launch", args: { id: id } }
+        const exe = lines[lines.length - 1]
+        return /\.exe$/i.test(exe) ? { cmd: "task_new", args: { path: exe } } : null
+    }
+    function taskMenu(group, item) {
+        preview.hideNow()
+        menuKey = group.key
+        const wins = group.wins
+        const exe = group.key.split("\n").pop().split("\\").pop().replace(/\.exe$/i, "")
+        const launch = launchTarget(group.key)
+        const n = wins.length
+        const list = [{ type: "title", label: exe || (wins[0] || {}).title || "" }]
+        if (launch)
+            list.push({ icon: "open_in_new", label: "Nouvelle fenêtre", run: () => {
+                menu.hide()
+                Api.invoke(launch.cmd, launch.args)
+            } }, { type: "sep" })
+        list.push({ icon: "close", label: n > 1 ? "Fermer les " + n + " fenêtres" : "Fermer la fenêtre", run: () => {
+            const g = bar.menuGroup()
+            menu.hide()
+            for (const w of (g ? g.wins : []))
+                Api.invoke("task_close", { id: w.id })
+        } })
+        menu.show(item.mapToItem(bar, 0, 0).x, Ilot.barH + 4, list)
+    }
+    CtxMenu {
+        id: menu
+        area: bar.parent
+        onVisibleChanged: {
+            if (!visible)
+                bar.menuKey = ""
+            bar.layoutChanged()
+        }
+        onXChanged: if (visible) bar.layoutChanged()
+        onYChanged: if (visible) bar.layoutChanged()
+        onWidthChanged: if (visible) bar.layoutChanged()
+        onHeightChanged: if (visible) bar.layoutChanged()
+        HoverHandler {
+            id: menuHover
+        }
+    }
+    // la fenetre ne voit pas les clics ailleurs : le menu se ferme quand la
+    // souris l'a quitte (et les applis de la barre), avec de la marge
+    Timer {
+        interval: 800
+        running: menu.visible && !menuHover.hovered && !tasksHover.hovered
+        onTriggered: menu.hide()
     }
 
     // composants locaux

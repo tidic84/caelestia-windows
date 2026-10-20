@@ -2,6 +2,7 @@
 //! haut des ecrans (AppBar) et masquage des barres des taches Windows.
 
 use std::collections::HashMap;
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -366,6 +367,19 @@ fn capture(h: HWND) -> Option<image::RgbaImage> {
 pub fn task_close(id: isize) {
     unsafe {
         let _ = PostMessageW(Some(hwnd(id)), WM_CLOSE, WPARAM(0), LPARAM(0));
+    }
+}
+
+/// Clic droit > Nouvelle fenetre, appli hors du dossier AppsFolder : relance
+/// son executable (la cle d'icone de `icon_key`).
+pub fn task_new(path: String) {
+    let p = std::path::Path::new(&path);
+    if path.to_ascii_lowercase().ends_with(".exe") && p.is_file() {
+        let mut c = Command::new(p);
+        if let Some(dir) = p.parent() {
+            c.current_dir(dir);
+        }
+        let _ = c.spawn();
     }
 }
 

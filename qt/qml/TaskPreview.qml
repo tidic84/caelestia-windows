@@ -21,7 +21,6 @@ Item {
     onXChanged: rectChangedSig()
     onWidthChanged: rectChangedSig()
     onHeightChanged: rectChangedSig()
-    onOpenChanged: if (bar && bar.hasIsland) Ilot.previewOpen = open
 
     function rect() {
         return { x: x, y: y, w: width, h: height }
@@ -51,7 +50,9 @@ Item {
     Timer {
         id: hideTimer
         interval: 250
-        onTriggered: pv.hideNow()
+        // souris rapide : un meme mouvement entre dans l'apercu avant de
+        // quitter l'appli de la barre, qui relance alors ce minuteur
+        onTriggered: if (!pvHover.hovered) pv.hideNow()
     }
     Timer {
         id: refresh
@@ -89,8 +90,6 @@ Item {
         if (!open)
             return
         key = ""
-        if (bar && bar.hasIsland && !Ilot.atTop)
-            Ilot.hideBarLater()
     }
     function loadThumbs() {
         if (!group)
@@ -100,6 +99,7 @@ Item {
     }
 
     HoverHandler {
+        id: pvHover
         onHoveredChanged: {
             if (hovered)
                 hideTimer.stop()

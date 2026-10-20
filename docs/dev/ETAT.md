@@ -4,10 +4,10 @@
 chaque session : ce qui a été fait, ce qui a été vérifié ou non, et où
 reprendre.
 
-## Où on en est (mis à jour le 2026-10-18)
+## Où on en est (mis à jour le 2026-10-20)
 
-- **Version** : 0.4.13 dans `Cargo.toml` (survol et infobulles du panneau),
-  installée sur le poste, publiée le 2026-10-19 par le tag `v0.4.13`
+- **Version** : 0.4.14 dans `Cargo.toml` (menu clic droit de la barre, alerte de jeu),
+  installée sur le poste, publiée le 2026-10-20 par le tag `v0.4.14`
   (GitHub Action `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
   dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
@@ -21,6 +21,31 @@ reprendre.
   Ensuite, piocher dans `BACKLOG.md`.
 
 ## Journal
+
+### 2026-10-20 : barre, aperçu qui se fermait, menu clic droit des applis
+
+Retour d'usage : l'aperçu des fenêtres se fermait quand on descendait vite
+de l'icône vers lui. Demande : un menu clic droit sur les applis de la barre.
+
+- **Cause** : un même mouvement rapide fait entrer dans l'aperçu avant de
+  quitter `tasksHover`. L'entrée arrête `hideTimer`, la sortie le relance, et
+  l'aperçu se ferme sous la souris.
+- `TaskPreview.qml` : `hideTimer` ne ferme plus si l'aperçu est survolé.
+  `Ilot.previewOpen` et `hideBarLater` sont gérés par `BarContent` (aperçu
+  ou menu ouvert).
+- `BarContent.qml` : clic droit sur une appli. Un `CtxMenu` sous la barre,
+  dans les zones cliquables, propose :
+  - « Nouvelle fenêtre » : `app_launch` si l'AUMID est dans `Ilot.apps`,
+    sinon la nouvelle commande `task_new` (lance l'exe) ;
+  - « Fermer la/les fenêtre(s) ».
+
+  Le menu se ferme 800 ms après que la souris a quitté le menu et les applis,
+  ou quand l'appli n'a plus de fenêtre. Il garde la barre affichée en
+  masquage auto.
+- `src/bar.rs` `task_new(path)` + `lib.rs`.
+- Compilé, qmllint sans nouvel avertissement, relu par un agent. Pas testé à
+  la souris. Défaut connu, déjà présent pour l'aperçu : près de l'îlot, le
+  menu peut passer sous lui.
 
 ### 2026-10-20 : alerte « partie trouvée » au lancement d'un jeu, son
 

@@ -4,6 +4,12 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.14 — 2026-10-20
+
+- **Barre, clic droit sur une appli** : menu avec « Nouvelle fenêtre » et « Fermer la fenêtre » (ou « Fermer les N fenêtres »). Il reste affiché tant que la souris est sur lui ou sur la barre.
+- **Barre, aperçu des fenêtres** : il ne se ferme plus quand on descend vite de l'icône vers lui.
+- **Assistant de jeu** : l'alerte « Partie trouvée » ne se déclenche plus au lancement du jeu, seulement quand on attend hors du jeu. Le son est maintenant le petit « pop » de Claude Code, au lieu des bips.
+
 ## 0.4.13 — 2026-10-19
 
 - **Survol et infobulles dans le panneau** : les boutons du panneau ouvert (Verrouiller, Veille, Déconnexion, Redémarrer, Éteindre, onglets, commandes…) réagissent de nouveau au survol de la souris (surbrillance) et affichent leur infobulle. Une zone invisible au-dessus de l'îlot leur prenait le survol.

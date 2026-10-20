@@ -373,6 +373,7 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "task_icon" => json(bar::task_icon(a!("key"), a!("id"))),
         "task_activate" => json(bar::task_activate(a!("id"))),
         "task_close" => json(bar::task_close(a!("id"))),
+        "task_new" => json(bar::task_new(a!("path"))),
         "task_thumb" => json(bar::task_thumb(a!("id"), a!("w"), a!("h"))),
         "desktop_go" => json(bar::desktop_go(a!("index"))),
         "taskbar_peek" => json(bar::taskbar_peek(app, a!("show"))),
