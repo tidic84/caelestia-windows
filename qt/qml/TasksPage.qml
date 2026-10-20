@@ -2,9 +2,9 @@ import QtQuick
 
 // Gestionnaire des taches : processus regroupes par programme (src/tasks.rs),
 // avec les memes chiffres et sections que l'onglet Processus de Windows,
-// rafraichis toutes les 2 s tant que l'onglet est affiche. La liste est un
-// ListModel mis a jour sur place (cle : nom de l'exe), pour garder le
-// defilement, le survol et les lignes d'un rafraichissement a l'autre.
+// rafraichis chaque seconde (comme Windows) tant que l'onglet est affiche.
+// La liste est un ListModel mis a jour sur place (cle : nom de l'exe), pour
+// garder le defilement, le survol et les lignes d'un rafraichissement a l'autre.
 Item {
     id: page
     readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "tasks" && !Watch.shareOpen
@@ -13,6 +13,8 @@ Item {
     // totaux de l'en-tete (compteurs de Windows)
     property var tot: ({ cpu: 0, gpu: 0, disk: 0, procs: 0 })
     property string sort: "cpu"
+    // second clic sur la colonne triee : ordre inverse, comme Windows
+    property bool asc: false
     property string armed: ""
     property bool busy: false
     property bool loaded: false
@@ -22,6 +24,12 @@ Item {
     property bool again: false
     // message bref dans l'en-tete (resultat d'une fin de tache)
     property string notice: ""
+    // releves en echec d'affilee (message au lieu de « Chargement… »)
+    property int fails: 0
+    // pas de reordonnancement pendant une confirmation ou avec le menu ouvert :
+    // la ligne visee ne doit pas bouger sous le curseur
+    readonly property bool frozen: armed !== "" || ctx.visible
+    onFrozenChanged: if (!frozen) rebuild()
 
     onShownChanged: {
         if (shown) {
@@ -34,9 +42,20 @@ Item {
         armed = ""
     }
     Component.onCompleted: if (shown) refresh()
+    // page detruite (module desactive, onglet ouvert) : liberer l'etat Rust
+    Component.onDestruction: Api.invoke("tasks_stop")
     onSortChanged: rebuild()
+    onAscChanged: rebuild()
+    function pickSort(id) {
+        if (sort === id)
+            asc = !asc
+        else {
+            asc = false
+            sort = id
+        }
+    }
     Timer {
-        interval: 2000
+        interval: 1000
         repeat: true
         running: page.shown
         onTriggered: page.refresh()
@@ -64,8 +83,22 @@ Item {
             page.netRate = { down: r.net_down, up: r.net_up }
             page.tot = { cpu: r.cpu, gpu: r.gpu, disk: r.disk_active, procs: r.procs }
             page.loaded = true
-            page.rebuild()
-        }).then(() => { page.done() }, () => { page.done() })
+            page.fails = 0
+            // groupes ouverts disparus (programme ferme) : oublies
+            const live = new Set(r.list.map(t => t.name.toLowerCase()))
+            if (Object.keys(page.opened).some(k => !live.has(k))) {
+                const o = {}
+                for (const k in page.opened)
+                    if (live.has(k))
+                        o[k] = true
+                page.opened = o
+            }
+            if (!page.frozen)
+                page.rebuild()
+        }).then(() => { page.done() }, () => {
+            page.fails++
+            page.done()
+        })
     }
     // une reponse arrivee apres la fermeture de l'onglet a pu recreer l'etat Rust
     function done() {
@@ -114,20 +147,23 @@ Item {
     function fmtPct(v) {
         return v >= 0.05 ? fmt1(v) + " %" : "0 %"
     }
+    // comme Windows : toujours en Mo, une decimale, espace des milliers
+    // (insecable normale : Rubik n'a pas l'espace fine U+202F)
+    readonly property var fr: Qt.locale("fr_FR")
     function fmtMem(b) {
-        return b >= Math.pow(1024, 3) ? fmt1(b / Math.pow(1024, 3)) + " Go" : Math.round(b / Math.pow(1024, 2)) + " Mo"
+        return (b / Math.pow(1024, 2)).toLocaleString(fr, "f", 1).replace(/\u202f/g, "\u00a0") + " Mo"
     }
     // debit reseau en bits/s, comme Windows
     function fmtNet(b) {
         const k = b * 8 / 1e3
-        return k < 1 ? "0" : k < 1000 ? Math.round(k) + " k" : k < 10000 ? fmt1(k / 1e3) + " M" : Math.round(k / 1e3) + " M"
+        // arrondi avant le choix de l'unite : pas de « 1000 k »
+        return k < 1 ? "0" : Math.round(k) < 1000 ? Math.round(k) + " k" : k < 9950 ? fmt1(k / 1e3) + " M" : Math.round(k / 1e3) + " M"
     }
     function fmtRate(b) {
         return b < 0.05 * Math.pow(1024, 2) ? "0 Mo/s" : fmt1(b / Math.pow(1024, 2)) + " Mo/s"
     }
     readonly property real diskFull: 100 * Math.pow(1024, 2)
     readonly property real netFull: 12.5 * Math.pow(1024, 2)
-    readonly property real connFull: 40
     readonly property var hues: ({ cpu: 210, mem: 275, disk: 135, gpu: 330, net: 30 })
     readonly property real memTotal: Ilot.sys ? Ilot.sys.mem_total : 16 * Math.pow(1024, 3)
 
@@ -139,16 +175,22 @@ Item {
     // filtre + tri + sections, puis mise a jour du modele sur place
     function rebuild() {
         const q = Ilot.norm(filter.text.trim())
-        // dernier critere toujours stable : le nom
-        const by = {
-            cpu: (x, y) => y.cpu - x.cpu || y.mem - x.mem,
-            mem: (x, y) => y.mem - x.mem,
-            disk: (x, y) => y.disk - x.disk || y.cpu - x.cpu || y.mem - x.mem,
-            gpu: (x, y) => y.gpu - x.gpu || y.cpu - x.cpu || y.mem - x.mem,
-            net: (x, y) => y.net - x.net || y.cpu - x.cpu || y.mem - x.mem,
+        // tri sur les valeurs telles qu'affichees (une decimale, Mo) : deux
+        // lignes a « 0 % » ne s'echangent pas a chaque releve ; dernier
+        // critere toujours stable : le nom
+        const r1 = v => Math.round(v * 10), mb = v => Math.round(v / 104857.6)
+        const desc = {
+            cpu: (x, y) => r1(y.cpu) - r1(x.cpu) || mb(y.mem) - mb(x.mem),
+            mem: (x, y) => mb(y.mem) - mb(x.mem),
+            disk: (x, y) => mb(y.disk) - mb(x.disk) || r1(y.cpu) - r1(x.cpu),
+            gpu: (x, y) => r1(y.gpu) - r1(x.gpu) || r1(y.cpu) - r1(x.cpu),
+            net: (x, y) => y.net - x.net || r1(y.cpu) - r1(x.cpu),
             name: () => 0
         }[sort]
-        const cmp = (x, y) => by(x, y) || x.label.localeCompare(y.label, "fr") || x.name.localeCompare(y.name)
+        const sign = asc ? -1 : 1
+        const name = (x, y) => x.label.localeCompare(y.label, "fr") || x.name.localeCompare(y.name)
+        const by = sort === "name" ? (x, y) => sign * name(x, y) : (x, y) => sign * desc(x, y)
+        const cmp = (x, y) => by(x, y) || name(x, y)
         const all = tasks.filter(t => !q || Ilot.norm(t.label).includes(q) || Ilot.norm(t.name).includes(q)).sort(cmp)
         // memes sections que l'onglet Processus du Gestionnaire des taches
         const out = []
@@ -163,7 +205,7 @@ Item {
                 out.push(row(key, "", t, null, open))
                 // groupe developpe : un processus par ligne, juste dessous
                 if (open && t.procs)
-                    for (const s of t.procs.slice().sort((x, y) => by(x, y) || x.pid - y.pid))
+                    for (const s of t.procs.slice().sort((x, y) => (sort === "name" ? 0 : sign * desc(x, y)) || x.pid - y.pid))
                         out.push(row(key + "/" + s.pid, "", t, s, false))
             }
         }
@@ -242,14 +284,14 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             model: [{ id: "cpu", label: "CPU" }, { id: "mem", label: "Mémoire" }, { id: "disk", label: "Disque" }, { id: "gpu", label: "GPU" }, { id: "net", label: "Réseau" }, { id: "name", label: "Nom" }]
             current: page.sort
-            onPicked: id => page.sort = id
+            onPicked: id => page.pickSort(id)
         }
         Txt {
             x: seg.x + seg.width + 8
             width: right.x - x - 8
             anchors.verticalCenter: parent.verticalCenter
             horizontalAlignment: Text.AlignHCenter
-            text: page.notice || ((page.tot.procs || page.tasks.reduce((n, t) => n + t.count, 0)) + " processus")
+            text: page.notice
             px: 12
             tnum: true
             color: page.notice ? Theme.primary : Theme.inkVariant
@@ -304,14 +346,15 @@ Item {
     }
 
     // colonnes : icone, programme, CPU, memoire, disque, GPU, reseau, fin de tache
-    readonly property var cols: [26, 0, 62, 74, 74, 58, 118, 36]
+    // chevron puis icone dans la premiere colonne, comme Windows
+    readonly property var cols: [40, 0, 62, 84, 80, 58, 118, 36]
     function colX(i) {
         let x = 12
         for (let k = 0; k < i; k++)
             x += (cols[k] || nameW) + 3
         return x
     }
-    readonly property real nameW: width - 4 - 12 - (26 + 62 + 74 + 74 + 58 + 118 + 36) - 7 * 3
+    readonly property real nameW: width - 4 - 12 - cols.reduce((a, b) => a + b, 0) - 7 * 3
 
     // totaux colores, comme le Gestionnaire des taches ; un clic trie la colonne
     Item {
@@ -327,15 +370,28 @@ Item {
             radius: 8
             color: hovered ? Theme.alpha(Theme.ink, 0.08) : "transparent"
             tip: "Trier par nom"
-            onClicked: page.sort = "name"
+            onClicked: page.pickSort("name")
             Txt {
                 id: progLabel
                 x: 6
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Programme" + (page.sort === "name" ? " ▴" : "")
+                text: "Programme" + (page.sort === "name" ? (page.asc ? " ▾" : " ▴") : "")
                 px: 11
                 color: page.sort === "name" ? Theme.primary : Theme.inkVariant
             }
+        }
+        // nombre de processus : ici, l'en-tete n'a pas la place (« 255 pro… »)
+        Txt {
+            x: page.colX(1) + progLabel.implicitWidth + 12
+            width: Math.max(0, page.colX(2) - x - 6)
+            elide: Text.ElideRight
+            y: 2
+            height: 22
+            verticalAlignment: Text.AlignVCenter
+            text: page.loaded ? "· " + (page.tot.procs || page.tasks.reduce((n, t) => n + t.count, 0)) + " processus" : ""
+            px: 11
+            tnum: true
+            color: Theme.inkVariant
         }
         readonly property real cpu: page.tot.cpu || Math.min(100, page.tasks.reduce((n, t) => n + t.cpu, 0))
         readonly property real memUsed: Ilot.sys ? Ilot.sys.mem_used : page.tasks.reduce((n, t) => n + t.mem, 0)
@@ -383,7 +439,8 @@ Item {
             kind: "net"
             frac: (page.netRate.down + page.netRate.up) / page.netFull
             value: page.loaded ? "↓" + page.fmtNet(page.netRate.down) + " ↑" + page.fmtNet(page.netRate.up) : "–"
-            label: "Réseau (bit/s)"
+            label: "Réseau"
+            valuePx: 12
             tip: "Débit total ↓ réception / ↑ envoi ; par programme : connexions actives"
         }
     }
@@ -445,7 +502,7 @@ Item {
                     onRightClicked: m => page.showMenu(cell, row.mapToItem(page, m.x, m.y))
                     Item {
                         visible: !cell.pid
-                        x: 12
+                        x: 26
                         width: 22
                         height: 22
                         anchors.verticalCenter: parent.verticalCenter
@@ -467,7 +524,7 @@ Item {
                     // groupe de plusieurs processus : chevron a gauche du nom
                     Ms {
                         visible: cell.n > 1 && !cell.pid
-                        x: page.colX(1) - 18
+                        x: 8
                         anchors.verticalCenter: parent.verticalCenter
                         name: cell.expanded ? "expand_more" : "chevron_right"
                         size: 16
@@ -533,7 +590,8 @@ Item {
                         x: page.colX(6)
                         width: page.cols[6]
                         kind: "net"
-                        frac: cell.net / page.connFull
+                        // un nombre de connexions n'est pas une charge : pas de couleur
+                        frac: 0
                         value: cell.net ? cell.net + " conn." : "–"
                     }
                     // fin de tache : premier clic arme, second clic termine le programme
@@ -587,7 +645,7 @@ Item {
             y: rows.y
             visible: rows.count === 0
             width: rows.width
-            text: !page.loaded ? "Chargement…" : filter.text.trim() ? "Aucun résultat" : "Aucun processus"
+            text: !page.loaded ? (page.fails >= 3 ? "Relevé des processus impossible" : "Chargement…") : filter.text.trim() ? "Aucun résultat" : "Aucun processus"
         }
     }
     Scroller { flick: rows }
@@ -623,6 +681,7 @@ Item {
         property string label: ""
         property bool head: false
         property string tip: ""
+        property real valuePx: 14
         readonly property real f: Math.max(0, Math.min(1, frac || 0))
         readonly property real hue: f >= 0.75 ? 0 : (page.hues[kind] !== undefined ? page.hues[kind] : 50)
         readonly property bool hot: f >= 0.5
@@ -662,14 +721,14 @@ Item {
             Txt {
                 anchors.right: parent.right
                 text: c.value
-                px: 14
+                px: c.valuePx
                 weight: Font.DemiBold
                 tnum: true
                 color: c.hot ? "#ffffff" : Theme.ink
             }
             Txt {
                 anchors.right: parent.right
-                text: c.label + (c.sorted ? " ▾" : "")
+                text: c.label + (c.sorted ? (page.asc ? " ▴" : " ▾") : "")
                 px: 11
                 color: c.hot ? "#ffffff" : c.sorted ? Theme.primary : Theme.inkVariant
             }
@@ -680,7 +739,7 @@ Item {
             active: c.head
             sourceComponent: Btn {
                 tip: c.tip || "Trier par " + c.label.toLowerCase()
-                onClicked: page.sort = c.kind
+                onClicked: page.pickSort(c.kind)
             }
         }
     }

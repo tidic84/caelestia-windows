@@ -67,6 +67,82 @@ le carillon (bips `Beep`) ne plaisait pas.
   - si `playing()` retient un processus sans fenêtre du dossier du jeu,
     l'alerte ne part jamais. Avant, ce cas donnait de fausses alertes.
 
+### 2026-10-19 : gestionnaire des tâches, chiffres alignés sur Windows
+
+Audit par deux agents (chiffres mesurés contre les compteurs Windows, et QML),
+puis correctifs, relus par `relecteur`.
+
+- **Ce qui était déjà juste** (mesuré) : mémoire = « Working Set - Private »
+  pour les 259 processus, CPU brut, E/S, réseau total, GPU (max des moteurs).
+- **CPU** (`src/tasks.rs`) : le coefficient turbo passe de « % Processor
+  Performance » (moyenne qui compte les cœurs au repos) à
+  Utility / Processor Time. Les lignes étaient 5 à 25 % sous l'en-tête ; la
+  somme des lignes rejoint maintenant l'en-tête, à 0,6–1,6 % près, ce qui
+  correspond aux interruptions et aux DPC.
+- **Disque** : les compteurs d'E/S comptent aussi les tubes et le cache
+  (exemple : zen.exe à 33 Mo/s pour un disque à 1 Mo/s). Ils sont ramenés au
+  débit physique (`PhysicalDisk(_Total)\Disk Bytes/sec`). La somme est
+  juste ; la répartition reste approximative (voir BACKLOG).
+- **`MIN_GAP` 500 ms** entre deux relevés (clic sur un groupe, fin de tâche
+  juste après le minuteur) : il remplace l'amorce de 300 ms et le `.max(0.2)`
+  qui sous-évaluait les taux.
+- **QML** (`TasksPage.qml`) : chevron à gauche de l'icône (il la recouvrait) ;
+  tri sur les valeurs affichées (les lignes à « 0 % » ne s'échangent plus) ;
+  second clic sur une colonne pour inverser le tri ; pas de réordonnancement
+  pendant une confirmation ou avec le menu ouvert ; `tasks_stop` à la
+  destruction de la page ; nettoyage d'`opened` ; message après 3 échecs ;
+  mémoire toujours en Mo avec une décimale (« 1 523,5 Mo », espace
+  insécable U+00A0 car Rubik n'a pas U+202F) ; plus de « 1000 k » ; cellule
+  réseau par ligne non colorée ; colonnes mémoire et disque élargies.
+- **Vérifié** : `cargo test` 6/6, clippy sans avertissement dans `tasks.rs`,
+  `install.ps1` OK, journal QML vide au démarrage, `qmllint` sans nouvelle
+  catégorie, `fmtMem` testé dans `qml.exe`. Sonde du relecteur (6 relevés
+  sous charge) : CPU des lignes ≈ en-tête, disque = débit physique à
+  ±0,02 Mo/s, aucune valeur aberrante.
+- **Comparaison à l'écran** (captures simultanées des deux gestionnaires,
+  îlot piloté par clics simulés) :
+  - mémoire identique au dixième de Mo (Zen 1 172,6, Discord 445,8,
+    Explorateur 178,6, Defender, ilot) ;
+  - CPU total 12 % contre 11 %, Zen 4,5 % contre 4,0 % : l'îlot relève
+    toutes les 2 s, Windows toutes les secondes ;
+  - GPU total 36 % contre 36 %, disque 0 % contre 0 % ;
+  - écarts de regroupement seulement : Everything et son service forment
+    une seule ligne, RustDesk aussi, alors que Windows les sépare.
+- **Trouvé à l'écran et corrigé** :
+  - « 256 pro… » était coupé dans l'en-tête : le compte va maintenant à côté
+    de « Programme » ;
+  - Claude Code n'avait pas d'icône. Son updater renomme l'exe qui tourne
+    (`claude.exe.old.<n>.<pid>`), et `QueryFullProcessImageNameW` renvoie ce
+    nom sans `.exe`. On reprend alors le chemin NT d'origine, s'il finit par
+    `.exe` et existe.
+- **Rafraîchissement chaque seconde**, comme Windows (avant : 2 s). Coût
+  mesuré sur 20 s, onglet ouvert : 12 % d'un cœur à 2 s, 19,7 % à 1 s
+  (1,0 → 1,6 % du total, 12 cœurs). Rien quand l'onglet est fermé.
+- **CPU : mauvais compteur, partout.** Retour de l'utilisateur : tout
+  colle sauf le CPU. Une sonde horodatée (`% Processor Utility`, `Time`,
+  `Performance`, `GetSystemTimes`, sysinfo) a été croisée avec des captures
+  du Gestionnaire prises à la même heure. Résultat : le Gestionnaire (onglet
+  Processus) suit **`% Processor Time`**, pas `Utility`, qui est ~12-25 %
+  plus haut à cause du turbo (exemple : 18 % au Gestionnaire, Time 18-23,
+  Utility 25-35). Corrigé :
+  - `system.rs` (accueil, barre, îlot en jeu), `activity.rs` (bilan de
+    session de jeu) et l'en-tête de `tasks.rs` lisent
+    `\Processor Information(_Total)\% Processor Time` ;
+  - lignes de `tasks.rs` : temps CPU brut / (durée × cœurs), sans le
+    facteur turbo ;
+  - premier relevé après l'amorce sur 1 s (`FIRST_GAP`) : sur 500 ms, il
+    tombait sur le pic d'ouverture de l'îlot (jusqu'à 45 % affichés).
+  - Vérifié : 12 paires de captures prises au même instant par un seul
+    processus PowerShell (îlot 8-12 %, moyenne 9,7 ; Gestionnaire 8-13 %,
+    moyenne 10,7), et accueil 15 % contre 16 %.
+  - Piège de mesure : lancer un PowerShell par capture crée des pics de
+    20-30 % de CPU qui faussent la comparaison. Il faut capturer depuis un
+    seul processus qui tourne en boucle. Autre piège : quand le Gestionnaire
+    (lancé en admin) a le focus, Windows bloque les clics simulés
+    (`mouse_event`). Il faut d'abord activer une autre fenêtre
+    (`WScript.Shell.AppActivate`).
+- **Non vérifié** : tri inversé, menu clic droit et fin de tâche à l'écran.
+
 ### 2026-10-19 : survol et infobulles du panneau (après 0.4.12)
 
 Retour d'usage : aucune infobulle (boutons de session, onglets…), y compris

@@ -1,5 +1,5 @@
 //! Onglet Taches : processus regroupes par programme, avec les memes chiffres
-//! que l'onglet Processus du Gestionnaire des taches (CPU en « utilite »,
+//! que l'onglet Processus du Gestionnaire des taches (CPU en temps processeur,
 //! memoire privee, GPU, sections Applications / arriere-plan / Windows).
 //!
 //! Les chiffres par processus viennent d'un seul appel a
@@ -49,7 +49,7 @@ pub struct Task {
     /// « app » (fenetre ouverte), « bg » (arriere-plan) ou « win » (processus Windows)
     kind: &'static str,
     count: usize,
-    /// % du processeur entier (0-100), en « utilite » comme Windows 11
+    /// % du processeur entier (0-100), en temps processeur comme Windows 11
     cpu: f32,
     /// memoire privee (jeu de travail prive), comme le Gestionnaire des taches
     mem: u64,
@@ -451,13 +451,23 @@ pub struct Tasks {
 /// Au-dela, les ecarts couvriraient une trop longue duree (onglet ferme) :
 /// on repart d'un releve neuf.
 const STALE: Duration = Duration::from_secs(6);
+/// Ecart minimal entre deux releves : en dessous (clic sur un groupe, fin de
+/// tache juste apres le minuteur), la granularite des temps CPU (15,6 ms)
+/// rendrait les taux instables.
+const MIN_GAP: Duration = Duration::from_millis(500);
+/// Premier releve apres l'amorce : une seconde, comme le Gestionnaire. Sur
+/// 500 ms, le CPU tombait en plein sur le pic d'ouverture de l'ilot (45 %
+/// affiches pour 17 % reels).
+const FIRST_GAP: Duration = Duration::from_secs(1);
 
 fn pdh_query() -> Option<crate::pdh::Query> {
     crate::pdh::Query::new(&[
-        r"\Processor Information(_Total)\% Processor Utility",
-        r"\Processor Information(_Total)\% Processor Performance",
+        // temps processeur, comme le Gestionnaire (pas « Utility », plus haut
+        // avec le turbo : voir system.rs)
+        r"\Processor Information(_Total)\% Processor Time",
         r"\PhysicalDisk(*)\% Idle Time",
         r"\GPU Engine(*)\Utilization Percentage",
+        r"\PhysicalDisk(_Total)\Disk Bytes/sec",
     ])
 }
 
@@ -476,9 +486,10 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
     let live = &mut *live;
 
     // premier releve (ou retour apres une pause) : un releve d'amorce, puis
-    // un vrai 300 ms plus tard, sinon CPU et disque seraient des moyennes
+    // un vrai FIRST_GAP plus tard, sinon CPU et disque seraient des moyennes
     // depuis le demarrage de chaque processus
-    if live.last.is_none_or(|t| t.elapsed() > STALE) {
+    let fresh = live.last.is_none_or(|t| t.elapsed() > STALE);
+    if fresh {
         live.pdh = pdh_query();
         let nets = live.nets.get_or_insert_with(Networks::new_with_refreshed_list);
         nets.refresh(true);
@@ -488,26 +499,29 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
             .map(|p| (p.pid, Prev { create: p.create, cpu: p.cpu, io: p.io }))
             .collect();
         live.last = Some(Instant::now());
-        std::thread::sleep(Duration::from_millis(300));
+    }
+    if let Some(t) = live.last {
+        let (gap, min) = (t.elapsed(), if fresh { FIRST_GAP } else { MIN_GAP });
+        if gap < min {
+            std::thread::sleep(min - gap);
+        }
     }
 
-    // compteurs Windows : CPU (utilite), frequence, disques, GPU
-    let (cpu_total, perf, disk_active, gpu_vals) = match live.pdh.as_ref() {
+    // compteurs Windows : CPU, disques, GPU
+    let (cpu_total, disk_active, gpu_vals, phys) = match live.pdh.as_ref() {
         Some(q) => {
             q.collect();
             let active = q
-                .values(2)
+                .values(1)
                 .iter()
                 .filter(|(n, _)| n != "_Total")
                 .map(|(_, v)| (100.0 - v).clamp(0.0, 100.0))
                 .fold(0.0, f64::max);
-            (q.value(0, "_Total"), q.value(1, "_Total"), active, q.values(3))
+            (q.value(0, "_Total"), active, q.values(2), q.value(3, "_Total"))
         }
-        None => (None, None, 0.0, Vec::new()),
+        None => (None, 0.0, Vec::new(), None),
     };
     let (gpu_pid, gpu_total) = crate::pdh::gpu_by_pid(&gpu_vals);
-    // le CPU par processus suit la frequence reelle (turbo), comme Windows 11
-    let boost = perf.map_or(1.0, |p| (p / 100.0).clamp(0.3, 3.0));
 
     let procs_now = snapshot(&mut live.buf).unwrap_or_default();
     let now = Instant::now();
@@ -538,6 +552,7 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
     let mut groups: HashMap<String, Group> = HashMap::new();
     let mut procs = 0;
     let mut cpu_sum = 0.0f32;
+    let mut io_sum = 0.0f64;
     let mut next_prev = HashMap::with_capacity(procs_now.len());
     for p in &procs_now {
         if p.pid == 0 {
@@ -555,10 +570,19 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
         let path = match live.paths.get(&p.pid) {
             Some((c, path)) if *c == p.create => path.clone(),
             _ => {
-                let path = exe_path(p.pid).or_else(|| {
+                let mut nt_dos = || {
                     let nt = nt_image_path(p.pid)?;
                     nt_to_dos(&nt, devs.get_or_insert_with(dos_devices))
-                });
+                };
+                let is_exe = |s: &str| s.to_lowercase().ends_with(".exe");
+                let path = match exe_path(p.pid) {
+                    // exe renomme pendant qu'il tourne (mise a jour :
+                    // claude.exe.old.123) : le chemin d'origine garde
+                    // l'icone et le nom, comme le Gestionnaire de Windows
+                    Some(x) if !is_exe(&x) => nt_dos().filter(|d| is_exe(d) && std::path::Path::new(d).exists()).or(Some(x)),
+                    Some(x) => Some(x),
+                    None => nt_dos(),
+                };
                 let path = path.map(PathBuf::from);
                 live.paths.insert(p.pid, (p.create, path.clone()));
                 path
@@ -590,12 +614,15 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
         let t = &mut g.task;
         t.net += tcp.get(&p.pid).copied().unwrap_or(0);
         t.count += 1;
-        let c = (dcpu as f64 / (secs * 1e7 * cores) * 100.0 * boost) as f32;
+        // temps CPU brut / (duree x coeurs logiques), comme le Gestionnaire :
+        // la somme des lignes rejoint l'en-tete (« % Processor Time »)
+        let c = (dcpu as f64 / (secs * 1e7 * cores) * 100.0) as f32;
         cpu_sum += c;
         t.cpu += c;
         t.mem += p.mem;
         t.gpu = t.gpu.max(gpu_pid.get(&p.pid).copied().unwrap_or(0.0) as f32);
         let disk = (dio as f64 / secs) as u64;
+        io_sum += disk as f64;
         t.disk += disk;
         let hwnd = windowed.get(&p.pid).copied();
         if expanded.contains(&key) {
@@ -625,6 +652,21 @@ pub fn tasks_get(st: State<Tasks>, expanded: Option<Vec<String>>) -> TasksReport
     }
     live.prev = next_prev;
     live.paths.retain(|pid, _| live.prev.contains_key(pid));
+
+    // les compteurs d'E/S des processus comptent aussi les tubes et les
+    // lectures servies par le cache ; Windows ne montre que le disque reel
+    // (ETW, admin). Sans admin : on ramene la somme au debit physique total.
+    if let Some(phys) = phys {
+        let k = (phys / io_sum.max(1.0)).clamp(0.0, 1.0);
+        if k < 1.0 {
+            for g in groups.values_mut() {
+                g.task.disk = (g.task.disk as f64 * k) as u64;
+                for s in &mut g.task.procs {
+                    s.disk = (s.disk as f64 * k) as u64;
+                }
+            }
+        }
+    }
 
     // icones et noms des executables pas encore vus
     let mut icons = lock(&st.icons);

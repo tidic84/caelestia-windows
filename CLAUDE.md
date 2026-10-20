@@ -65,6 +65,10 @@ l'appli). Pour publier, pousser un tag `v*` : la CI publie
   de `src/lib.rs` (`call()`).
 - **`sourceSize`** est déjà multiplié par le DPI par Qt avant d'arriver au
   provider `image://ilot`.
+- **CPU « comme le Gestionnaire des tâches »** : c'est
+  `\Processor Information(_Total)\% Processor Time`, pas
+  `% Processor Utility`, qui est 12 à 25 % plus haut avec le turbo. Vérifié
+  par captures simultanées le 2026-10-19.
 - **Ne pas passer `panic = "abort"`** : `ilot_invoke` rattrape les paniques
   avec `catch_unwind`.
 - **Effets système de l'appli** :

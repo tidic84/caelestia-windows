@@ -109,8 +109,10 @@ pub fn watch(app: AppHandle) {
         let mut disks = Disks::new_with_refreshed_list();
         let mut last_ac: Option<bool> = None;
         let mut n = 0u32;
-        // CPU en « utilite », comme le Gestionnaire des taches
-        let pdh = crate::pdh::Query::new(&[r"\Processor Information(_Total)\% Processor Utility"]);
+        // « % Processor Time », pas « % Processor Utility » : c'est ce que montre le
+        // Gestionnaire des taches (verifie par captures simultanees ; Utility est
+        // ~12-25 % plus haut a cause du turbo)
+        let pdh = crate::pdh::Query::new(&[r"\Processor Information(_Total)\% Processor Time"]);
         loop {
             sys.refresh_cpu_usage();
             sys.refresh_memory();

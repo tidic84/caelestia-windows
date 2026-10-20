@@ -1,6 +1,6 @@
 //! Compteurs de performance Windows (PDH) : les memes que le Gestionnaire des
-//! taches. « % Processor Utility » tient compte du turbo (d'ou un CPU parfois
-//! plus haut que la simple somme des temps processeur), le GPU vient de
+//! taches. Le CPU est « % Processor Time » (« % Processor Utility », pondere
+//! par le turbo, donne ~12-25 % de plus que le Gestionnaire), le GPU vient de
 //! « GPU Engine », l'activite disque de « PhysicalDisk ».
 
 use std::collections::HashMap;

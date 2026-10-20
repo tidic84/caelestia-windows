@@ -580,8 +580,10 @@ pub fn watch(app: AppHandle) {
         // jeu », il attend qu'il se lance (launcher, chargement initial)
         let mut seen: Option<String> = None;
         flash_hook();
-        // CPU en « utilite », comme le Gestionnaire des taches
-        let pdh = crate::pdh::Query::new(&[r"\Processor Information(_Total)\% Processor Utility"]);
+        // « % Processor Time », pas « % Processor Utility » : c'est ce que montre le
+        // Gestionnaire des taches (verifie par captures simultanees ; Utility est
+        // ~12-25 % plus haut a cause du turbo)
+        let pdh = crate::pdh::Query::new(&[r"\Processor Information(_Total)\% Processor Time"]);
         loop {
             log.poll();
             let dt = at.elapsed().as_secs_f64();

@@ -102,8 +102,22 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   classé « win »).
 - 🟢 Les caches `icons` et `labels` (par chemin) grossissent sans limite. Ça
   ne compte que pour les exe lancés depuis `%TEMP%` sous des noms aléatoires.
-- 🟢 La colonne « Disque » compte toutes les E/S (réseau et pipes compris),
-  comme `GetProcessIoCounters`.
+- 🟢 Colonne « Disque » : depuis le 2026-10-19, les E/S des processus sont
+  ramenées au débit physique total. La somme est juste, mais un programme qui
+  fait beaucoup d'E/S par tube ou depuis le cache prend une part du disque
+  réel d'un autre. Il faudrait ETW, qui demande les droits admin.
+- 🟢 Regroupement par nom d'exe : les ~80 svchost forment une seule ligne,
+  alors que Windows affiche « Hôte de service : X » par service et groupe les
+  applis par arbre de processus. Ce serait une refonte.
+- 🟢 Colonne Réseau par ligne : un nombre de connexions TCP, pas un débit.
+  Un débit par processus demanderait ETW.
+- 🟢 Pas de ligne « Interruptions système » (≈ 1 % du CPU), d'où un petit
+  écart entre l'en-tête et la somme des lignes.
+- 🟢 Les sous-lignes n'ont pas d'icône, alors que Windows en affiche une, en
+  retrait.
+- 🟢 Une page détruite pendant un `tasks_get` en cours peut recréer l'état
+  Rust après `tasks_stop`. Il est libéré à la prochaine fermeture de
+  l'onglet.
 - 🟢 Clic droit sur une sous-ligne (un seul processus) : « Ouvrir
   l'emplacement » prend le chemin du groupe. Si deux installations ont le
   même nom d'exe (Chrome et Chrome Canary), il peut viser la mauvaise.
