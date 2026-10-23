@@ -4,6 +4,17 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.16 — 2026-10-23
+
+- **Nouveau lecteur de musique**, inspiré de Swiftify : barre de progression ondulée qui s'anime pendant la lecture, bouton lecture festonné qui tourne, couleurs tirées de la pochette.
+- **Survol de la pilule** : précédent, lecture / pause et suivant, et une barre qu'on clique ou fait glisser pour se déplacer dans le morceau (avec le temps sous le curseur), sans ouvrir le panneau. L'îlot ne se replie pas pendant qu'on glisse.
+- **Pilule repliée** : la pochette qui tourne est entourée d'un anneau qui se remplit avec le morceau ; les petites barres d'égaliseur disparaissent.
+- **Onglet Média** : pochette festonnée entourée d'un spectre qui suit la musique, halo de ses couleurs, pochette réduite et assombrie en pause, fond coloré qui dérive, titre qui défile, paroles à droite avec la ligne chantée mise en avant, boutons « Paroles » et « Playlists ».
+- **Accueil** : nouvelle carte musique, avec la pochette, le titre, les commandes et la barre de progression.
+- **Réglages › Apparence › Lecteur de musique** : couleur du lecteur (pochette, thème ou couleur au choix), barre ondulée ou plate, bouton festonné ou rond, bouton de l'onglet Média blanc ou en couleur, pochette festonnée ou arrondie, disposition en colonne ou côte à côte, glisser la pochette pour changer de titre, et molette sur la pilule qui règle le volume de l'appli qui joue (Spotify…) au lieu du volume général.
+- **Plus fiable** : si une appli refuse le déplacement dans le morceau, la barre revient à la vraie position ; précédent, suivant et la barre se grisent quand l'appli ne les permet pas.
+- **Plus léger** : la capture du son pour le visualiseur ne tourne plus quand rien ne l'affiche.
+
 ## 0.4.15 — 2026-10-20
 
 - **Gestionnaire des tâches, regroupé comme Windows** : chaque hôte de service a sa ligne (« Hôte de service : Audio Windows », « … +2 »), avec la liste de ses services quand on la déplie. Les applis du Store forment une ligne par paquet (Spotify et son lanceur ensemble). Un programme ne regroupe plus que ses propres processus : les assistants lancés par lui (EpicWebHelper, Claude Code sous PowerShell…) ont leur ligne, comme dans Windows.

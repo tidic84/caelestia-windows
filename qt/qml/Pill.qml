@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 
 // Pilule de l'ilot ferme : replie (heure, indicateurs), survol (titre ou
 // date et meteo) et activite (OSD, notification, Bluetooth, capture...).
@@ -31,9 +32,62 @@ Item {
         }
         onWheel: w => {
             const d = w.angleDelta.y || w.angleDelta.x
-            if (d)
-                Watch.wheel(d > 0 ? 1 : -1, !!(w.modifiers & Qt.ShiftModifier))
+            if (!d)
+                return
+            const shift = !!(w.modifiers & Qt.ShiftModifier)
+            if (Ilot.cfg.player_wheel && Ilot.hasMedia && Ilot.media.playing && !shift && Ilot.media.app)
+                pill.appWheel(d > 0 ? 1 : -1)
+            else
+                Watch.wheel(d > 0 ? 1 : -1, shift)
         }
+    }
+
+    // Reglages > Lecteur : molette = volume de l'appli qui joue (pas de 4 %).
+    // Niveau garde en local 3 s (pas de relecture a chaque cran) ; les crans
+    // tournes pendant la lecture du niveau s'ajoutent ensuite. Pas de
+    // session audio : volume general (Watch.wheel)
+    property var wheelVol: null
+    property real wheelVolAt: 0
+    property bool wheelBusy: false
+    property int wheelSteps: 0
+    function appWheel(dy) {
+        const app = Ilot.media.app
+        const v = wheelVol
+        if (v && v.app === app && Date.now() - wheelVolAt < 3000) {
+            wheelVolAt = Date.now()
+            return v.none ? Watch.wheel(dy, false) : applyAppWheel(dy)
+        }
+        wheelSteps += dy
+        if (wheelBusy)
+            return
+        wheelBusy = true
+        Api.invoke("app_volume_get", { app: app }).then(r => {
+            pill.wheelBusy = false
+            const n = pill.wheelSteps
+            pill.wheelSteps = 0
+            pill.wheelVol = r ? { app: app, level: r.level } : { app: app, none: true }
+            pill.wheelVolAt = Date.now()
+            if (!n)
+                return
+            if (r)
+                pill.applyAppWheel(n)
+            else
+                for (let i = 0; i < Math.abs(n); i++)
+                    Watch.wheel(n > 0 ? 1 : -1, false)
+        }, () => {
+            pill.wheelBusy = false
+            pill.wheelSteps = 0
+        })
+    }
+    function applyAppWheel(steps) {
+        const l = Math.max(0, Math.min(100, Math.round(wheelVol.level * 100) + steps * 4))
+        wheelVol = { app: wheelVol.app, level: l / 100 }
+        // session audio disparue : le cran suivant relit le volume
+        Api.invoke("app_volume_set", { app: wheelVol.app, level: l / 100, muted: false }).then(ok => {
+            if (!ok)
+                pill.wheelVol = null
+        })
+        Ilot.simpleActivity(l === 0 ? "volume_off" : l < 50 ? "volume_down" : "volume_up", wheelVol.app, l + " %", { ms: 1600 })
     }
 
     // ------------------------------------------------------- replie
@@ -72,17 +126,55 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: 400 } }
             }
         }
-        RoundArt {
-            size: 18
-            visible: Ilot.hasMedia && Ilot.art !== ""
-            anchors.verticalCenter: parent.verticalCenter
-            spinning: Ilot.media.playing && mini.on
-            period: 8000
-        }
-        Eq {
+        // musique : pochette ronde qui tourne dans un anneau qui se remplit
+        // avec le morceau (depuis le haut, sens horaire)
+        Item {
+            id: disc
             visible: Ilot.hasMedia
+            width: 24
+            height: 24
             anchors.verticalCenter: parent.verticalCenter
-            running: Ilot.media.playing && mini.on
+            readonly property real frac: Ilot.media.duration > 0 ? Math.max(0, Math.min(1, Ilot.pos / Ilot.media.duration)) : 0
+            Shape {
+                anchors.fill: parent
+                preferredRendererType: Shape.CurveRenderer
+                ShapePath {
+                    strokeColor: Theme.alpha(Theme.ink, 0.13)
+                    strokeWidth: 2
+                    fillColor: "transparent"
+                    PathAngleArc { centerX: 12; centerY: 12; radiusX: 11; radiusY: 11; startAngle: 0; sweepAngle: 360 }
+                }
+                ShapePath {
+                    strokeColor: Ilot.playerPal.primary
+                    strokeWidth: disc.frac > 0.001 ? 2 : 0
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    PathAngleArc { centerX: 12; centerY: 12; radiusX: 11; radiusY: 11; startAngle: -90; sweepAngle: 360 * disc.frac }
+                }
+            }
+            RoundArt {
+                size: 18
+                visible: Ilot.art !== ""
+                anchors.centerIn: parent
+                spinning: Ilot.media.playing && mini.on
+                period: 8000
+            }
+            Ms {
+                visible: Ilot.art === ""
+                name: "music_note"
+                size: 14
+                color: Ilot.playerPal.primary
+                anchors.centerIn: parent
+            }
+            // replie, Ilot.pos n'est plus relu (timer `progress`) : l'anneau
+            // le relit toutes les 2 s, seulement quand il se voit
+            Timer {
+                interval: 2000
+                repeat: true
+                triggeredOnStart: true
+                running: disc.visible && mini.on && Ilot.media.playing && !Ilot.fullscreen
+                onTriggered: Ilot.pos = Ilot.position()
+            }
         }
         Ms {
             visible: Ilot.caffeine
@@ -331,17 +423,18 @@ Item {
             }
         }
 
-        // titre en cours
-        Row {
+        // titre en cours : pochette, titre, artiste, barre de progression,
+        // precedent / lecture / suivant, sans ouvrir le panneau
+        Item {
             visible: Ilot.hasMedia
             anchors.left: parent.left
             anchors.right: peekDc.visible ? peekDc.left : parent.right
             anchors.rightMargin: peekDc.visible ? 8 : 0
             height: parent.height
-            spacing: 12
             Rectangle {
-                width: 46
-                height: 46
+                id: peekArt
+                width: 52
+                height: 52
                 radius: 14
                 anchors.verticalCenter: parent.verticalCenter
                 color: Theme.surfaceHigh
@@ -349,13 +442,46 @@ Item {
                     anchors.fill: parent
                     radius: 14
                 }
+                transform: Translate { id: swipeX }
+                // Reglages > Apparence > Lecteur : glisser la pochette vers la
+                // gauche = suivant, vers la droite = precedent ; clic : ouvrir
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: !!Ilot.cfg.player_swipe
+                    preventStealing: true
+                    cursorShape: Qt.PointingHandCursor
+                    property real x0: 0
+                    property real dx: 0
+                    onPressed: m => {
+                        x0 = mapToItem(null, m.x, 0).x
+                        dx = 0
+                    }
+                    onPositionChanged: m => {
+                        dx = (mapToItem(null, m.x, 0).x - x0) / Ilot.pillK
+                        swipeX.x = Math.max(-14, Math.min(14, dx * 0.5))
+                    }
+                    onReleased: {
+                        swipeX.x = 0
+                        if (Math.abs(dx) >= 30) {
+                            if ((dx < 0 ? Ilot.media.can_next : Ilot.media.can_prev) !== false)
+                                Ilot.mediaAction(dx < 0 ? "next" : "prev")
+                        }
+                        else
+                            Ilot.pillClicked()
+                    }
+                    onCanceled: swipeX.x = 0
+                }
             }
             Column {
-                width: parent.width - 46 - 36 - 24
+                anchors.left: peekArt.right
+                anchors.leftMargin: 12
+                anchors.right: peekCtrls.left
+                anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 Txt {
                     width: parent.width
                     text: Ilot.media.title || "Sans titre"
+                    px: 14
                     weight: Font.Medium
                     elide: Text.ElideRight
                 }
@@ -364,39 +490,19 @@ Item {
                     topPadding: 1
                     text: Ilot.media.artist || ""
                     px: 12
-                    color: Theme.inkVariant
+                    color: Ilot.playerPal.primary
                     elide: Text.ElideRight
                 }
-                Item {
-                    width: 1
-                    height: 7
-                }
-                Rectangle {
+                SeekBar {
                     width: parent.width
-                    height: 3
-                    radius: 2
-                    color: Theme.surfaceHighest
-                    clip: true
-                    Rectangle {
-                        width: parent.width
-                        height: parent.height
-                        radius: 2
-                        color: Theme.primary
-                        transformOrigin: Item.Left
-                        // transform (pas de mise en page), comme la version perf
-                        transform: Scale {
-                            xScale: Ilot.media.duration ? Math.min(1, Ilot.pos / Ilot.media.duration) : 0
-                            Behavior on xScale { NumberAnimation { duration: 500 } }
-                        }
-                    }
+                    small: true
                 }
             }
-            IconBtn {
-                filled: true
-                icon: Ilot.media.playing ? "pause" : "play_arrow"
+            MediaControls {
+                id: peekCtrls
+                compact: true
+                anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                tip: Ilot.media.playing ? "Pause" : "Lecture"
-                onClicked: Ilot.mediaAction("toggle")
             }
         }
 

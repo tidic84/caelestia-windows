@@ -26,6 +26,10 @@ pub struct MediaInfo {
     /// secondes
     pub position: f64,
     pub duration: f64,
+    /// commandes que l'appli accepte (barre de progression, boutons)
+    pub can_seek: bool,
+    pub can_next: bool,
+    pub can_prev: bool,
 }
 
 /// Unites WinRT : 100 ns.
@@ -91,7 +95,13 @@ fn read(s: &Session) -> windows::core::Result<MediaInfo> {
 
 fn read_props(s: &Session) -> windows::core::Result<MediaInfo> {
     let props = crate::wait(s.TryGetMediaPropertiesAsync()?, WAIT_MS)?;
-    let playing = s.GetPlaybackInfo()?.PlaybackStatus()? == Status::Playing;
+    let info = s.GetPlaybackInfo()?;
+    let playing = info.PlaybackStatus()? == Status::Playing;
+    // capacites : secondaires, une lecture ratee ne cache pas le media
+    let ctl = info.Controls().ok();
+    let can = |f: fn(&windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackControls) -> windows::core::Result<bool>| {
+        ctl.as_ref().and_then(|c| f(c).ok()).unwrap_or(true)
+    };
     let tl = s.GetTimelineProperties()?;
     let duration = (tl.EndTime()?.Duration - tl.StartTime()?.Duration) as f64 / TICKS;
     let mut position = tl.Position()?.Duration as f64 / TICKS;
@@ -122,6 +132,9 @@ fn read_props(s: &Session) -> windows::core::Result<MediaInfo> {
         playing,
         position,
         duration,
+        can_seek: can(|c| c.IsPlaybackPositionEnabled()),
+        can_next: can(|c| c.IsNextEnabled()),
+        can_prev: can(|c| c.IsPreviousEnabled()),
     })
 }
 
@@ -269,9 +282,10 @@ pub fn media_art() -> String {
     session().and_then(|s| art(&s)).unwrap_or_default()
 }
 
-pub fn media_action(action: String, value: Option<f64>) {
+/// Renvoie ce que l'appli a repondu (false : commande refusee ou echouee).
+pub fn media_action(action: String, value: Option<f64>) -> bool {
     crate::com_init_mta();
-    let Ok(s) = session() else { return };
+    let Ok(s) = session() else { return false };
     let r = match action.as_str() {
         "toggle" => s.TryTogglePlayPauseAsync().and_then(|o| crate::wait(o, WAIT_MS)),
         "next" => s.TrySkipNextAsync().and_then(|o| crate::wait(o, WAIT_MS)),
@@ -279,9 +293,7 @@ pub fn media_action(action: String, value: Option<f64>) {
         "seek" => s
             .TryChangePlaybackPositionAsync((value.unwrap_or(0.0) * TICKS) as i64)
             .and_then(|o| crate::wait(o, WAIT_MS)),
-        _ => return,
+        _ => return false,
     };
-    if let Err(e) = r {
-        lost(&e);
-    }
+    r.inspect_err(lost).unwrap_or(false)
 }

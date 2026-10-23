@@ -41,6 +41,7 @@ qt_add_resources(ilot "fonts" PREFIX "/" FILES ${FONT_FILES})
 qt_add_shaders(ilot "shaders"
     PREFIX "/"
     FILES shaders/round.frag shaders/claude.frag shaders/vizbars.frag
+          shaders/wave.frag shaders/cookie.frag shaders/scallop.frag shaders/ring.frag
 )
 
 # coeur Rust (cargo build --release a la racine du depot)

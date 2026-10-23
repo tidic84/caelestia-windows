@@ -109,7 +109,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ```text
 ├── CMakeLists.txt  Module QML "Ilot" (glob qml/*), singletons Theme/Ilot/Api/Watch, shader, polices, compile_commands.json
 ├── build.cmd       cargo build --release → CMake/Ninja (MSVC via vswhere) → windeployqt
-├── ilot.rc, fonts/ (Rubik, Material Symbols), shaders/round.frag (image arrondie en une passe), shaders/claude.frag (animation Claude Code), shaders/vizbars.frag (visualiseur de l'onglet Média)
+├── ilot.rc, fonts/ (Rubik, Material Symbols), shaders/round.frag (image arrondie en une passe), shaders/claude.frag (animation Claude Code), shaders/vizbars.frag (visualiseur de l'onglet Média), shaders/wave.frag (barre de progression ondulée), shaders/cookie.frag (bouton lecture festonné), shaders/scallop.frag (pochette festonnée), shaders/ring.frag (anneau de spectre)
 └── src/
     ├── main.cpp      Démarrage, instance unique, journal ILOT_QT_LOG
     ├── core.h        Prototypes C du cœur Rust
@@ -133,7 +133,7 @@ Cartes PC     PcCard · ServicesCard · HealthCard · ShutdownCard · SensCard
 Compagnon     Pet (10 espèces, expressions, tours)
 Décor         Aurora · WxFx (météo animée) · Glow · Eq · VizBars
 Composants    Btn · IconBtn · TextBtn · M3Switch · M3Slider · Seg · Field · Area · CtxMenu · Card · Chip · Empty
-              Gauge · Spinner · Scroller · Tip · Txt · Ms · ClaudeMark · RoundImage · ArtImage · RoundArt · MediaControls
+              Gauge · Spinner · Scroller · Tip · Txt · Ms · ClaudeMark · RoundImage · ArtImage · RoundArt · MediaControls · SeekBar · PlayBtn
               NotifRow · TimerBody
 Modules JS    calc · emoji · ical · rank (frécence du lanceur) · mcu (material-color-utilities)
 ```

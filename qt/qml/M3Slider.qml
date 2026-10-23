@@ -11,6 +11,9 @@ Item {
     property real trackH: 14
     property real thumbH: 24
     property color ringColor: Theme.surfaceC
+    // couleurs de la piste et de la partie pleine (curseur blanc du lecteur)
+    property color accent: Theme.primary
+    property color trackColor: Theme.surfaceHighest
     property bool disabled: false
     // pas de la molette (0 : la molette passe au parent)
     property real wheelStep: 0
@@ -26,19 +29,19 @@ Item {
         width: parent.width
         height: sl.trackH
         radius: height / 2
-        color: Theme.surfaceHighest
+        color: sl.trackColor
         Rectangle {
             width: Math.max(0, Math.min(1, sl.fill)) * parent.width
             height: parent.height
             radius: parent.radius
-            color: Theme.primary
+            color: sl.accent
             // pas d'arrondi a droite de la partie pleine
             Rectangle {
                 visible: parent.width > parent.radius && parent.width < sl.width - parent.radius
                 anchors.right: parent.right
                 width: Math.min(parent.radius, parent.width)
                 height: parent.height
-                color: Theme.primary
+                color: sl.accent
             }
         }
     }
@@ -55,7 +58,7 @@ Item {
             width: 4
             height: sl.thumbH
             radius: 2
-            color: Theme.primary
+            color: sl.accent
         }
     }
     MouseArea {

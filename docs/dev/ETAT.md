@@ -4,23 +4,128 @@
 chaque session : ce qui a été fait, ce qui a été vérifié ou non, et où
 reprendre.
 
-## Où on en est (mis à jour le 2026-10-20)
+## Où on en est (mis à jour le 2026-10-23)
 
-- **Version** : 0.4.15 dans `Cargo.toml` (onglet Tâches regroupé comme Windows),
-  installée sur le poste, publiée le 2026-10-20 par le tag `v0.4.15`
-  (GitHub Action `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle est incluse
-  dans la 0.4.9.
+- **Version** : 0.4.16 dans `Cargo.toml` (nouveau lecteur de musique),
+  installée sur le poste, publiée le 2026-10-23 par le tag `v0.4.16`
+  (GitHub Action `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle
+  est incluse dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
   un raccourci dans le dossier Démarrage. Elle a été construite depuis les
   sources par `install.ps1`.
 - **Consigne de l'utilisateur** : ne corriger que l'essentiel, sans rien qui
   change l'usage. Le Rust se traite « selon l'usage », et les bugs au fur et à
   mesure. Ce qui reste à faire est dans `BACKLOG.md`.
+- **Lecteur de musique (0.4.16)** : une première version, validée par
+  l'utilisateur. Il reste à le tester à la main (voir « Non vérifié » dans le
+  journal du 2026-10-23).
 - **Prochaine étape** : aucune n'est imposée. Option encore en attente de son
   accord : « Redémarrer » dans le clic droit de la ligne `explorer`.
   Ensuite, piocher dans `BACKLOG.md`.
 
 ## Journal
+
+### 2026-10-23 (suite) : variantes choisies dans l'atelier, intégrées
+
+Page de variantes `docs/dev/maquettes/atelier.html`, aux dimensions réelles
+de l'îlot. Choix de l'utilisateur :
+- pilule repliée B ;
+- pilule survolée A ;
+- widget de l'accueil C ;
+- onglet Média A ;
+- molette C.
+
+- **Pilule repliée** (`Pill.qml`) :
+  - plus d'égaliseur `Eq` (fichier gardé, il ne sert plus) ;
+  - disque de 18 dans un anneau de progression de 24, dessiné avec un Shape
+    de deux `PathAngleArc` ;
+  - Timer de 2 s, actif seulement en replié pendant la lecture ;
+  - largeur avec média : 183 (avant 200).
+- **Molette** : option `cfg.player_wheel`, désactivée par défaut, dans
+  Réglages > Lecteur. Pendant la lecture, la molette règle le volume de l'appli
+  qui joue (`app_volume_get` / `app_volume_set`, pas de 4 %), sinon le volume
+  général.
+- **Accueil** (`HomePage.qml`) : la carte musique est refaite d'après la
+  maquette. Fond pochette floutée, pochette 198, titre qui défile, PlayBtn,
+  précédent / suivant, SeekBar. L'ancien disque, ses 48 bras et `VizBars` sont
+  retirés (`VizBars.qml` gardé, il ne sert plus).
+- **Onglet Média** : tailles alignées sur la variante A, à 708×459 (pochette
+  156, colonne 340, boutons 44 / 58 / 44 dans `MediaControls` big), lueur sur
+  la ligne de paroles active.
+- **`Ilot.updateViz`** : la capture du son ne tourne plus que si quelqu'un la
+  lit (compagnon, fond « aurore », onglet Média).
+
+Vérifié :
+- compilé et installé ;
+- journal Qt vide au lancement ;
+- relu par l'agent `relecteur`, remarques appliquées.
+
+Non vérifié : le rendu à l'écran, aucun survol ni ouverture n'a été fait en
+automatique. Publié en 0.4.16.
+
+### 2026-10-23 : refonte du lecteur de musique (style Swiftify)
+
+Plan : `docs/dev/PLAN-MEDIA.md`. Maquette validée par l'utilisateur :
+`docs/dev/maquettes/media.html` (à ouvrir dans un navigateur). Swiftify, c'est
+https://github.com/swiftify-org/swiftify, un lecteur Spotify en Qt/QML + Rust,
+sans licence : on reprend les valeurs, pas le code.
+
+- **Survol de la pilule** (`Pill.qml`, 460×76 dans `Ilot.sizeFor`) : pochette,
+  titre, artiste, barre de progression cliquable, précédent / lecture /
+  suivant. Rien de tout ça n'ouvre le panneau. Le clic ailleurs l'ouvre comme
+  avant.
+- **Nouveaux composants** :
+  - `SeekBar.qml` : barre ondulée (`shaders/wave.frag`), qui s'épaissit au
+    survol, avec poignée et bulle de temps. Le seek part au relâchement, et
+    pas de seek si la piste a changé pendant le glisser.
+  - `PlayBtn.qml` : bouton « cookie » festonné (`shaders/cookie.frag`), qui
+    tourne en lecture. Blanc avec une lueur colorée dans l'onglet Média.
+- **Onglet Média** (`MediaPage.qml`) :
+  - disposition en colonne, paroles à droite, ou côte à côte, paroles en
+    bandeau ;
+  - pochette festonnée (`shaders/scallop.frag`) entourée d'un anneau de
+    spectre (`shaders/ring.frag`) ;
+  - halo flou ; pochette réduite et assombrie en pause ;
+  - titre qui défile ;
+  - fond pochette floutée qui dérive lentement ;
+  - pastilles « Paroles » / « Playlists » ; plus de `VizBars` dans la page.
+- **Accueil** : la carte musique gagne la barre de progression et la couleur
+  du lecteur.
+- **`Ilot.qml`** :
+  - `seekDrag` / `setSeekDrag` : l'îlot ne se replie pas pendant un glisser,
+    et se replie au relâchement hors de l'îlot ;
+  - `seek()` relit `media_get` (tout de suite si refus, 1,5 s après sinon) ;
+  - `playerPal` : couleur du lecteur ;
+  - `artColor()` tourne aussi quand le lecteur suit la pochette.
+- **Réglages > Apparence > Lecteur de musique**, en `cfg.player_*` : couleur
+  (pochette, thème ou pastille), barre ondulée ou plate, bouton festonné ou
+  rond, bouton de l'onglet Média blanc ou en couleur, pochette, disposition,
+  glisser la pochette pour changer de titre (désactivé par défaut).
+- **Rust `media.rs`** :
+  - `media_action` renvoie le booléen de l'appli ;
+  - `MediaInfo` gagne `can_seek`, `can_next` et `can_prev`, qui valent vrai
+    si la lecture échoue.
+- `M3Slider` gagne `accent` et `trackColor` (valeurs par défaut inchangées).
+
+Vérifié :
+- `qtuild.cmd`, `install.ps1` (installée et relancée), `cargo clippy` (pas
+  de nouvel avertissement), `cargo test` (26 ok).
+- Pas d'erreur de qmllint sur les fichiers touchés.
+- Journal Qt sans erreur au lancement.
+- Capture réelle de la pilule survolée : pochette, barre, 3 boutons, Discord.
+- Maquette testée dans Chromium (Playwright) : glisser hors de l'îlot,
+  boutons sans ouverture, resynchro, direct.
+- Deux relectures par l'agent `relecteur`, remarques appliquées.
+
+Non vérifié (à tester à la main) :
+- glisser la barre puis relâcher hors de l'îlot dans la vraie appli ;
+- seek dans Spotify et dans un navigateur ;
+- onglet Média ouvert, paroles, pochette festonnée et anneau ;
+- thème clair, tailles de pilule S et L ;
+- CPU en survol et onglet ouvert (l'ondulation et la dérive du fond tournent
+  tant qu'ils sont visibles).
+
+Non commité.
 
 ### 2026-10-20 : « Fin de tâche » dans le menu clic droit de la barre
 

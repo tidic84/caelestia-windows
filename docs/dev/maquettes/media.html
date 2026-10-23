@@ -1,0 +1,1130 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maquette Média</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block" rel="stylesheet">
+<style>
+/* Maquette de la refonte Média (style Swiftify) pour l'îlot.
+   Couleurs et polices reprises de qt/qml/Theme.qml (thème sombre). */
+:root {
+  --primary: #cfbdfe;
+  --ink-primary: #36265d;
+  --primary-container: #4d3d75;
+  --surface: #141218;
+  --surface-low: #1d1b20;
+  --surface-c: #211f26;
+  --surface-high: #2b2930;
+  --surface-highest: #36343b;
+  --ink: #e6e0e9;
+  --ink-variant: #cac4d0;
+  --error: #ffb4ab;
+  --emph: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --spatial: cubic-bezier(0.38, 1.21, 0.22, 1);
+  /* couleurs de la pochette (mises a jour par piste) */
+  --a1: #6b4bd6; --a2: #e2557a; --a3: #2bb3c0; --accent: #cfbdfe;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: #0d0c10;
+  color: var(--ink);
+  font-family: Rubik, system-ui, sans-serif;
+  display: flex;
+  overflow: hidden;
+  user-select: none;
+}
+.ms {
+  font-family: "Material Symbols Rounded";
+  font-weight: 400;
+  font-style: normal;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  direction: ltr;
+  font-variation-settings: "FILL" 1, "opsz" 24;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ------------------------------------------------ ecran simule */
+#screen {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 700px at 20% 110%, #2a2250 0%, transparent 60%),
+    radial-gradient(900px 600px at 90% -10%, #3a1f33 0%, transparent 55%),
+    linear-gradient(160deg, #15131c, #0c0b10);
+}
+#screen .hint {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  color: #ffffff55;
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.6;
+  pointer-events: none;
+}
+#scaler {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform-origin: top center;
+}
+#island {
+  position: relative;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 30px;
+  border-radius: 15px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px #0008, inset 0 0 0 1px #ffffff0d;
+  overflow: hidden;
+  transition: width 500ms var(--emph), height 500ms var(--emph), border-radius 500ms var(--emph);
+  cursor: default;
+}
+.layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 250ms, transform 400ms var(--emph);
+}
+#island[data-mode="collapsed"] .mini,
+#island[data-mode="peek"] .peek,
+#island[data-mode="open"] .panel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+#island:not([data-mode="open"]) .panel *,
+#island:not([data-mode="peek"]) .peek * { pointer-events: none !important; }
+.peek { transform: translateY(-8px); }
+.panel { transition: opacity 300ms 120ms; }
+
+/* replie */
+.mini { display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 6px; }
+.mini .disc { width: 18px; height: 18px; border-radius: 50%; background-size: cover; }
+.eq { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+.eq i { width: 3px; border-radius: 2px; background: var(--accent); height: 4px; }
+
+/* survol */
+.peek { display: flex; align-items: center; gap: 12px; padding: 0 12px 0 12px; cursor: pointer; }
+.art {
+  flex: none;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+.peek .art { width: 52px; height: 52px; border-radius: 14px; transition: transform 300ms var(--spatial), filter 300ms; touch-action: none; }
+.peek .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.title { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.artist { font-size: 12px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .9; }
+.peek .ctrls { display: flex; align-items: center; gap: 2px; flex: none; }
+.dc { display: none; gap: 4px; flex: none; }
+.discord .dc { display: flex; }
+.dc button { width: 30px; height: 30px; border-radius: 50%; border: 0; background: var(--surface-high); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.dc button .ms { font-size: 18px; }
+
+/* boutons */
+.ib {
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 350ms var(--spatial), opacity 200ms;
+  padding: 0;
+}
+.ib::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #ffffff14;
+  transform: scale(.35);
+  opacity: 0;
+  transition: transform 140ms, opacity 140ms;
+}
+.ib:hover::before { transform: scale(1); opacity: 1; }
+.ib:disabled { opacity: .35; cursor: default; }
+.ib:disabled::before { display: none; }
+.ib.nudge-l { transform: translateX(-4px); transition-duration: 90ms; }
+.ib.nudge-r { transform: translateX(4px); transition-duration: 90ms; }
+.ib .ms { position: relative; }
+.play {
+  position: relative;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 300ms var(--spatial);
+}
+.play:active { transform: scale(.88); }
+.play svg { position: absolute; inset: 0; overflow: visible; }
+.play .ms { position: relative; color: var(--ink-primary); transition: transform 480ms var(--spatial); }
+.play.pop .ms { transform: scale(.55); transition: none; }
+
+/* barre de progression */
+.seek { display: flex; align-items: center; gap: 8px; }
+.seek .t { font-size: 10px; font-weight: 500; color: var(--ink-variant); font-variant-numeric: tabular-nums; min-width: 28px; }
+.seek .t.r { text-align: right; }
+.seek .hit { position: relative; flex: 1; height: 20px; cursor: pointer; touch-action: none; }
+.seek .hit.off { cursor: default; }
+.seek canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bubble {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 2px;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: var(--surface-highest);
+  color: var(--ink);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px #0006;
+}
+.bubble.on { opacity: 1; }
+
+/* panneau ouvert */
+.panel { display: flex; }
+.rail { width: 56px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 14px; background: var(--surface); }
+.rail button { width: 40px; height: 40px; border-radius: 14px; border: 0; background: transparent; color: var(--ink-variant); display: grid; place-items: center; cursor: pointer; }
+.rail button.on { background: var(--primary-container); color: var(--ink); }
+.rail button:disabled { opacity: .25; cursor: default; }
+.pages { flex: 1; position: relative; margin: 8px 8px 8px 0; border-radius: 22px; overflow: hidden; background: var(--surface-c); }
+.page { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity 250ms; }
+.page.on { opacity: 1; pointer-events: auto; }
+
+/* onglet media */
+.liquid { position: absolute; inset: 0; background: #0b0a0f; overflow: hidden; }
+.liquid i { position: absolute; width: 60%; height: 70%; border-radius: 50%; filter: blur(60px); opacity: .55; }
+.liquid::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, #0000 40%, #0007); }
+.mp { position: absolute; inset: 0; }
+.player {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 50%;
+  width: 340px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: left 500ms var(--emph), transform 500ms var(--emph);
+}
+.lyrics-on .player { left: 28px; transform: none; }
+.side .player { width: auto; left: 32px; right: 32px; transform: none; flex-direction: row; gap: 28px; }
+.side .player .meta { align-items: flex-start; text-align: left; }
+.side.lyrics-on .player { right: 50%; }
+.side .player .stack { flex: 1; min-width: 0; }
+.stack { width: 100%; display: flex; flex-direction: column; align-items: center; }
+.big-art-box { position: relative; width: 210px; height: 210px; flex: none; margin-bottom: 18px; }
+.side .big-art-box { margin-bottom: 0; }
+.halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background-size: cover;
+  filter: blur(28px) saturate(1.7);
+  opacity: 0;
+  transform: scale(1.05);
+  transition: opacity 600ms, transform 600ms var(--emph);
+}
+.playing .halo { opacity: .75; transform: scale(1.12); }
+.big-art {
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background-size: cover;
+  background-position: center;
+  transition: transform 500ms var(--spatial), filter 400ms, border-radius 300ms;
+  box-shadow: 0 14px 34px #0007;
+  transform: scale(.9);
+  filter: brightness(.55);
+}
+.playing .big-art { transform: scale(1); filter: none; }
+.scallop .big-art { box-shadow: none; }
+.big-art-box.scallop { width: 172px; height: 172px; margin: 26px 0 32px; }
+.side .big-art-box.scallop { margin: 0 30px; }
+.ring { position: absolute; inset: -34px; width: calc(100% + 68px); height: calc(100% + 68px); pointer-events: none; }
+.art.pop, .big-art.pop { animation: pop 560ms cubic-bezier(.34, 1.9, .5, 1); }
+@keyframes pop { from { scale: .7; } to { scale: 1; } }
+.meta { width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; }
+.marq { width: 100%; overflow: hidden; white-space: nowrap; }
+.marq span { display: inline-block; }
+.marq.run span { animation: marq var(--dur) linear infinite; padding-right: 40px; }
+@keyframes marq { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--dist)); } }
+.big-title { font-size: 24px; font-weight: 700; }
+.big-artist { font-size: 16px; font-weight: 500; color: var(--accent); }
+.big-album { font-size: 12px; color: #ffffff66; min-height: 15px; }
+.chip { font-size: 11px; padding: 3px 9px; border-radius: 9px; background: #ffffff14; color: var(--ink-variant); margin-bottom: 4px; }
+.mp .seek { width: 100%; margin-top: 14px; }
+.mp .seek .t { font-size: 11px; }
+.big-ctrls { display: flex; align-items: center; gap: 22px; margin-top: 10px; }
+.vol { display: flex; align-items: center; gap: 10px; width: 260px; margin-top: 14px; color: var(--ink-variant); }
+.vol .ms { font-size: 18px; }
+input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 20px; background: transparent; cursor: pointer; }
+input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--ink) var(--v, 70%), #ffffff26 var(--v, 70%)); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 4px; height: 20px; border-radius: 2px; background: var(--ink); margin-top: -6px; }
+input[type=range]::-moz-range-track { height: 8px; border-radius: 4px; background: #ffffff26; }
+input[type=range]::-moz-range-progress { height: 8px; border-radius: 4px; background: var(--ink); }
+input[type=range]::-moz-range-thumb { width: 4px; height: 20px; border-radius: 2px; background: var(--ink); border: 0; }
+.mp-tools { position: absolute; right: 14px; bottom: 14px; display: flex; gap: 6px; }
+.pillbtn { border: 0; height: 32px; padding: 0 12px; border-radius: 16px; background: #ffffff14; color: var(--ink); font: 500 12px Rubik, sans-serif; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.pillbtn.on { background: #ffffffeb; color: #141414; }
+.pillbtn:disabled { opacity: .35; cursor: default; }
+.pillbtn .ms { font-size: 18px; }
+.lyrics {
+  position: absolute;
+  top: 0; bottom: 0;
+  right: 0;
+  width: 50%;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms;
+  -webkit-mask-image: linear-gradient(180deg, #0000, #000 22%, #000 78%, #0000);
+  mask-image: linear-gradient(180deg, #0000, #000 22%, #000 78%, #0000);
+}
+.lyrics-on .lyrics { opacity: 1; pointer-events: auto; }
+.ly-list { position: absolute; left: 0; right: 24px; top: 50%; transition: transform 560ms cubic-bezier(.34, 1.4, .5, 1); }
+.ly {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.25;
+  padding: 7px 14px;
+  margin: 2px 0;
+  border-radius: 18px;
+  opacity: .28;
+  transform: scale(.96);
+  transform-origin: left center;
+  transition: opacity 400ms, transform 400ms var(--spatial), background 400ms, text-shadow 400ms;
+  cursor: pointer;
+}
+.ly:hover { opacity: .5; }
+.ly.on { opacity: 1; transform: none; background: #ffffff12; text-shadow: 0 0 18px var(--accent); }
+
+/* accueil */
+.home { padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.np {
+  position: relative;
+  border-radius: 24px;
+  padding: 18px;
+  display: flex;
+  gap: 20px;
+  background: var(--surface-high);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px #ffffff12;
+}
+.np .wash { position: absolute; inset: 0; opacity: .35; filter: blur(40px) saturate(1.5); background-size: cover; background-position: center; transform: scale(1.3); }
+.np .art { width: 136px; height: 136px; border-radius: 18px; box-shadow: 0 8px 20px #0006; transition: transform 500ms var(--spatial), filter 400ms; transform: scale(.92); filter: brightness(.6); }
+.playing .np .art { transform: none; filter: none; }
+.np .col { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.np .lbl { font-size: 11px; font-weight: 600; letter-spacing: 1.6px; color: var(--accent); }
+.np .ttl { font-size: 22px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np .sub { font-size: 14px; color: var(--ink-variant); }
+.np .row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.np .row .state { font-size: 13px; font-weight: 500; margin-right: auto; }
+.np .seek { margin-top: 6px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.tile { height: 92px; border-radius: 20px; background: var(--surface-high); opacity: .45; display: grid; place-items: center; color: var(--ink-variant); font-size: 12px; }
+
+/* ------------------------------------------------ banc d'essai */
+#bench {
+  width: 330px;
+  flex: none;
+  height: 100%;
+  overflow-y: auto;
+  background: #17151c;
+  border-left: 1px solid #ffffff12;
+  padding: 18px 18px 30px;
+  font-size: 13px;
+}
+#bench h1 { font-size: 16px; margin: 0 0 4px; }
+#bench h2 { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--primary); margin: 20px 0 8px; }
+#bench p { color: var(--ink-variant); margin: 0 0 8px; line-height: 1.45; }
+#bench label { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; color: var(--ink); }
+#bench .seg { display: flex; background: #ffffff0f; border-radius: 10px; padding: 3px; gap: 3px; margin: 4px 0 8px; }
+#bench .seg button { flex: 1; border: 0; background: transparent; color: var(--ink-variant); font: 500 12px Rubik, sans-serif; padding: 6px 4px; border-radius: 8px; cursor: pointer; }
+#bench .seg button.on { background: var(--primary-container); color: var(--ink); }
+#bench .sub { font-size: 11px; color: #ffffff66; margin: -2px 0 6px 26px; line-height: 1.35; }
+#log { font: 11px/1.5 Consolas, monospace; background: #0d0c10; border-radius: 10px; padding: 8px 10px; min-height: 120px; color: #b9f5c9; white-space: pre-wrap; word-break: break-all; }
+#log .no { color: #ffb4ab; }
+#log .dim { color: #ffffff55; }
+#readout { font: 11px Consolas, monospace; color: var(--ink-variant); margin-top: 6px; }
+kbd { font: 11px Consolas, monospace; background: #ffffff14; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div id="screen">
+  <div id="scaler">
+    <div id="island" data-mode="collapsed">
+
+      <!-- replie -->
+      <div class="layer mini">
+        <div class="disc" data-art></div>
+        <div class="eq"><i></i><i></i><i></i></div>
+      </div>
+
+      <!-- survol -->
+      <div class="layer peek" id="peek">
+        <div class="art" id="peekArt" data-art title="Clic : ouvrir le panneau"></div>
+        <div class="info">
+          <div class="title" data-k="title"></div>
+          <div class="artist" data-k="artist"></div>
+          <div class="seek" data-seek="peek"></div>
+        </div>
+        <div class="ctrls">
+          <button class="ib" data-act="prev" style="width:34px;height:34px" title="Précédent"><span class="ms">skip_previous</span></button>
+          <button class="play" data-act="toggle" data-size="42" style="width:42px;height:42px" title="Lecture / pause"></button>
+          <button class="ib" data-act="next" style="width:34px;height:34px" title="Suivant"><span class="ms">skip_next</span></button>
+        </div>
+        <div class="dc">
+          <button title="Couper le micro (Discord)"><span class="ms">mic</span></button>
+          <button title="Sourdine (Discord)"><span class="ms">headphones</span></button>
+        </div>
+      </div>
+
+      <!-- panneau ouvert -->
+      <div class="layer panel">
+        <div class="rail">
+          <button data-tab="home" title="Accueil"><span class="ms">home</span></button>
+          <button data-tab="media" class="on" title="Média"><span class="ms">music_note</span></button>
+          <button disabled><span class="ms">calendar_month</span></button>
+          <button disabled><span class="ms">monitoring</span></button>
+          <button disabled><span class="ms">settings</span></button>
+        </div>
+        <div class="pages">
+
+          <div class="page home" data-page="home">
+            <div class="np">
+              <div class="wash" data-art></div>
+              <div class="art" data-art></div>
+              <div class="col">
+                <div class="lbl">EN LECTURE · <span data-k="app"></span></div>
+                <div class="ttl" data-k="title"></div>
+                <div class="sub" data-k="artist"></div>
+                <div class="row">
+                  <button class="play" data-act="toggle" data-size="48" style="width:48px;height:48px"></button>
+                  <span class="state" data-k="state"></span>
+                  <button class="ib" data-act="prev" style="width:36px;height:36px"><span class="ms">skip_previous</span></button>
+                  <button class="ib" data-act="next" style="width:36px;height:36px"><span class="ms">skip_next</span></button>
+                </div>
+                <div class="seek" data-seek="home"></div>
+              </div>
+            </div>
+            <div class="tiles">
+              <div class="tile">reste de l'accueil</div>
+              <div class="tile">inchangé</div>
+              <div class="tile">(météo, agenda…)</div>
+            </div>
+          </div>
+
+          <div class="page on" data-page="media" id="mediaPage">
+            <div class="liquid" id="liquid"><i></i><i></i><i></i><i></i></div>
+            <div class="mp" id="mp">
+              <div class="player">
+                <div class="big-art-box" id="artBox">
+                  <canvas class="ring" id="ring"></canvas>
+                  <div class="halo" data-art></div>
+                  <div class="big-art" id="bigArt" data-art></div>
+                </div>
+                <div class="stack">
+                  <div class="meta">
+                    <div class="chip" data-k="app"></div>
+                    <div class="marq big-title" id="bigTitle"><span data-k="title"></span></div>
+                    <div class="big-artist" data-k="artist"></div>
+                    <div class="big-album" data-k="album"></div>
+                  </div>
+                  <div class="seek" data-seek="big"></div>
+                  <div class="big-ctrls">
+                    <button class="ib" data-act="prev" style="width:44px;height:44px"><span class="ms" style="font-size:30px">skip_previous</span></button>
+                    <button class="play white" data-act="toggle" data-size="62" style="width:62px;height:62px"></button>
+                    <button class="ib" data-act="next" style="width:44px;height:44px"><span class="ms" style="font-size:30px">skip_next</span></button>
+                  </div>
+                  <div class="vol" title="Volume de l'appli qui joue">
+                    <span class="ms">volume_up</span>
+                    <input type="range" id="vol" min="0" max="100" value="70">
+                  </div>
+                </div>
+              </div>
+              <div class="lyrics" id="lyrics"><div class="ly-list" id="lyList"></div></div>
+              <div class="mp-tools">
+                <button class="pillbtn" id="lyBtn"><span class="ms">lyrics</span>Paroles</button>
+                <button class="pillbtn" disabled title="Inchangé dans la maquette"><span class="ms">queue_music</span>Playlists</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="hint">Survole l'îlot en haut · clic sur le survol = ouvrir le panneau · <kbd>Échap</kbd> referme<br>Maquette : données factices, rien n'est envoyé à l'appli.</div>
+</div>
+
+<aside id="bench">
+  <h1>Maquette Média</h1>
+  <p>Style Swiftify, aux couleurs de l'îlot. Sert à choisir avant d'écrire le QML.</p>
+
+  <h2>À choisir</h2>
+  Barre de progression
+  <div class="seg" data-opt="wave"><button data-v="1" class="on">Ondulée</button><button data-v="0">Plate</button></div>
+  Bouton lecture
+  <div class="seg" data-opt="cookie"><button data-v="1" class="on">Festonné</button><button data-v="0">Rond</button></div>
+  Pochette (onglet Média)
+  <div class="seg" data-opt="scallop"><button data-v="0" class="on">Arrondie</button><button data-v="1">Festonnée + spectre</button></div>
+  Disposition (onglet Média)
+  <div class="seg" data-opt="layout"><button data-v="col" class="on">Colonne</button><button data-v="side">Côte à côte</button></div>
+  <div class="sub" style="margin-left:0">Colonne = Swiftify. Côte à côte = disposition actuelle.</div>
+  <label><input type="checkbox" data-opt="swipe"> Glisser sur la pochette du survol = changer de titre</label>
+  <div class="sub">vers la gauche = suivant, vers la droite = précédent (seuil 30 px)</div>
+
+  <h2>Simuler</h2>
+  <label><input type="checkbox" data-opt="refuse"> L'appli refuse le déplacement</label>
+  <div class="sub">la barre revient à la vraie position 1 s après (resynchro prévue)</div>
+  <label><input type="checkbox" data-opt="noseek"> L'appli interdit le déplacement (can_seek)</label>
+  <label><input type="checkbox" data-opt="live"> Direct / radio (durée 0)</label>
+  <label><input type="checkbox" data-opt="discord"> Raccourcis Discord affichés</label>
+  <label><input type="checkbox" data-opt="reduced"> Animations réduites</label>
+  <label><input type="checkbox" data-opt="pinned" checked> Panneau épinglé (ne se ferme pas en sortant)</label>
+  Taille de la pilule
+  <div class="seg" data-opt="k"><button data-v="0.85">S</button><button data-v="1" class="on">M</button><button data-v="1.2">L</button></div>
+
+  <h2>Commandes envoyées au Rust</h2>
+  <div id="log"><span class="dim">(rien pour l'instant)</span></div>
+  <div id="readout"></div>
+</aside>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------- donnees
+const TRACKS = [
+  { title: "Néons sur la Loire", artist: "Les Phares Bleus", album: "Marée basse", app: "Spotify", dur: 214, c: ["#5b3fd1", "#e2557a", "#2bb3c0"] },
+  { title: "Minuit, quai 9 (version longue enregistrée en direct à la Cigale)", artist: "Aube Rouge", album: "Gare du Nord", app: "Spotify", dur: 187, c: ["#d9622b", "#f2c14e", "#7a1f3d"] },
+  { title: "Sable & cendres", artist: "Opaline", album: "", app: "Chrome", dur: 248, c: ["#1f8a70", "#bedb39", "#004358"] },
+];
+const LYRICS = [
+  "Les lumières glissent sur l'eau", "On compte les ponts un par un", "Personne ne dort ce soir",
+  "♪", "Et la ville tient sa promesse", "On attend que le jour se lève", "Encore un tour, encore un",
+  "Les néons s'éteignent doucement", "♪", "On garde la nuit pour nous", "Jusqu'au dernier refrain", "♪",
+];
+
+// pochettes factices dessinees une fois
+function makeArt(t, i) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 320;
+  const g = c.getContext("2d");
+  const lg = g.createLinearGradient(0, 0, 320, 320);
+  lg.addColorStop(0, t.c[0]);
+  lg.addColorStop(1, t.c[2]);
+  g.fillStyle = lg;
+  g.fillRect(0, 0, 320, 320);
+  const rg = g.createRadialGradient(210, 110, 10, 210, 110, 170);
+  rg.addColorStop(0, t.c[1]);
+  rg.addColorStop(1, "transparent");
+  g.fillStyle = rg;
+  g.fillRect(0, 0, 320, 320);
+  g.globalAlpha = .18;
+  g.fillStyle = "#fff";
+  for (let k = 0; k < 6; k++) g.fillRect(0, 200 + k * 18 + i * 4, 320, 6);
+  g.globalAlpha = 1;
+  g.fillStyle = "#ffffffd0";
+  g.font = "700 30px Rubik, sans-serif";
+  g.fillText(t.artist.toUpperCase().slice(0, 14), 22, 50);
+  return c.toDataURL("image/png");
+}
+
+// ---------------------------------------------------------------- etat
+const S = {
+  mode: "collapsed",
+  tab: "media",
+  playing: true,
+  track: 0,
+  pos: 42,       // position affichee (QML)
+  truePos: 42,   // position reelle de l'appli
+  dragging: 0,
+  lyricsOn: false,
+  opt: { wave: 1, cookie: 1, scallop: 0, layout: "col", swipe: false, refuse: false, noseek: false, live: false, discord: false, reduced: false, pinned: true, k: 1 },
+};
+const cur = () => TRACKS[S.track];
+const dur = () => (S.opt.live ? 0 : cur().dur);
+const canSeek = () => dur() > 0 && !S.opt.noseek;
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const island = $("#island");
+
+function fmt(s) {
+  s = Math.max(0, Math.floor(s));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+// ---------------------------------------------------------------- journal
+const logLines = [];
+function log(cmd, res, cls) {
+  logLines.unshift({ t: new Date().toLocaleTimeString("fr-FR"), cmd, res, cls });
+  logLines.length = Math.min(logLines.length, 9);
+  $("#log").innerHTML = logLines.map(l =>
+    `<span class="dim">${l.t}</span> ${l.cmd}${l.res !== undefined ? ` → <span class="${l.cls || ""}">${l.res}</span>` : ""}`).join("\n");
+}
+
+// ---------------------------------------------------------------- couleurs
+function hexToHsl(h) {
+  const n = parseInt(h.slice(1), 16);
+  let r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  let hh = 0, s = 0;
+  const l = (mx + mn) / 2;
+  if (mx !== mn) {
+    const d = mx - mn;
+    s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn);
+    hh = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    hh /= 6;
+  }
+  return [hh * 360, s * 100, l * 100];
+}
+// couleur d'accent lisible sur fond sombre : luminosite minimale 72 %
+function accentOf(hex) {
+  const [h, s, l] = hexToHsl(hex);
+  return `hsl(${h.toFixed(0)} ${Math.min(90, s + 10).toFixed(0)}% ${Math.max(72, l).toFixed(0)}%)`;
+}
+
+// ---------------------------------------------------------------- piste
+function renderTrack(anim) {
+  const t = cur();
+  const art = `url(${t.img})`;
+  $$("[data-art]").forEach(e => { e.style.backgroundImage = art; });
+  $$("[data-k=title]").forEach(e => { e.textContent = t.title; });
+  $$("[data-k=artist]").forEach(e => { e.textContent = t.artist; });
+  $$("[data-k=album]").forEach(e => { e.textContent = t.album; });
+  $$("[data-k=app]").forEach(e => { e.textContent = t.app; });
+  const r = document.documentElement.style;
+  r.setProperty("--a1", t.c[0]);
+  r.setProperty("--a2", t.c[1]);
+  r.setProperty("--a3", t.c[2]);
+  r.setProperty("--accent", accentOf(t.c[1]));
+  accent = accentOf(t.c[1]);
+  $$(".liquid i").forEach((e, i) => { e.style.background = t.c[i % 3]; });
+  if (anim && !S.opt.reduced) {
+    $$("#peekArt, #bigArt, .np .art").forEach(e => { e.classList.remove("pop"); void e.offsetWidth; e.classList.add("pop"); });
+  }
+  buildLyrics();
+  requestAnimationFrame(updateMarquee);
+}
+let accent = "#cfbdfe";
+
+function updateMarquee() {
+  const box = $("#bigTitle"), sp = box.firstElementChild;
+  box.classList.remove("run");
+  const over = sp.scrollWidth - box.clientWidth;
+  if (over > 4 && !S.opt.reduced) {
+    box.style.setProperty("--dist", -(over + 40) + "px");
+    box.style.setProperty("--dur", Math.max(6, over / 30 + 4) + "s");
+    box.classList.add("run");
+  }
+}
+
+// ---------------------------------------------------------------- actions
+function action(a) {
+  if (a === "toggle") {
+    S.playing = !S.playing;
+    log(`media_action { action: "toggle" }`, "true");
+    $$(".play").forEach(p => { p.classList.add("pop"); requestAnimationFrame(() => requestAnimationFrame(() => p.classList.remove("pop"))); });
+  } else if (a === "next") {
+    log(`media_action { action: "next" }`, "true");
+    S.track = (S.track + 1) % TRACKS.length;
+    S.pos = S.truePos = 0;
+    renderTrack(true);
+    nudge("next");
+  } else if (a === "prev") {
+    log(`media_action { action: "prev" }`, "true");
+    nudge("prev");
+    if (S.truePos > 3) {
+      // comme la plupart des applis : retour au debut du morceau
+      S.pos = S.truePos = 0;
+    } else {
+      S.track = (S.track + TRACKS.length - 1) % TRACKS.length;
+      S.pos = S.truePos = 0;
+      renderTrack(true);
+    }
+  }
+  updatePlayState();
+}
+function nudge(a) {
+  if (S.opt.reduced) return;
+  const cls = a === "next" ? "nudge-r" : "nudge-l";
+  $$(`[data-act=${a}]`).forEach(b => {
+    b.classList.add(cls);
+    setTimeout(() => b.classList.remove(cls), 90);
+  });
+}
+let resync = 0;
+function seekTo(v) {
+  v = Math.max(0, Math.min(dur(), v));
+  const ok = !S.opt.refuse;
+  log(`media_action { action: "seek", value: ${v.toFixed(1)} }`, String(ok), ok ? "" : "no");
+  S.pos = v;                 // retour immediat, comme Ilot.seek()
+  if (ok) S.truePos = v;
+  clearTimeout(resync);
+  resync = setTimeout(() => {
+    const drift = Math.abs(S.pos - S.truePos);
+    S.pos = S.truePos;
+    log(`media_get (resynchro 1 s après le seek)`, drift > 1 ? `position corrigée de ${drift.toFixed(1)} s` : "ok", drift > 1 ? "no" : "");
+  }, 1000);
+}
+function updatePlayState() {
+  island.classList.toggle("playing", S.playing);
+  $$("[data-k=state]").forEach(e => { e.textContent = S.playing ? "Pause" : "Lecture"; });
+  $$(".play").forEach(p => {
+    p.querySelector(".ms").textContent = S.playing ? "pause" : "play_arrow";
+    p.title = S.playing ? "Pause" : "Lecture";
+  });
+}
+
+$$("[data-act]").forEach(b => {
+  b.addEventListener("click", e => { e.stopPropagation(); action(b.dataset.act); });
+});
+
+// ---------------------------------------------------------------- bouton festonne
+// forme « cookie » : 5 bosses douces en pause, 9 festons en lecture, tourne
+const playBtns = $$(".play").map(p => {
+  const sz = +p.dataset.size;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${sz} ${sz}`);
+  svg.setAttribute("width", sz);
+  svg.setAttribute("height", sz);
+  const path = document.createElementNS(ns, "path");
+  svg.appendChild(path);
+  p.prepend(svg);
+  const ic = document.createElement("span");
+  ic.className = "ms";
+  ic.style.fontSize = Math.round(sz * .5) + "px";
+  p.appendChild(ic);
+  const white = p.classList.contains("white");
+  if (white) {
+    ic.style.color = "#000";
+    svg.style.filter = "drop-shadow(0 4px 12px var(--accent))";
+  }
+  return { p, path, sz, white, m: 1, rot: 0 };
+});
+function cookiePath(sz, m, rot, cookie) {
+  const R = sz / 2 - 1, c = sz / 2, N = 120;
+  let d = "";
+  for (let i = 0; i <= N; i++) {
+    const th = i / N * Math.PI * 2;
+    const k = cookie ? (1 - m) * 0.055 * Math.cos(5 * (th + rot)) + m * 0.07 * Math.cos(9 * (th + rot)) : 0;
+    const r = R * (1 - 0.07 + k);
+    d += (i ? "L" : "M") + (c + r * Math.cos(th)).toFixed(2) + " " + (c + r * Math.sin(th)).toFixed(2);
+  }
+  return d + "Z";
+}
+
+// ---------------------------------------------------------------- barre de progression
+// zone de prise de 20 px, trait fin qui s'epaissit au survol, ondule en
+// lecture, bulle de temps, envoi au relachement
+class Seek {
+  constructor(root, kind) {
+    this.kind = kind;
+    this.thin = kind === "peek" ? 3 : 4;
+    this.thick = kind === "peek" ? 5.5 : 7;
+    root.innerHTML = `<span class="t"></span><div class="hit"><canvas></canvas><div class="bubble"></div></div><span class="t r"></span>`;
+    [this.tl, this.tr] = $$(".t", root);
+    this.hit = $(".hit", root);
+    this.cv = $("canvas", root);
+    this.bub = $(".bubble", root);
+    this.g = this.cv.getContext("2d");
+    this.hover = false;
+    this.drag = false;
+    this.frac = 0;
+    this.hoverFrac = 0;
+    this.th = this.thin;
+    this.amp = 0;
+    this.handle = 0;
+    const at = e => {
+      const r = this.hit.getBoundingClientRect();
+      return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    };
+    this.hit.addEventListener("pointerenter", () => { this.hover = true; });
+    this.hit.addEventListener("pointerleave", () => { this.hover = false; });
+    this.hit.addEventListener("pointermove", e => {
+      this.hoverFrac = at(e);
+      if (this.drag) this.frac = this.hoverFrac;
+    });
+    this.hit.addEventListener("pointerdown", e => {
+      e.stopPropagation();
+      if (!canSeek() || e.button !== 0) return;
+      this.hit.setPointerCapture(e.pointerId);
+      this.drag = true;
+      S.dragging++;
+      this.frac = this.hoverFrac = at(e);
+    });
+    const end = e => {
+      if (!this.drag) return;
+      this.drag = false;
+      S.dragging--;
+      if (e.type === "pointerup") seekTo(this.frac * dur());
+      afterDrag();
+    };
+    this.hit.addEventListener("pointerup", end);
+    this.hit.addEventListener("pointercancel", end);
+    // le clic arrive sur la zone capturee : il ne doit pas ouvrir le panneau
+    this.hit.addEventListener("click", e => e.stopPropagation());
+  }
+  draw(dt, phase) {
+    const on = canSeek();
+    this.hit.classList.toggle("off", !on);
+    this.hit.title = dur() === 0 ? "Direct : pas de position" : !on ? "L'appli ne permet pas de se déplacer" : "";
+    const d = dur();
+    this.tl.textContent = d ? fmt(this.drag ? this.frac * d : S.pos) : "";
+    this.tr.textContent = d ? "-" + fmt(d - (this.drag ? this.frac * d : S.pos)) : "DIRECT";
+    const active = on && (this.hover || this.drag);
+    const ease = 1 - Math.exp(-dt / 0.06);
+    this.th += ((active ? this.thick : this.thin) - this.th) * ease;
+    const wantAmp = S.opt.wave && S.playing && !S.opt.reduced && d ? (active ? 2.4 : 1.6) * (this.kind === "peek" ? .8 : 1) : 0;
+    this.amp += (wantAmp - this.amp) * ease;
+    this.handle += ((active ? 1 : 0) - this.handle) * ease;
+    const f = this.drag ? this.frac : d ? Math.min(1, S.pos / d) : 0;
+
+    // bulle de temps (dans l'ilot : au-dessus de la barre)
+    this.bub.classList.toggle("on", active);
+    if (active) {
+      const bf = this.drag ? this.frac : this.hoverFrac;
+      this.bub.textContent = fmt(bf * d);
+      const w = this.hit.clientWidth;
+      this.bub.style.left = Math.max(16, Math.min(w - 16, bf * w)) + "px";
+    }
+
+    const dpr = window.devicePixelRatio * S.opt.k;
+    const W = this.cv.clientWidth, H = this.cv.clientHeight;
+    if (this.cv.width !== Math.round(W * dpr)) { this.cv.width = Math.round(W * dpr); this.cv.height = Math.round(H * dpr); }
+    const g = this.g;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    const mid = H / 2, th = this.th, x = f * W;
+    const gap = 2 + this.handle * 4;
+    g.lineCap = "round";
+    g.lineWidth = th;
+    g.globalAlpha = on ? 1 : .45;
+    // reste du morceau : trait droit
+    g.strokeStyle = this.kind === "big" ? "#ffffff33" : "#ffffff26";
+    const x0 = d ? x + gap + th / 2 : th / 2;
+    if (x0 < W - th / 2) {
+      g.beginPath();
+      g.moveTo(x0, mid);
+      g.lineTo(W - th / 2, mid);
+      g.stroke();
+    }
+    if (!d) return;
+    // partie jouee : ondulee pendant la lecture
+    g.strokeStyle = accent;
+    const x1 = Math.max(th / 2, x - gap - th / 2);
+    if (x > gap + th) {
+      g.beginPath();
+      const wl = this.kind === "peek" ? 22 : 34;
+      for (let px = th / 2; px <= x1; px += 1) {
+        const y = mid + this.amp * Math.sin(px / wl * Math.PI * 2 - phase);
+        px === th / 2 ? g.moveTo(px, y) : g.lineTo(px, y);
+      }
+      g.stroke();
+    }
+    // poignee verticale au survol
+    if (this.handle > .02) {
+      g.globalAlpha = this.handle * (on ? 1 : .45);
+      g.fillStyle = accent;
+      const hh = H * .85 * this.handle;
+      g.beginPath();
+      g.roundRect(x - 2, mid - hh / 2, 4, hh, 2);
+      g.fill();
+    }
+    g.globalAlpha = 1;
+  }
+}
+const seeks = $$("[data-seek]").map(e => new Seek(e, e.dataset.seek));
+
+// ---------------------------------------------------------------- etats de l'ilot
+const SIZES = { collapsed: [200, 30, 15], peek: [460, 76, 26], open: [740, 540, 22] };
+let collapseT = 0;
+let lastPt = { x: -1, y: -1 };
+document.addEventListener("pointermove", e => { lastPt = { x: e.clientX, y: e.clientY }; }, true);
+
+function setMode(m) {
+  clearTimeout(collapseT);
+  S.mode = m;
+  island.dataset.mode = m;
+  let [w, h, r] = SIZES[m];
+  if (m === "peek" && S.opt.discord) w += 70;
+  island.style.width = w + "px";
+  island.style.height = h + "px";
+  island.style.borderRadius = r + "px";
+  if (m === "open") requestAnimationFrame(updateMarquee);
+}
+function overIsland() {
+  const r = island.getBoundingClientRect();
+  return lastPt.x >= r.left && lastPt.x <= r.right && lastPt.y >= r.top && lastPt.y <= r.bottom;
+}
+function scheduleCollapse() {
+  clearTimeout(collapseT);
+  if (S.dragging) return;                 // jamais pendant un glisse
+  if (S.mode === "peek") collapseT = setTimeout(() => setMode("collapsed"), 120);
+  else if (S.mode === "open" && !S.opt.pinned) collapseT = setTimeout(() => setMode("collapsed"), 450);
+}
+// relache hors de l'ilot : on relance le repli (sinon le survol resterait ouvert)
+function afterDrag() {
+  if (!S.dragging && !overIsland()) scheduleCollapse();
+}
+island.addEventListener("pointerenter", () => {
+  clearTimeout(collapseT);
+  if (S.mode === "collapsed") setMode("peek");
+});
+island.addEventListener("pointerleave", () => scheduleCollapse());
+island.addEventListener("click", () => {
+  if (S.mode !== "open") setMode("open");
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") setMode("collapsed"); });
+$("#screen").addEventListener("pointerdown", e => {
+  if (!island.contains(e.target) && S.mode === "open") setMode("collapsed");
+});
+// clic molette = lecture/pause, comme la pilule actuelle
+island.addEventListener("auxclick", e => { if (e.button === 1) { e.preventDefault(); action("toggle"); } });
+island.addEventListener("mousedown", e => { if (e.button === 1) e.preventDefault(); });
+
+// onglets
+$$(".rail [data-tab]").forEach(b => b.addEventListener("click", e => {
+  e.stopPropagation();
+  S.tab = b.dataset.tab;
+  $$(".rail [data-tab]").forEach(x => x.classList.toggle("on", x === b));
+  $$(".page").forEach(p => p.classList.toggle("on", p.dataset.page === S.tab));
+  requestAnimationFrame(updateMarquee);
+}));
+$(".panel").addEventListener("click", e => e.stopPropagation());
+
+// paroles
+$("#lyBtn").addEventListener("click", () => {
+  S.lyricsOn = !S.lyricsOn;
+  $("#lyBtn").classList.toggle("on", S.lyricsOn);
+  $("#mp").classList.toggle("lyrics-on", S.lyricsOn);
+  setTimeout(updateMarquee, 520);
+});
+let lyTimes = [];
+function buildLyrics() {
+  const d = cur().dur;
+  lyTimes = LYRICS.map((_, i) => 6 + i * (d - 12) / LYRICS.length);
+  $("#lyList").innerHTML = LYRICS.map((l, i) => `<div class="ly" data-i="${i}">${l}</div>`).join("");
+  $$(".ly").forEach(e => e.addEventListener("click", () => { if (canSeek()) seekTo(lyTimes[+e.dataset.i]); }));
+  lastLy = -2;
+}
+let lastLy = -2;
+function updateLyrics() {
+  let a = -1;
+  for (let i = 0; i < lyTimes.length; i++) if (lyTimes[i] <= S.pos) a = i;
+  if (a === lastLy) return;
+  lastLy = a;
+  const els = $$(".ly");
+  els.forEach((e, i) => e.classList.toggle("on", i === a));
+  const target = els[Math.max(0, a)];
+  if (target) $("#lyList").style.transform = `translateY(${-(target.offsetTop + target.offsetHeight / 2)}px)`;
+}
+
+// volume
+const vol = $("#vol");
+const setVol = () => vol.style.setProperty("--v", vol.value + "%");
+vol.addEventListener("input", setVol);
+vol.addEventListener("change", () => log(`app_volume_set { app: "${cur().app}", value: ${vol.value} }`));
+setVol();
+
+// geste A : glisser sur la pochette du survol
+(() => {
+  const art = $("#peekArt");
+  let x0 = null, moved = false;
+  art.addEventListener("pointerdown", e => {
+    if (!S.opt.swipe || e.button !== 0) return;
+    x0 = e.clientX;
+    moved = false;
+    art.setPointerCapture(e.pointerId);
+    S.dragging++;
+  });
+  art.addEventListener("pointermove", e => {
+    if (x0 === null) return;
+    const dx = (e.clientX - x0) / S.opt.k;
+    if (Math.abs(dx) > 4) moved = true;
+    art.style.transition = "none";
+    art.style.transform = `translateX(${Math.max(-26, Math.min(26, dx * .5))}px) rotate(${Math.max(-8, Math.min(8, dx * .15))}deg)`;
+  });
+  const end = e => {
+    if (x0 === null) return;
+    const dx = (e.clientX - x0) / S.opt.k;
+    x0 = null;
+    S.dragging--;
+    art.style.transition = "";
+    art.style.transform = "";
+    if (e.type === "pointerup" && Math.abs(dx) >= 30) action(dx < 0 ? "next" : "prev");
+    afterDrag();
+  };
+  art.addEventListener("pointerup", end);
+  art.addEventListener("pointercancel", end);
+  art.addEventListener("click", e => { if (moved) e.stopPropagation(); });
+})();
+
+// ---------------------------------------------------------------- banc d'essai
+$$("#bench .seg").forEach(seg => {
+  seg.addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    $$("button", seg).forEach(x => x.classList.toggle("on", x === b));
+    const k = seg.dataset.opt, v = b.dataset.v;
+    S.opt[k] = isNaN(+v) ? v : +v;
+    applyOpts();
+  });
+});
+$$("#bench input[type=checkbox]").forEach(c => {
+  c.addEventListener("change", () => {
+    S.opt[c.dataset.opt] = c.checked;
+    applyOpts();
+  });
+});
+function applyOpts() {
+  $("#scaler").style.transform = `scale(${S.opt.k})`;
+  $("#mp").classList.toggle("side", S.opt.layout === "side");
+  $("#artBox").classList.toggle("scallop", !!S.opt.scallop);
+  $("#mp").classList.toggle("scallop", !!S.opt.scallop);
+  island.classList.toggle("discord", S.opt.discord);
+  document.documentElement.style.setProperty("--spatial", S.opt.reduced ? "linear" : "cubic-bezier(0.38, 1.21, 0.22, 1)");
+  if (!S.opt.scallop) $("#bigArt").style.clipPath = "";
+  setMode(S.mode);
+  setTimeout(updateMarquee, 520);
+}
+
+// ---------------------------------------------------------------- spectre factice
+const bands = new Float32Array(48);
+function spectrum(t) {
+  const beat = Math.exp(-((t % 0.5) / 0.11));
+  for (let i = 0; i < bands.length; i++) {
+    const low = i < 8 ? beat * (1 - i / 10) : 0;
+    const v = S.playing ? Math.min(1, low * .9 + (.25 + .2 * Math.sin(t * (1.3 + i * .37) + i)) * (1 - i / 70) * (.6 + .4 * Math.abs(Math.sin(t * 2.1 + i * .7)))) : 0;
+    bands[i] += (v - bands[i]) * .35;
+  }
+}
+
+// ---------------------------------------------------------------- boucle
+let last = performance.now(), phase = 0, artRot = 0;
+const ringCv = $("#ring"), ringG = ringCv.getContext("2d");
+const eqBars = $$(".eq i");
+const blobs = $$(".liquid i");
+
+function scallopPath(sz, rot) {
+  const c = sz / 2, N = 160;
+  let d = "";
+  for (let i = 0; i <= N; i++) {
+    const th = i / N * Math.PI * 2;
+    const r = c * (0.95 + 0.04 * Math.cos(12 * (th + rot)));
+    d += (i ? "L" : "M") + (c + r * Math.cos(th)).toFixed(1) + " " + (c + r * Math.sin(th)).toFixed(1);
+  }
+  return `path("${d}Z")`;
+}
+
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  const d = dur();
+  if (S.playing && d) {
+    S.pos += dt;
+    S.truePos += dt;
+    if (S.truePos >= d) { action("next"); }
+  }
+  if (!S.opt.reduced && S.playing) phase += dt * 5;
+  spectrum(now / 1000);
+
+  // boutons festonnes
+  for (const b of playBtns) {
+    b.m += ((S.playing ? 1 : 0) - b.m) * (1 - Math.exp(-dt / 0.12));
+    if (S.playing && !S.opt.reduced && S.opt.cookie) b.rot += dt * 25 * Math.PI / 180;
+    b.path.setAttribute("d", cookiePath(b.sz, b.m, b.rot, S.opt.cookie));
+    b.path.setAttribute("fill", b.white ? "#ffffff" : accent);
+  }
+  seeks.forEach(s => s.draw(dt, phase));
+
+  // egaliseur de la pilule repliee
+  if (S.mode === "collapsed") {
+    eqBars.forEach((e, i) => { e.style.height = (3 + bands[i * 6 + 1] * 9) + "px"; });
+  }
+
+  if (S.mode === "open" && S.tab === "media") {
+    updateLyrics();
+    // fond liquide : 4 taches floues qui derivent
+    if (!S.opt.reduced) {
+      const t = now / 1000;
+      const e = bands[1];
+      blobs.forEach((b, i) => {
+        const x = 50 + 32 * Math.sin(t * (.11 + i * .03) + i * 1.7) - 30;
+        const y = 50 + 30 * Math.cos(t * (.09 + i * .04) + i * 2.3) - 35;
+        b.style.transform = `translate(${x}%, ${y}%) scale(${1 + e * .15})`;
+      });
+    }
+    // pochette festonnee + anneau de spectre
+    if (S.opt.scallop) {
+      if (S.playing && !S.opt.reduced) artRot += dt * .15;
+      const A = $("#artBox").clientWidth;
+      $("#bigArt").style.clipPath = scallopPath(A, artRot);
+      const W = ringCv.clientWidth, dpr = devicePixelRatio * S.opt.k;
+      if (ringCv.width !== Math.round(W * dpr)) ringCv.width = ringCv.height = Math.round(W * dpr);
+      ringG.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ringG.clearRect(0, 0, W, W);
+      const c = W / 2, r0 = A / 2 + 6;
+      ringG.lineCap = "round";
+      ringG.lineWidth = 4;
+      ringG.strokeStyle = accent;
+      const n = 72;
+      for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2 - Math.PI / 2;
+        const bi = Math.abs(((i / n) * 2 - 1)) * (bands.length - 1);
+        const len = 3 + bands[Math.round(bi)] * 22;
+        ringG.globalAlpha = .55 + bands[Math.round(bi)] * .45;
+        ringG.beginPath();
+        ringG.moveTo(c + r0 * Math.cos(a), c + r0 * Math.sin(a));
+        ringG.lineTo(c + (r0 + len) * Math.cos(a), c + (r0 + len) * Math.sin(a));
+        ringG.stroke();
+      }
+      ringG.globalAlpha = 1;
+    } else if (ringCv.width) {
+      ringG.clearRect(0, 0, ringCv.width, ringCv.height);
+    }
+  }
+
+  // disque replie qui tourne
+  if (S.playing && !S.opt.reduced) $(".mini .disc").style.transform = `rotate(${(now / 1000 * 40) % 360}deg)`;
+
+  $("#readout").textContent = `mode ${S.mode} · position ${fmt(S.pos)} (réelle ${fmt(S.truePos)})${S.dragging ? " · glissé en cours" : ""}`;
+  requestAnimationFrame(frame);
+}
+
+// ---------------------------------------------------------------- demarrage
+document.fonts.ready.then(() => {
+  TRACKS.forEach((t, i) => { t.img = makeArt(t, i); });
+  renderTrack(false);
+  updatePlayState();
+  applyOpts();
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

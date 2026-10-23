@@ -9,7 +9,8 @@ Rectangle {
     readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "media"
     readonly property string bg: Ilot.cfg.media_bg || "art"
     radius: 22
-    color: bg === "color" ? Theme.primaryContainer : Theme.surfaceC
+    // pochette floutee : fond presque noir sous les couleurs (maquette)
+    color: bg === "color" ? Theme.primaryContainer : bg === "art" && !Theme.light && Ilot.hasMedia ? "#0b0a0f" : Theme.surfaceC
     clip: true
     gradient: bg === "gradient" ? grad : null
     Gradient {
@@ -107,62 +108,111 @@ Rectangle {
         }
     }
 
-    // pochette floutee (.mp-bg : inset -40px, blur 40px, saturate 1.3)
+    // ------------------------------------------------- disposition
+    // Reglages > Apparence > Lecteur : colonne centree (paroles a droite) ou
+    // cote a cote (paroles en bandeau), pochette arrondie ou festonnee
+    readonly property bool col: (Ilot.cfg.player_layout || "col") !== "side"
+    readonly property bool scallop: (Ilot.cfg.player_art || "scallop") === "scallop"
+    readonly property bool playing: Ilot.hasMedia && Ilot.media.playing
+    function pm(c) {
+        return Qt.vector4d(c.r * c.a, c.g * c.a, c.b * c.a, c.a)
+    }
+
+    // pochette floutee : tres floue (decodee en 48 px), saturee, qui derive
+    // lentement (le flou est calcule une fois, seul le deplacement bouge)
     Item {
         id: bgSrc
         anchors.fill: parent
-        anchors.margins: -40
+        anchors.margins: -60
         visible: false
         Image {
             anchors.fill: parent
             source: Ilot.hasMedia ? Ilot.art : ""
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
-            sourceSize.width: 400
+            smooth: true
+            sourceSize.width: 48
         }
     }
     MultiEffect {
+        id: bgFx
         anchors.fill: bgSrc
         source: bgSrc
         visible: page.bg === "art" && Ilot.hasMedia && Ilot.art !== "" && page.visible
         blurEnabled: true
         blurMax: 64
         blur: 1
-        saturation: 0.3
-        opacity: Theme.light ? 0.22 : 0.35
+        saturation: 0.8
+        opacity: Theme.light ? 0.4 : 0.85
+        scale: 1.15
+        property real t: 0
+        transform: Translate {
+            x: 36 * Math.sin(bgFx.t * 0.7)
+            y: 28 * Math.cos(bgFx.t * 0.5)
+        }
+        NumberAnimation on t {
+            from: 0
+            to: Math.PI * 20
+            duration: 180000
+            loops: Animation.Infinite
+            // en pause (pas arretee) : la derive reprend la ou elle s'etait figee
+            running: bgFx.visible
+            paused: running && !(page.shown && page.playing && !Theme.reduced)
+        }
+    }
+    // assombri vers le bas (lisibilite des commandes)
+    Rectangle {
+        anchors.fill: parent
+        visible: page.bg === "art" && Ilot.hasMedia && !Theme.light
+        radius: page.radius
+        gradient: Gradient {
+            GradientStop { position: 0.4; color: "transparent" }
+            GradientStop { position: 1; color: Qt.rgba(0, 0, 0, 0.47) }
+        }
     }
 
-    VizBars {
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: parent.height * 0.38
-        opacity: 0.5
-        mirror: true
-        active: page.shown
-    }
-
-    Row {
+    Item {
         id: main
         anchors.fill: parent
-        anchors.leftMargin: 32
-        anchors.rightMargin: 32
-        // avec les paroles (.ly-on) : le bandeau prend le bas, pochette de 190 px
-        anchors.topMargin: page.lyricsOn ? 14 : 24
-        anchors.bottomMargin: page.lyricsOn ? 96 : 24
+        // colonne (maquette .mcol) : centree, ou a 24 px du bord gauche avec
+        // les paroles (main prend alors juste la largeur de la colonne)
+        anchors.leftMargin: page.col ? (page.lyricsOn ? 24 : 0) : 32
+        anchors.rightMargin: page.col ? (page.lyricsOn ? page.width - 24 - colW : 0) : 32
+        // cote a cote + paroles (.ly-on) : le bandeau prend le bas
+        anchors.topMargin: page.col ? 0 : page.lyricsOn ? 14 : 24
+        anchors.bottomMargin: page.col ? 0 : page.lyricsOn ? 96 : 24
+        Behavior on anchors.leftMargin { NumberAnimation { duration: 500; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
+        Behavior on anchors.rightMargin { NumberAnimation { duration: 500; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
         Behavior on anchors.topMargin { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
         Behavior on anchors.bottomMargin { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
-        spacing: 28
+        // cote a cote : ecart pochette / infos et place de l'anneau
+        readonly property real gap: 28
+        readonly property real ringPad: page.scallop ? 30 : 0
+        // colonne : marges au-dessus et au-dessous de la pochette (anneau de
+        // spectre : 30 / 32 ; pochette arrondie : 12 / 16)
+        readonly property real padTop: page.scallop ? 30 : 12
+        readonly property real padBot: page.scallop ? 32 : 16
         property real artMax: page.lyricsOn ? 190 : 260
         Behavior on artMax { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
-        readonly property real artSize: Math.min(artMax, height)
+        // colonne : 156 (festonnee) ou 172 (arrondie) a 459 px de haut ; grandit
+        // avec la hauteur (panneau agrandi), plafonnee a 300, sans deborder
+        readonly property real colArt: Math.round(Math.max(90, Math.min((page.scallop ? 156 : 172) + Math.max(0, page.height - 459) * 0.5, 300,
+            page.height - meta.height - padTop - padBot - 16)))
+        readonly property real artSize: page.col
+            ? colArt
+            : Math.max(90, Math.min(artMax, height - ringPad * 2, width * 0.42))
+        // colonne de 340 (plus large si la pochette grandit)
+        readonly property real colW: Math.min(page.width - 48, Math.max(340, artSize + 184))
+        readonly property real stackH: artSize + padTop + padBot + meta.height
 
-        // grande pochette, inclinee en 3D au survol
+        // grande pochette : halo de ses couleurs en lecture, reduite et
+        // assombrie en pause, inclinee en 3D au survol
         Item {
             id: art
             width: main.artSize
             height: main.artSize
-            anchors.verticalCenter: parent.verticalCenter
+            x: page.col ? (main.width - width) / 2 : main.ringPad
+            y: page.col ? Math.max(0, (main.height - main.stackH) / 2) + main.padTop : (main.height - height) / 2
             property real rx: 0
             property real ry: 0
             Behavior on rx { NumberAnimation { duration: 200 } }
@@ -182,30 +232,125 @@ Rectangle {
                 }
                 onContainsMouseChanged: if (!containsMouse) { art.rx = 0; art.ry = 0 }
             }
+
+            // halo : la pochette tres floutee derriere elle (flou calcule une
+            // fois par pochette, seuls l'opacite et l'echelle bougent)
+            Item {
+                id: haloSrc
+                anchors.fill: parent
+                visible: false
+                Image {
+                    anchors.fill: parent
+                    source: Ilot.hasMedia ? Ilot.art : ""
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    sourceSize.width: 96
+                }
+            }
+            MultiEffect {
+                anchors.fill: parent
+                source: haloSrc
+                visible: page.visible && Ilot.hasMedia && Ilot.art !== "" && opacity > 0
+                blurEnabled: true
+                blurMax: 48
+                blur: 1
+                saturation: 0.6
+                opacity: page.playing ? (Theme.light ? 0.5 : 0.75) : 0
+                scale: page.playing ? 1.12 : 1.05
+                Behavior on opacity { NumberAnimation { duration: 600 } }
+                Behavior on scale { NumberAnimation { duration: 600; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
+            }
             RectangularShadow {
+                visible: !page.scallop
                 anchors.fill: parent
                 radius: 28
                 offset.y: 12
                 blur: 40
                 color: Qt.rgba(0, 0, 0, Theme.light ? 0.18 : 0.35)
             }
-            Rectangle {
+
+            // anneau de spectre autour de la pochette festonnee
+            ShaderEffect {
+                readonly property bool on: page.scallop && page.shown && Ilot.live
+                visible: on
+                anchors.centerIn: parent
+                width: parent.width + 68
+                height: width
+                fragmentShader: "qrc:/shaders/ring.frag.qsb"
+                function lv(i) {
+                    const s = Ilot.shown
+                    return Qt.vector4d(s[i] || 0, s[i + 1] || 0, s[i + 2] || 0, s[i + 3] || 0)
+                }
+                property size size: Qt.size(Math.max(1, width), Math.max(1, height))
+                property real r0: art.width / 2 + 5
+                property real maxLen: 22
+                property vector4d l0: on ? lv(0) : Qt.vector4d(0, 0, 0, 0)
+                property vector4d l1: on ? lv(4) : Qt.vector4d(0, 0, 0, 0)
+                property vector4d l2: on ? lv(8) : Qt.vector4d(0, 0, 0, 0)
+                property vector4d l3: on ? lv(12) : Qt.vector4d(0, 0, 0, 0)
+                property vector4d l4: on ? lv(16) : Qt.vector4d(0, 0, 0, 0)
+                property vector4d l5: on ? lv(20) : Qt.vector4d(0, 0, 0, 0)
+                property vector4d color: page.pm(Ilot.playerPal.primary)
+            }
+
+            Item {
+                id: cover
                 anchors.fill: parent
-                radius: 28
-                color: Theme.surfaceHighest
-                Ms {
-                    anchors.centerIn: parent
-                    name: "music_note"
-                    size: 64
-                    color: Theme.inkVariant
+                scale: page.playing || !Ilot.hasMedia ? 1 : 0.9
+                Behavior on scale { NumberAnimation { duration: 500; easing.type: Easing.OutBack } }
+                Rectangle {
+                    anchors.fill: parent
+                    visible: !page.scallop || !scImg.ok
+                    radius: page.scallop ? width / 2 : 28
+                    color: Theme.surfaceHighest
+                    Ms {
+                        anchors.centerIn: parent
+                        name: "music_note"
+                        size: 64
+                        color: Theme.inkVariant
+                    }
                 }
                 ArtImage {
+                    visible: !page.scallop
                     anchors.fill: parent
                     radius: 28
                 }
+                // voile de pause (pochette arrondie)
+                Rectangle {
+                    visible: !page.scallop && opacity > 0
+                    anchors.fill: parent
+                    radius: 28
+                    color: "black"
+                    opacity: Ilot.hasMedia && !Ilot.media.playing ? 0.45 : 0
+                    Behavior on opacity { NumberAnimation { duration: 400 } }
+                }
+                // pochette festonnee (shaders/scallop.frag), assombrie en pause
+                Image {
+                    id: scImg
+                    visible: false
+                    asynchronous: true
+                    source: page.scallop && Ilot.hasMedia ? Ilot.art : ""
+                    // taille fixe : suivre la taille animee rechargerait l'image a
+                    // chaque trame (le DPI est deja applique par Qt)
+                    sourceSize.width: 512
+                    retainWhileLoading: true
+                    // l'ancienne pochette reste affichee pendant le chargement
+                    property bool ok: false
+                    onStatusChanged: ok = status === Image.Ready || (status === Image.Loading && ok)
+                }
+                ShaderEffect {
+                    anchors.fill: parent
+                    visible: page.scallop && scImg.ok
+                    fragmentShader: "qrc:/shaders/scallop.frag.qsb"
+                    property var source: scImg
+                    property size size: Qt.size(Math.max(1, width), Math.max(1, height))
+                    property size imgSize: Qt.size(Math.max(1, scImg.implicitWidth), Math.max(1, scImg.implicitHeight))
+                    property real dim: Ilot.hasMedia && !Ilot.media.playing ? 0.45 : 0
+                    Behavior on dim { NumberAnimation { duration: 400 } }
+                }
                 // reflet qui suit la souris
                 Glow {
-                    visible: tilt.containsMouse
+                    visible: tilt.containsMouse && !page.scallop
                     width: parent.width * 1.2
                     height: width
                     x: tilt.mouseX - width / 2
@@ -217,80 +362,82 @@ Rectangle {
         }
 
         Column {
-            width: parent.width - main.artSize - 28
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 4
+            id: meta
+            x: page.col ? (main.width - width) / 2 : art.x + art.width + main.ringPad + main.gap
+            y: page.col ? art.y + art.height + main.padBot : (main.height - height) / 2
+            width: page.col ? main.colW : main.width - x
+            // colonne : pas d'ecart, seulement les marges de la maquette
+            spacing: page.col ? 0 : 4
             Chip {
+                x: page.col ? (parent.width - width) / 2 : 0
+                // colonne (.chip) : 19 px de haut, 9 px de marge de cote
+                width: implicitWidth - (page.col ? 2 : 0)
+                height: page.col ? 19 : implicitHeight
                 text: Ilot.hasMedia ? Ilot.media.app || "" : ""
+                color: Theme.alpha(Theme.ink, 0.08)
+                fg: Theme.inkVariant
             }
             Item {
                 width: 1
                 height: 4
                 visible: Ilot.hasMedia && !!Ilot.media.app
             }
-            Txt {
+            // titre : defile s'il est trop long
+            Item {
+                id: titleBox
                 width: parent.width
-                text: Ilot.hasMedia ? Ilot.media.title || "Sans titre" : "Rien en lecture"
-                px: 24
-                weight: Font.DemiBold
-                lineHeightMode: Text.FixedHeight
-                lineHeight: 24 * 1.15
-                wrapMode: Text.Wrap
-                maximumLineCount: 2
-                elide: Text.ElideRight
+                height: titleTxt.implicitHeight
+                clip: true
+                readonly property real over: titleTxt.implicitWidth - width
+                property real shift: 0
+                Txt {
+                    id: titleTxt
+                    x: (titleBox.over > 0 ? 0 : page.col ? -titleBox.over / 2 : 0) + (scroll.running ? titleBox.shift : 0)
+                    text: Ilot.hasMedia ? Ilot.media.title || "Sans titre" : "Rien en lecture"
+                    px: page.col ? 22 : 24
+                    weight: Font.Bold
+                }
+                SequentialAnimation {
+                    id: scroll
+                    running: titleBox.over > 4 && page.shown && !Theme.reduced
+                    loops: Animation.Infinite
+                    onRunningChanged: titleBox.shift = 0
+                    PauseAnimation { duration: 2500 }
+                    NumberAnimation { target: titleBox; property: "shift"; from: 0; to: -titleBox.over; duration: Math.max(1500, titleBox.over * 30); easing.type: Easing.InOutSine }
+                    PauseAnimation { duration: 1500 }
+                    NumberAnimation { target: titleBox; property: "shift"; to: 0; duration: 600; easing.type: Easing.InOutCubic }
+                }
             }
             Txt {
                 width: parent.width
                 visible: text !== ""
+                horizontalAlignment: page.col ? Text.AlignHCenter : Text.AlignLeft
                 text: Ilot.hasMedia ? Ilot.media.artist || "" : ""
-                px: 15
-                color: Theme.primary
+                px: page.col ? 15 : 16
+                weight: Font.Medium
+                color: Ilot.playerPal.primary
                 elide: Text.ElideRight
             }
             Txt {
                 width: parent.width
                 height: Math.max(15, implicitHeight)
+                horizontalAlignment: page.col ? Text.AlignHCenter : Text.AlignLeft
                 text: Ilot.hasMedia ? Ilot.media.album || "" : ""
                 px: 12
-                color: Theme.inkVariant
+                // colonne, theme sombre : blanc a 40 % (maquette)
+                readonly property bool white: page.col && !Theme.light
+                color: white ? Qt.rgba(1, 1, 1, 0.4) : Theme.inkVariant
+                opacity: white ? 1 : 0.75
                 elide: Text.ElideRight
             }
             Item {
                 width: 1
-                height: page.lyricsOn ? 6 : 14
+                height: page.col ? 8 : page.lyricsOn ? 6 : 12
             }
-            // progression (glisser pour se deplacer dans le titre)
-            M3Slider {
-                id: seek
+            // progression (cliquer ou glisser pour se deplacer dans le titre)
+            SeekBar {
                 width: parent.width
-                to: 1000
-                trackH: 6
-                thumbH: 18
-                readonly property real pct: Ilot.media.duration ? Ilot.pos / Ilot.media.duration : 0
-                Binding on value {
-                    when: !seek.dragging
-                    value: Math.round(seek.pct * 1000)
-                }
-                onReleased: v => Ilot.seek(v / 1000 * (Ilot.media.duration || 0))
-            }
-            Item {
-                width: parent.width
-                height: 18
-                Txt {
-                    y: 4
-                    text: Ilot.fmtTime(seek.dragging ? seek.value / 1000 * (Ilot.media.duration || 0) : Ilot.pos)
-                    px: 11
-                    tnum: true
-                    color: Theme.inkVariant
-                }
-                Txt {
-                    y: 4
-                    anchors.right: parent.right
-                    text: Ilot.fmtTime(Ilot.media.duration || 0)
-                    px: 11
-                    tnum: true
-                    color: Theme.inkVariant
-                }
+                restColor: Theme.alpha(Theme.ink, 0.2)
             }
             Item {
                 width: 1
@@ -300,14 +447,23 @@ Rectangle {
                 big: true
                 anchors.horizontalCenter: parent.horizontalCenter
             }
+            Item {
+                width: 1
+                height: 4
+            }
             // volume de l'appli qui joue
             Row {
                 visible: !!page.appVol
                 anchors.horizontalCenter: parent.horizontalCenter
                 topPadding: 6
-                spacing: 8
+                // colonne (.vol) : icone 18 px, ecart 10, 250 px en tout
+                spacing: page.col ? 10 : 8
                 IconBtn {
                     small: true
+                    width: page.col ? 20 : 26
+                    height: width
+                    iconSize: page.col ? 18 : 20
+                    fg: page.col ? Theme.inkVariant : Theme.ink
                     readonly property int n: page.appVol ? Math.round(page.appVol.level * 100) : 0
                     icon: !page.appVol || page.appVol.muted || !n ? "volume_off" : n < 50 ? "volume_down" : "volume_up"
                     tip: "Couper le son de l'appli"
@@ -320,9 +476,12 @@ Rectangle {
                 }
                 M3Slider {
                     id: appSlider
-                    width: 160
+                    width: 220
                     trackH: 8
-                    thumbH: 18
+                    thumbH: 20
+                    accent: Theme.ink
+                    trackColor: Theme.alpha(Theme.ink, 0.15)
+                    ringColor: "transparent"
                     wheelStep: 5
                     anchors.verticalCenter: parent.verticalCenter
                     fill: page.appVol && page.appVol.muted ? 0 : value / 100
@@ -335,36 +494,35 @@ Rectangle {
                         Api.invoke("app_volume_set", { app: page.volApp, level: v / 100, muted: false })
                     }
                 }
-                Txt {
-                    width: 26
-                    text: page.appVol ? (page.appVol.muted ? "–" : Math.round(page.appVol.level * 100)) : ""
-                    px: 11
-                    tnum: true
-                    color: Theme.inkVariant
-                    anchors.verticalCenter: parent.verticalCenter
-                }
             }
         }
     }
 
-    // paroles : bandeau en bas de la page (.ly-bar), la ligne chantee au centre
+    // paroles : colonne de droite (disposition en colonne, la ligne chantee
+    // au centre, les autres estompees) ou bandeau en bas (cote a cote)
+    Gradient {
+        id: bandGrad
+        GradientStop { position: 0; color: "transparent" }
+        GradientStop { position: 0.3; color: Theme.alpha(Theme.surface, 0.55) }
+        GradientStop { position: 1; color: Theme.alpha(Theme.surface, 0.55) }
+    }
     Rectangle {
         id: lyBox
         visible: page.lyricsOn
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: 104
-        bottomLeftRadius: page.radius
+        x: page.col ? page.width / 2 : 0
+        y: page.col ? 0 : page.height - height
+        width: page.col ? page.width / 2 - 16 : page.width
+        height: page.col ? page.height : 104
+        bottomLeftRadius: page.col ? 0 : page.radius
         bottomRightRadius: page.radius
-        gradient: Gradient {
-            GradientStop { position: 0; color: "transparent" }
-            GradientStop { position: 0.3; color: Theme.alpha(Theme.surface, 0.55) }
-            GradientStop { position: 1; color: Theme.alpha(Theme.surface, 0.55) }
-        }
+        color: "transparent"
+        gradient: page.col ? null : bandGrad
         Txt {
             visible: page.ly.state !== "synced" && page.ly.state !== "plain"
             anchors.centerIn: parent
+            width: parent.width - 32
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
             px: 12.5
             color: Theme.inkVariant
             text: ({ loading: "Recherche des paroles…", none: "Pas de paroles trouvées pour ce morceau.", instr: "♪ Morceau instrumental",
@@ -374,14 +532,15 @@ Rectangle {
             id: lyList
             readonly property bool synced: page.ly.state === "synced"
             anchors.fill: parent
-            anchors.leftMargin: 32
-            anchors.rightMargin: 32
+            anchors.leftMargin: page.col ? 0 : 32
+            anchors.rightMargin: page.col ? 8 : 32
             visible: synced || page.ly.state === "plain"
             clip: true
             model: page.ly.lines
-            spacing: 4
-            topMargin: synced ? 36 : 8
-            bottomMargin: topMargin
+            spacing: page.col ? 2 : 4
+            topMargin: !synced ? 8 : page.col ? height / 2 - 20 : 36
+            // colonne : les pastilles Paroles / Playlists couvrent le bas
+            bottomMargin: !synced && page.col ? 54 : topMargin
             interactive: !synced
             boundsBehavior: Flickable.StopAtBounds
             highlightRangeMode: synced ? ListView.StrictlyEnforceRange : ListView.NoHighlightRange
@@ -394,32 +553,51 @@ Rectangle {
                 required property var modelData
                 required property int index
                 readonly property bool on: index === page.lyOn
-                // fondu en haut et en bas du bandeau (mask-image : transparent, 32 %, 68 %, transparent)
+                // fondu en haut et en bas (mask-image : transparent, 22 %, 78 %,
+                // transparent en colonne ; 32 % / 68 % dans le bandeau)
                 readonly property real mid: y - lyList.contentY + height / 2
-                readonly property real edge: lyList.synced ? Math.max(0, Math.min(1, Math.min(mid, lyList.height - mid) / (lyList.height * 0.32))) : 1
+                readonly property real edge: lyList.synced ? Math.max(0, Math.min(1, Math.min(mid, lyList.height - mid) / (lyList.height * (page.col ? 0.22 : 0.32)))) : 1
                 width: lyList.width
                 height: txt.implicitHeight
                 active: lyList.synced && modelData.t >= 0
-                color: "transparent"
+                radius: 16
+                // colonne : la ligne chantee sur une pastille claire
+                color: page.col && on ? Qt.rgba(1, 1, 1, 0.07) : "transparent"
                 opacity: edge
                 // clic sur une ligne : le lecteur y saute
                 onClicked: Ilot.seek(modelData.t)
                 Txt {
                     id: txt
                     width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
+                    leftPadding: page.col ? 12 : 0
+                    rightPadding: leftPadding
+                    topPadding: page.col ? 6 : 0
+                    bottomPadding: topPadding
+                    horizontalAlignment: page.col ? Text.AlignLeft : Text.AlignHCenter
                     wrapMode: Text.WordWrap
                     lineHeightMode: Text.FixedHeight
                     lineHeight: px * 1.3
                     text: line.modelData.text || "♪"
-                    px: !lyList.synced ? 13 : line.modelData.text ? 15 : 12
-                    weight: line.on ? Font.DemiBold : Font.Normal
-                    color: line.on ? Theme.primary : Theme.inkVariant
-                    opacity: line.on ? 1 : !lyList.synced ? 0.9 : line.hovered ? 0.85 : 0.5
-                    scale: line.on ? 1.12 : 1
+                    px: !lyList.synced ? 13 : page.col ? 18 : line.modelData.text ? 15 : 12
+                    weight: page.col && lyList.synced ? Font.Bold : line.on ? Font.DemiBold : Font.Normal
+                    color: page.col ? Theme.ink : line.on ? Ilot.playerPal.primary : Theme.inkVariant
+                    opacity: line.on ? 1 : !lyList.synced ? 0.9 : line.hovered ? (page.col ? 0.5 : 0.85) : page.col ? 0.28 : 0.5
+                    scale: page.col ? (line.on || !lyList.synced ? 1 : 0.96) : line.on ? 1.12 : 1
+                    transformOrigin: page.col ? Item.Left : Item.Center
                     Behavior on opacity { NumberAnimation { duration: 300 } }
                     Behavior on color { ColorAnimation { duration: 300 } }
                     Behavior on scale { NumberAnimation { duration: 350; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
+                    // colonne : lueur de la couleur du lecteur sous la ligne
+                    // chantee (text-shadow 0 0 18px) ; une seule couche a la fois
+                    layer.enabled: line.on && page.col && lyList.synced && !Theme.reduced
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: Ilot.playerPal.primary
+                        shadowHorizontalOffset: 0
+                        shadowVerticalOffset: 0
+                        blurMax: 32
+                        shadowBlur: 0.6
+                    }
                 }
             }
         }
@@ -427,27 +605,53 @@ Rectangle {
     onLyricsOnChanged: if (lyricsOn) { ly = { key: "", lines: [], state: "" }; loadLyrics() }
     Component.onCompleted: if (lyricsOn) loadLyrics()
 
-    // paroles
-    IconBtn {
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.topMargin: 10
-        anchors.rightMargin: 52
-        icon: "lyrics"
-        on: page.lyricsOn
-        color: on ? Theme.secondaryContainer : hovered ? Theme.mix(Theme.alpha(Theme.ink, 0.1), Theme.alpha(Theme.surface, 0.55), 0.5) : Theme.alpha(Theme.surface, 0.55)
-        tip: "Paroles"
-        onClicked: Ilot.saveUi({ lyrics: !page.lyricsOn })
+    // paroles, playlists : pastilles en bas a droite (en haut a droite en
+    // cote a cote : le bandeau des paroles prend le bas)
+    component Pastille: Btn {
+        id: pa
+        property string icon
+        property string label
+        property bool on: false
+        width: pr.implicitWidth + 24
+        height: 32
+        radius: 16
+        color: on ? Qt.rgba(1, 1, 1, 0.92) : hovered ? Theme.alpha(Theme.ink, 0.16) : Theme.alpha(Theme.ink, 0.08)
+        Row {
+            id: pr
+            anchors.centerIn: parent
+            spacing: 6
+            Ms {
+                name: pa.icon
+                size: 18
+                color: pa.on ? "#141414" : Theme.ink
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Txt {
+                text: pa.label
+                px: 12
+                weight: Font.Medium
+                color: pa.on ? "#141414" : Theme.ink
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
     }
-    // playlists
-    IconBtn {
+    Row {
         anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: 10
-        icon: "queue_music"
-        color: hovered ? Theme.mix(Theme.alpha(Theme.ink, 0.1), Theme.alpha(Theme.surface, 0.55), 0.5) : Theme.alpha(Theme.surface, 0.55)
-        tip: "Playlists"
-        onClicked: lists.visible = !lists.visible
+        anchors.rightMargin: 14
+        y: page.col ? page.height - height - 14 : 10
+        spacing: 6
+        Pastille {
+            icon: "lyrics"
+            label: "Paroles"
+            on: page.lyricsOn
+            onClicked: Ilot.saveUi({ lyrics: !page.lyricsOn })
+        }
+        Pastille {
+            icon: "queue_music"
+            label: "Playlists"
+            on: lists.visible
+            onClicked: lists.visible = !lists.visible
+        }
     }
 
     // ------------------------------------------- playlists favorites

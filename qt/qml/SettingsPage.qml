@@ -620,6 +620,86 @@ Item {
                     current: page.cfg.media_bg || "art"
                     onPicked: v => Ilot.setCfg({ media_bg: v })
                 }
+
+                // lecteur : survol de la pilule, onglet Media, carte de l'accueil
+                SetRow {
+                    icon: "music_note"
+                    title: "Lecteur de musique"
+                    sub: "Survol de la pilule, onglet Média et carte de l'accueil"
+                }
+                SubTitle { text: "Couleur du lecteur" }
+                Flow {
+                    width: parent.width
+                    topPadding: 8
+                    spacing: 6
+                    Swatch {
+                        on: (page.cfg.player_color || "art") === "art"
+                        icon: "album"
+                        tip: "Pochette du morceau en cours"
+                        onClicked: Ilot.setCfg({ player_color: "art" })
+                    }
+                    Swatch {
+                        on: page.cfg.player_color === "theme"
+                        icon: "palette"
+                        tip: "Couleurs du thème"
+                        onClicked: Ilot.setCfg({ player_color: "theme" })
+                    }
+                    Repeater {
+                        model: page.swatches
+                        Swatch {
+                            required property var modelData
+                            fill: modelData
+                            on: page.cfg.player_color === modelData
+                            onClicked: Ilot.setCfg({ player_color: modelData })
+                        }
+                    }
+                }
+                SubTitle { text: "Barre de progression" }
+                Chips {
+                    model: [["wave", "Ondulée"], ["flat", "Plate"]]
+                    current: page.cfg.player_bar || "wave"
+                    onPicked: v => Ilot.setCfg({ player_bar: v })
+                }
+                SubTitle { text: "Bouton lecture" }
+                Chips {
+                    model: [["cookie", "Festonné"], ["round", "Rond"]]
+                    current: page.cfg.player_btn || "cookie"
+                    onPicked: v => Ilot.setCfg({ player_btn: v })
+                }
+                SubTitle { text: "Bouton lecture de l'onglet Média" }
+                Chips {
+                    model: [["white", "Blanc lumineux"], ["accent", "Couleur du lecteur"]]
+                    current: page.cfg.player_bigbtn || "white"
+                    onPicked: v => Ilot.setCfg({ player_bigbtn: v })
+                }
+                SubTitle { text: "Pochette de l'onglet Média" }
+                Chips {
+                    model: [["round", "Arrondie"], ["scallop", "Festonnée, avec spectre"]]
+                    current: page.cfg.player_art || "scallop"
+                    onPicked: v => Ilot.setCfg({ player_art: v })
+                }
+                SubTitle { text: "Disposition de l'onglet Média" }
+                Chips {
+                    model: [["col", "Colonne (paroles à droite)"], ["side", "Côte à côte (paroles en bas)"]]
+                    current: page.cfg.player_layout || "col"
+                    onPicked: v => Ilot.setCfg({ player_layout: v })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Glisser la pochette pour changer de titre"
+                    sub: "Au survol de la pilule : vers la gauche, titre suivant ; vers la droite, précédent"
+                    toggle: true
+                    checked: !!page.cfg.player_swipe
+                    onToggled: on => Ilot.setCfg({ player_swipe: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Molette : volume de l'appli qui joue"
+                    sub: "Pendant la musique, la molette sur la pilule règle le volume de Spotify (ou de l'appli qui joue) au lieu du volume général"
+                    toggle: true
+                    checked: !!page.cfg.player_wheel
+                    onToggled: on => Ilot.setCfg({ player_wheel: on })
+                }
             }
 
             // ---------------------------------------------------- pilule

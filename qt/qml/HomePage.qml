@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import "ical.mjs" as Ical
 
 // Accueil : utilisateur, meteo, horloge, calendrier, lecteur, ressources,
@@ -469,103 +470,211 @@ Item {
     }
 
     // -------------------------------------------------------- lecteur
+    // carte « En lecture » (maquette atelier, accueil C) : fond de pochette
+    // floutee, pochette arrondie, titre qui defile, lecture / pause et etat,
+    // precedent / suivant, progression
     Card {
         id: mediaCard
         x: col1 + col2 + gap * 2
         width: col3
         height: row1 + row2 + row3 + gap * 2
         clip: true
-        VizBars {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: 40
-            opacity: 0.45
-            active: home.shown
+        readonly property bool paused: Ilot.hasMedia && !Ilot.media.playing
+
+        // fond (.wash) : pochette tres floue (decodee en 48 px) et saturee, qui
+        // deborde de 30 px ; flou calcule une fois, masque aux coins de la carte
+        Item {
+            id: washSrc
+            anchors.fill: parent
+            anchors.margins: -30
+            visible: false
+            Image {
+                anchors.fill: parent
+                source: Ilot.hasMedia ? Ilot.art : ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                smooth: true
+                sourceSize.width: 48
+            }
         }
+        Item {
+            id: washMask
+            anchors.fill: washSrc
+            visible: false
+            layer.enabled: washFx.visible
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 30
+                radius: mediaCard.radius
+            }
+        }
+        MultiEffect {
+            id: washFx
+            anchors.fill: washSrc
+            source: washSrc
+            visible: home.shown && Ilot.hasMedia && Ilot.art !== ""
+            blurEnabled: true
+            blurMax: 64
+            blur: 1
+            saturation: 0.6
+            opacity: 0.4
+            maskEnabled: true
+            maskSource: washMask
+        }
+
         Column {
-            anchors.centerIn: parent
-            width: parent.width - 28
-            spacing: 4
-            Item {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: 138
-                height: 138
-                // barres en cercle autour du disque, suivant la musique (graves en
-                // haut, symetrique) ; le disque bat avec les basses
-                Repeater {
-                    model: Ilot.live && home.shown ? 48 : 0
-                    // un bras par barre, tourne autour du centre du disque
-                    Item {
-                        id: arm
-                        required property int index
-                        readonly property int band: index < 24 ? index : 47 - index
-                        readonly property real v: Ilot.shown[band] || 0
-                        anchors.centerIn: parent
-                        width: 2.6
-                        height: 2 * (76 + 22)
-                        rotation: index * 7.5
-                        Rectangle {
-                            width: parent.width
-                            height: 2 + arm.v * 20
-                            radius: width / 2
-                            y: parent.height / 2 - 76 - height
-                            color: arm.band < 8 ? Theme.primary : arm.band < 16 ? Theme.tertiary : Theme.secondary
-                            opacity: arm.v < 0.01 ? 0 : 0.45 + arm.v * 0.55
-                        }
-                    }
-                }
-                // anneau (box-shadow 0 0 0 5px) : hors de la mise en page
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 148
-                    height: 148
-                    radius: 74
-                    color: Theme.surfaceHigh
-                    scale: Ilot.live ? 1 + (Ilot.shown[0] + Ilot.shown[1] + Ilot.shown[2]) / 3 * 0.07 : 1
-                }
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 69
-                    color: Theme.surfaceHighest
-                    Ms {
-                        anchors.centerIn: parent
-                        name: "music_note"
-                        size: 44
-                        color: Theme.inkVariant
-                    }
-                    RoundArt {
-                        anchors.fill: parent
-                        size: 138
-                        period: 14000
-                        spinning: Ilot.media.playing && home.shown
-                    }
-                }
-            }
-            Item {
-                width: 1
-                height: 6
-            }
+            x: 16
+            y: 18
+            width: parent.width - 32
+            spacing: 3
+            // .lbl
             Txt {
                 width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                text: Ilot.hasMedia ? Ilot.media.title || "Sans titre" : "Rien en lecture"
-                px: 14
-                weight: Font.Medium
+                text: "EN LECTURE" + (Ilot.hasMedia && Ilot.media.app ? " · " + Ilot.media.app : "")
+                px: 10
+                weight: Font.DemiBold
+                font.letterSpacing: 1.4
+                color: Ilot.playerPal.primary
                 elide: Text.ElideRight
+            }
+            // pochette 198 (marges 8 / 10) : reduite et assombrie en pause
+            Item {
+                width: parent.width
+                height: 8 + 198 + 10
+                Item {
+                    y: 8
+                    width: 198
+                    height: 198
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    scale: mediaCard.paused ? 0.92 : 1
+                    // --spatial
+                    Behavior on scale { NumberAnimation { duration: 500; easing.type: Easing.BezierSpline; easing.bezierCurve: [0.38, 1.21, 0.22, 1, 1, 1] } }
+                    RectangularShadow {
+                        anchors.fill: parent
+                        radius: 18
+                        offset.y: 8
+                        blur: 20
+                        color: Qt.rgba(0, 0, 0, 0.4)
+                    }
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 18
+                        color: Theme.surfaceHighest
+                        Ms {
+                            anchors.centerIn: parent
+                            name: "music_note"
+                            size: 44
+                            color: Theme.inkVariant
+                        }
+                    }
+                    ArtImage {
+                        anchors.fill: parent
+                        radius: 18
+                    }
+                    // voile de pause (brightness .6)
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 18
+                        color: "black"
+                        visible: opacity > 0
+                        opacity: mediaCard.paused ? 0.4 : 0
+                        Behavior on opacity { NumberAnimation { duration: 400 } }
+                    }
+                }
+            }
+            // titre : defile s'il est trop long (comme l'onglet Media)
+            Item {
+                id: mTitleBox
+                width: parent.width
+                height: mTitle.implicitHeight
+                clip: true
+                readonly property real over: mTitle.implicitWidth - width
+                property real shift: 0
+                Txt {
+                    id: mTitle
+                    x: mScroll.running ? mTitleBox.shift : 0
+                    text: Ilot.hasMedia ? Ilot.media.title || "Sans titre" : "Rien en lecture"
+                    px: 17
+                    weight: Font.Bold
+                }
+                SequentialAnimation {
+                    id: mScroll
+                    running: mTitleBox.over > 4 && home.shown && !Theme.reduced
+                    loops: Animation.Infinite
+                    onRunningChanged: mTitleBox.shift = 0
+                    PauseAnimation { duration: 2500 }
+                    NumberAnimation { target: mTitleBox; property: "shift"; from: 0; to: -mTitleBox.over; duration: Math.max(1500, mTitleBox.over * 30); easing.type: Easing.InOutSine }
+                    PauseAnimation { duration: 1500 }
+                    NumberAnimation { target: mTitleBox; property: "shift"; to: 0; duration: 600; easing.type: Easing.InOutCubic }
+                }
             }
             Txt {
                 width: parent.width
                 height: Math.max(15, implicitHeight)
-                horizontalAlignment: Text.AlignHCenter
                 text: Ilot.hasMedia ? Ilot.media.artist || "" : ""
-                px: 12
+                px: 12.5
                 color: Theme.inkVariant
                 elide: Text.ElideRight
             }
-            MediaControls {
-                anchors.horizontalCenter: parent.horizontalCenter
-                topPadding: 8
+            // lecture / pause, etat, precedent / suivant (marge haute 8)
+            Item {
+                width: parent.width
+                height: 8 + 42
+                PlayBtn {
+                    id: mPlay
+                    y: 8
+                    size: 42
+                }
+                Txt {
+                    x: mPlay.width + 8
+                    y: 8
+                    width: mPrev.x - x - 8
+                    height: 42
+                    text: Ilot.media.playing ? "Pause" : "Lecture"
+                    px: 13
+                    weight: Font.Medium
+                    elide: Text.ElideRight
+                }
+                IconBtn {
+                    id: mPrev
+                    x: mNext.x - 8 - width
+                    y: 8 + 5
+                    width: 32
+                    height: 32
+                    iconSize: 20
+                    icon: "skip_previous"
+                    readonly property bool can: !Ilot.hasMedia || Ilot.media.can_prev !== false
+                    opacity: can ? 1 : 0.35
+                    tip: "Précédent"
+                    // grise : le clic est pris quand meme (pas d'ouverture du panneau)
+                    onClicked: if (can) Ilot.mediaAction("prev")
+                    onMiddleClicked: Ilot.mediaAction("toggle")
+                }
+                IconBtn {
+                    id: mNext
+                    x: parent.width - width
+                    y: 8 + 5
+                    width: 32
+                    height: 32
+                    iconSize: 20
+                    icon: "skip_next"
+                    readonly property bool can: !Ilot.hasMedia || Ilot.media.can_next !== false
+                    opacity: can ? 1 : 0.35
+                    tip: "Suivant"
+                    onClicked: if (can) Ilot.mediaAction("next")
+                    onMiddleClicked: Ilot.mediaAction("toggle")
+                }
+            }
+            // progression (marge haute 4), seulement avec un titre
+            Item {
+                visible: Ilot.hasMedia
+                width: parent.width
+                height: 4 + 20
+                SeekBar {
+                    y: 4
+                    width: parent.width
+                    small: true
+                }
             }
         }
     }

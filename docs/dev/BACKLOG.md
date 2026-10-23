@@ -13,6 +13,23 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🔴 **`Theme.lift` rend une couleur transparente** : `Theme.qml:129`. Il
+  appelle `mix(c, "#ffffff", 0.88)`, et `mix` lit `.r` sur la chaîne, ce qui
+  donne NaN puis `#00000000`. C'est l'agent `relecteur` qui l'a vu, avec
+  `qml.exe` le 2026-10-23. Au survol, les `IconBtn filled`, `TextBtn primary`
+  et `BarContent` perdent donc leur fond. Correction :
+  `mix(c, Qt.rgba(1, 1, 1, 1), 0.88)`. Pas corrigé, car ça change l'aspect de
+  plusieurs boutons. `PlayBtn` le contourne déjà.
+- 🟠 **Boucle de liaison `overIsland`** : `Main.qml:65`. Le journal Qt
+  affiche « Binding loop detected » à l'entrée dans l'îlot : `overIsland`
+  appelle `setHovered`, puis `setMode`, `Ilot.size`, `hoverZone`, et revient à
+  `overIsland`. Vu le 2026-10-23. Ça existait sans doute avant la refonte du
+  lecteur, mais ce n'est pas vérifié.
+- 🟢 **Lecteur, une seule session** : seule `GetCurrentSession()` est suivie,
+  donc on ne choisit pas entre deux applis qui jouent. Il n'y a pas non plus
+  d'aléatoire ni de répétition, qui demanderaient du Rust en plus. Voir
+  `PLAN-MEDIA.md`, « Hors plan ».
+
 - 🟢 **Infobulle au-dessus d'un menu natif** : `Btn.qml`. Après un clic sur
   une icône de la zone de notification, le menu de l'appli capture la souris.
   Notre infobulle peut rester affichée jusqu'au prochain mouvement sur la

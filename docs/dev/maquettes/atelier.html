@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier Musique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block" rel="stylesheet">
+<style>
+/* Atelier : variantes de la partie musique de l'ilot, aux dimensions exactes
+   du code (Ilot.sizeFor, Panel.qml, HomePage.qml), palette sombre par defaut
+   de Theme.qml. Donnees factices. */
+:root {
+  --primary: #cfbdfe; --ink-primary: #36265d; --primary-container: #4d3d75;
+  --secondary-container: #4a4458; --tertiary-container: #633b48;
+  --surface: #141218; --surface-low: #1d1b20; --surface-c: #211f26;
+  --surface-high: #2b2930; --surface-highest: #36343b;
+  --ink: #e6e0e9; --ink-variant: #cac4d0;
+  --spring: cubic-bezier(.34, 1.36, .5, 1); --emph: cubic-bezier(.05, .7, .1, 1); --std: cubic-bezier(.2, 0, 0, 1);
+  --spatial: cubic-bezier(.38, 1.21, .22, 1);
+  --accent: #cfbdfe;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #0d0c10; color: var(--ink); font-family: Rubik, system-ui, sans-serif; user-select: none; }
+.ms { font-family: "Material Symbols Rounded"; font-weight: 400; font-style: normal; font-size: 20px; line-height: 1; white-space: nowrap; direction: ltr; font-variation-settings: "FILL" 1, "opsz" 24; -webkit-font-smoothing: antialiased; display: inline-block; }
+
+/* ------------------------------------------------ page */
+header { position: sticky; top: 0; z-index: 10; background: #0d0c10ee; backdrop-filter: blur(10px); border-bottom: 1px solid #ffffff12; padding: 12px 24px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+header h1 { font-size: 17px; margin: 0 12px 0 0; }
+.hbtn { border: 0; height: 32px; padding: 0 12px; border-radius: 16px; background: #ffffff12; color: var(--ink); font: 500 12px Rubik, sans-serif; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.hbtn:hover { background: #ffffff20; }
+.hbtn .ms { font-size: 18px; }
+header .sep { flex: 1; }
+main { max-width: 1200px; margin: 0 auto; padding: 8px 24px 80px; }
+section { margin-top: 34px; }
+section h2 { font-size: 15px; margin: 0 0 4px; display: flex; align-items: baseline; gap: 10px; }
+section h2 small { font-weight: 400; color: var(--ink-variant); font-size: 12px; }
+.pick { display: flex; gap: 6px; margin: 10px 0; flex-wrap: wrap; }
+.pick button { border: 0; padding: 8px 14px; border-radius: 12px; background: #ffffff0f; color: var(--ink-variant); font: 500 12.5px Rubik, sans-serif; cursor: pointer; text-align: left; }
+.pick button b { display: block; color: var(--ink); font-weight: 600; margin-bottom: 2px; }
+.pick button.on { background: var(--primary-container); color: #e9ddff; }
+.pick button.on b { color: #fff; }
+.note { color: #ffffff77; font-size: 12px; margin: 0 0 10px; line-height: 1.5; }
+
+/* scene : fond d'ecran, l'ilot colle en haut au centre */
+.stage { position: relative; border-radius: 16px; overflow: hidden; background: radial-gradient(900px 400px at 20% 120%, #2a2250, transparent 60%), radial-gradient(700px 400px at 90% -20%, #3a1f33, transparent 55%), linear-gradient(160deg, #1a1722, #0c0b10); }
+.stage .anchor { position: absolute; top: 0; left: 50%; transform: translateX(-50%); }
+
+/* ------------------------------------------------ ilot (Island.qml + Ear.qml) */
+.isl { position: relative; background: var(--surface); border-radius: 0 0 var(--r) var(--r); }
+.isl::before, .isl::after { content: ""; position: absolute; top: 0; width: var(--ear); height: var(--ear); }
+.isl::before { left: calc(-1 * var(--ear)); background: radial-gradient(circle at 0 100%, transparent var(--ear), var(--surface) calc(var(--ear) + .5px)); }
+.isl::after { right: calc(-1 * var(--ear)); background: radial-gradient(circle at 100% 100%, transparent var(--ear), var(--surface) calc(var(--ear) + .5px)); }
+
+/* replie */
+.mini { height: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.pet { width: 20px; height: 18px; }
+.disc { border-radius: 50%; background-size: cover; background-position: center; flex: none; }
+.clock { font-size: 13px; font-weight: 500; letter-spacing: .3px; font-variant-numeric: tabular-nums; }
+.ringwrap { position: relative; flex: none; }
+.ringwrap svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.mtitle { width: 84px; overflow: hidden; white-space: nowrap; font-size: 12px; color: var(--ink-variant); -webkit-mask-image: linear-gradient(90deg, #000 80%, transparent); mask-image: linear-gradient(90deg, #000 80%, transparent); }
+.mtitle span { display: inline-block; animation: tick 9s linear infinite; padding-right: 30px; }
+@keyframes tick { 0%, 20% { transform: translateX(0); } 90%, 100% { transform: translateX(-100%); } }
+
+/* survol */
+.peek { height: 100%; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 10px; }
+.peek .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.t1 { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t2 { color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.art { background-size: cover; background-position: center; flex: none; position: relative; transition: transform 500ms var(--spatial), filter 400ms; }
+.paused .art.dim { transform: scale(.92); filter: brightness(.6); }
+.ctrls { display: flex; align-items: center; gap: 2px; flex: none; }
+
+/* boutons */
+.ib { position: relative; border: 0; background: transparent; color: var(--ink); display: grid; place-items: center; cursor: pointer; border-radius: 50%; padding: 0; transition: transform 350ms var(--spatial); }
+.ib::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #ffffff16; transform: scale(.35); opacity: 0; transition: transform 140ms, opacity 140ms; }
+.ib:hover::before { transform: scale(1); opacity: 1; }
+.ib .ms { position: relative; }
+.play { position: relative; border: 0; background: transparent; padding: 0; cursor: pointer; display: grid; place-items: center; flex: none; transition: transform 300ms var(--spatial); }
+.play:active { transform: scale(.88); }
+.play svg { position: absolute; inset: 0; overflow: visible; }
+.play .ms { position: relative; }
+
+/* barre de progression (SeekBar.qml) */
+.seek { display: flex; align-items: center; height: 20px; }
+.seek .t { font-weight: 500; color: var(--ink-variant); font-variant-numeric: tabular-nums; flex: none; }
+.seek .t.r { text-align: right; }
+.seek .hit { position: relative; flex: 1; height: 20px; margin: 0 4px; cursor: pointer; }
+.seek canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bubble { position: absolute; bottom: 100%; transform: translateX(-50%); padding: 1px 7px; border-radius: 8px; background: var(--surface-highest); font-size: 11px; font-variant-numeric: tabular-nums; pointer-events: none; opacity: 0; transition: opacity 120ms; white-space: nowrap; }
+.bubble.on { opacity: 1; }
+
+/* panneau (Panel.qml) */
+.topbar { position: absolute; left: 0; right: 0; top: 0; height: 65px; }
+.qs { position: absolute; left: 18px; top: 12px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-variant); }
+.tools { position: absolute; right: 18px; top: 12px; display: flex; gap: 4px; }
+.tools span { width: 34px; height: 34px; display: grid; place-items: center; color: var(--ink-variant); }
+.tools .ms, .qs .ms { font-size: 19px; }
+.tabs { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); height: 43px; padding: 4px; border-radius: 21.5px; background: var(--surface-c); display: flex; }
+.tab { height: 35px; padding: 0 8px; border-radius: 17.5px; display: flex; align-items: center; gap: 6px; color: var(--ink-variant); font-size: 13px; cursor: pointer; }
+.tab .ms { font-size: 19px; }
+.tab.on { background: var(--primary); color: var(--ink-primary); }
+.pagearea { position: absolute; left: 16px; top: 65px; width: 708px; height: 459px; }
+.card { position: absolute; border-radius: 22px; background: var(--surface-c); overflow: hidden; }
+.ghost { display: grid; place-items: center; color: #ffffff38; font-size: 12px; }
+
+/* widget accueil */
+.wash { position: absolute; inset: -30px; background-size: cover; background-position: center; filter: blur(34px) saturate(1.6); opacity: .4; }
+.wcol { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 14px; }
+.lbl { font-size: 10px; font-weight: 600; letter-spacing: 1.4px; color: var(--accent); }
+
+/* onglet media */
+.mpage { position: absolute; inset: 0; border-radius: 22px; overflow: hidden; background: #0b0a0f; }
+.liquid { position: absolute; inset: 0; overflow: hidden; }
+.liquid i { position: absolute; width: 60%; height: 70%; border-radius: 50%; filter: blur(60px); opacity: .55; }
+.liquid::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, #0000 40%, #0007); }
+.halo { position: absolute; inset: 0; border-radius: 28px; background-size: cover; filter: blur(28px) saturate(1.7); opacity: 0; transform: scale(1.05); transition: opacity 600ms, transform 600ms var(--emph); }
+.playing .halo { opacity: .75; transform: scale(1.12); }
+.big { position: absolute; inset: 0; background-size: cover; background-position: center; transition: transform 500ms var(--spatial), filter 400ms; }
+.paused .big { transform: scale(.9); filter: brightness(.55); }
+.ringcv { position: absolute; pointer-events: none; }
+.chip { font-size: 11px; padding: 3px 9px; border-radius: 9px; background: #ffffff14; color: var(--ink-variant); }
+.marq { overflow: hidden; white-space: nowrap; }
+.marq span { display: inline-block; }
+.marq.run span { animation: marq var(--dur) ease-in-out infinite; }
+@keyframes marq { 0%, 22% { transform: translateX(0); } 78%, 100% { transform: translateX(var(--dist)); } }
+.pastille { border: 0; height: 32px; padding: 0 12px; border-radius: 16px; background: #ffffff14; color: var(--ink); font: 500 12px Rubik, sans-serif; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.pastille.on { background: #ffffffeb; color: #141414; }
+.pastille .ms { font-size: 18px; }
+.vol { display: flex; align-items: center; gap: 10px; color: var(--ink-variant); }
+.vol .ms { font-size: 18px; }
+.vtrack { position: relative; height: 8px; border-radius: 4px; background: #ffffff26; flex: 1; }
+.vtrack i { position: absolute; left: 0; top: 0; bottom: 0; width: 70%; border-radius: 4px; background: var(--ink); }
+.vtrack b { position: absolute; left: 70%; top: -6px; width: 4px; height: 20px; border-radius: 2px; background: var(--ink); margin-left: -2px; }
+.lyrics { position: absolute; top: 0; bottom: 0; right: 0; width: 50%; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #0000, #000 22%, #000 78%, #0000); mask-image: linear-gradient(180deg, #0000, #000 22%, #000 78%, #0000); }
+.ly-list { position: absolute; left: 0; right: 24px; top: 50%; transition: transform 560ms cubic-bezier(.34, 1.4, .5, 1); }
+.ly { font-size: 18px; font-weight: 700; line-height: 1.3; padding: 6px 12px; margin: 2px 0; border-radius: 16px; opacity: .28; transform: scale(.96); transform-origin: left center; transition: opacity 400ms, transform 400ms var(--spatial), background 400ms, text-shadow 400ms; }
+.ly.on { opacity: 1; transform: none; background: #ffffff12; text-shadow: 0 0 18px var(--accent); }
+
+/* choix */
+#summary { max-width: 1200px; margin: 0 auto 60px; padding: 0 24px; font-size: 12px; }
+#summary > div { background: #1d1b22; border: 1px solid #ffffff1a; border-radius: 16px; padding: 14px 16px; }
+#summary h3 { margin: 0 0 6px; font-size: 13px; }
+#summary pre { margin: 0 0 8px; font: 12px/1.5 Consolas, monospace; color: #b9f5c9; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Atelier Musique</h1>
+  <button class="hbtn" id="gPlay"><span class="ms">pause</span><span>Pause</span></button>
+  <button class="hbtn" id="gNext"><span class="ms">skip_next</span>Morceau suivant</button>
+  <span class="sep"></span>
+  <span style="font-size:12px;color:#ffffff77">Dimensions exactes de l'îlot (Ilot.sizeFor, Panel.qml, HomePage.qml) · palette sombre par défaut</span>
+</header>
+
+<main>
+  <section data-sec="mini">
+    <h2>1. Pilule repliée <small>224 × 30 avec le compagnon · les 3 barres d'égaliseur sont retirées</small></h2>
+    <div class="pick"></div>
+    <p class="note"></p>
+    <div class="stage" style="height:90px"><div class="anchor"></div></div>
+  </section>
+
+  <section data-sec="peek">
+    <h2>2. Pilule survolée <small>460 × 76 aujourd'hui · survole la barre, clique, glisse</small></h2>
+    <div class="pick"></div>
+    <p class="note"></p>
+    <div class="stage" style="height:140px"><div class="anchor"></div></div>
+  </section>
+
+  <section data-sec="home">
+    <h2>3. Widget musique de l'accueil <small>carte de 230 × 397 dans la grille de l'accueil (708 × 459)</small></h2>
+    <div class="pick"></div>
+    <p class="note"></p>
+    <div class="stage" style="height:570px"><div class="anchor"></div></div>
+  </section>
+
+  <section data-sec="media">
+    <h2>4. Onglet Média <small>zone de page de 708 × 459 dans le panneau de 740 × 540</small></h2>
+    <div class="pick"></div>
+    <p class="note"></p>
+    <div class="stage" style="height:570px"><div class="anchor"></div></div>
+  </section>
+
+  <section data-sec="wheel">
+    <h2>5. Molette sur la pilule pendant la musique</h2>
+    <div class="pick"></div>
+    <p class="note"></p>
+  </section>
+</main>
+
+<div id="summary"><div>
+  <h3>Tes choix</h3>
+  <pre id="sumTxt"></pre>
+  <button class="hbtn" id="copy"><span class="ms">content_copy</span>Copier pour Claude</button>
+</div></div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------- donnees
+const TRACKS = [
+  { title: "Néons sur la Loire", artist: "Les Phares Bleus", album: "Marée basse", app: "Spotify", dur: 214, c: ["#5b3fd1", "#e2557a", "#2bb3c0"] },
+  { title: "Minuit, quai 9 (version longue enregistrée en direct)", artist: "Aube Rouge", album: "Gare du Nord", app: "Spotify", dur: 187, c: ["#d9622b", "#f2c14e", "#7a1f3d"] },
+  { title: "Sable & cendres", artist: "Opaline", album: "Dunes", app: "Chrome", dur: 248, c: ["#1f8a70", "#bedb39", "#004358"] },
+];
+const LYRICS = ["Les lumières glissent sur l'eau", "On compte les ponts un par un", "Personne ne dort ce soir", "♪",
+  "Et la ville tient sa promesse", "On attend que le jour se lève", "Encore un tour, encore un", "Les néons s'éteignent doucement",
+  "♪", "On garde la nuit pour nous", "Jusqu'au dernier refrain", "♪"];
+function makeArt(t, i) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 320;
+  const g = c.getContext("2d");
+  const lg = g.createLinearGradient(0, 0, 320, 320);
+  lg.addColorStop(0, t.c[0]); lg.addColorStop(1, t.c[2]);
+  g.fillStyle = lg; g.fillRect(0, 0, 320, 320);
+  const rg = g.createRadialGradient(210, 110, 10, 210, 110, 170);
+  rg.addColorStop(0, t.c[1]); rg.addColorStop(1, "transparent");
+  g.fillStyle = rg; g.fillRect(0, 0, 320, 320);
+  g.globalAlpha = .18; g.fillStyle = "#fff";
+  for (let k = 0; k < 6; k++) g.fillRect(0, 200 + k * 18 + i * 4, 320, 6);
+  g.globalAlpha = 1; g.fillStyle = "#ffffffd0"; g.font = "700 30px Rubik, sans-serif";
+  g.fillText(t.artist.toUpperCase().slice(0, 14), 22, 50);
+  return c.toDataURL("image/png");
+}
+const S = { playing: true, track: 0, pos: 52, pick: { mini: "A", peek: "A", home: "A", media: "A", wheel: "A" }, lyrics: false };
+const cur = () => TRACKS[S.track];
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+function hsl(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  let h = 0, s = 0;
+  if (mx !== mn) {
+    const d = mx - mn; s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn);
+    h = (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) / 6;
+  }
+  return [h * 360, s * 100, l * 100];
+}
+// couleur du lecteur : primaire d'un schema Material sombre (ton ~80)
+const accentOf = hex => { const [h, s] = hsl(hex); return `hsl(${h.toFixed(0)} ${Math.min(90, s + 10).toFixed(0)}% 76%)`; };
+let accent = "#cfbdfe";
+
+// ---------------------------------------------------------------- pieces
+const PET = `<svg class="pet" viewBox="0 0 20 18"><path d="M3 15c-2-4 0-12 7-12s9 8 7 12c-1 2-13 2-14 0z" fill="#b28dff"/><circle cx="7.5" cy="9" r="1.4" fill="#141218"/><circle cx="12.5" cy="9" r="1.4" fill="#141218"/></svg>`;
+const icon = (n, sz) => `<span class="ms" style="font-size:${sz}px">${n}</span>`;
+const ib = (act, n, box, sz) => `<button class="ib" data-act="${act}" style="width:${box}px;height:${box}px">${icon(n, sz)}</button>`;
+const play = (sz, white) => `<button class="play${white ? " white" : ""}" data-act="toggle" data-size="${sz}" style="width:${sz}px;height:${sz}px"></button>`;
+const seek = (kind, tpx) => `<div class="seek" data-seek="${kind}" data-tpx="${tpx}"></div>`;
+const ctrls = (b, p, gap, isz) => `<div class="ctrls" style="gap:${gap}px">${ib("prev", "skip_previous", b, isz)}${play(p)}${ib("next", "skip_next", b, isz)}</div>`;
+function island(w, h, r, ear, inner) {
+  return `<div class="isl" style="width:${w}px;height:${h}px;--r:${r}px;--ear:${ear}px">${inner}</div>`;
+}
+
+// ---------------------------------------------------------------- variantes
+const V = {
+  mini: {
+    A: { name: "Disque seul", note: "Compagnon, pochette ronde de 18 px qui tourne, heure. Le plus sobre (200 × 30).",
+      html: () => island(200, 30, 15, 15, `<div class="mini">${PET}<div class="disc spin" data-art style="width:18px;height:18px"></div><span class="clock">20:41</span></div>`) },
+    B: { name: "Disque + anneau de progression", note: "Pochette de 20 px entourée d'un fin anneau qui se remplit avec le morceau (204 × 30).",
+      html: () => island(204, 30, 15, 15, `<div class="mini">${PET}<div class="ringwrap" style="width:24px;height:24px"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="none" stroke="#ffffff22" stroke-width="2"/><circle class="prog" cx="12" cy="12" r="11" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-dasharray="69.1" stroke-dashoffset="69.1"/></svg><div class="disc spin" data-art style="position:absolute;left:3px;top:3px;width:18px;height:18px"></div></div><span class="clock">20:41</span></div>`) },
+    C: { name: "Disque + titre qui défile", note: "Pochette + titre court qui défile lentement (290 × 30). Plus d'infos, mais plus large.",
+      html: () => island(290, 30, 15, 15, `<div class="mini">${PET}<div class="disc spin" data-art style="width:18px;height:18px"></div><div class="mtitle"><span data-k="title"></span></div><span class="clock">20:41</span></div>`) },
+  },
+  peek: {
+    A: { name: "Actuelle · 460 × 76", note: "Ce qui est installé : pochette 52, boutons 34 / 42 / 34.",
+      html: () => island(460, 76, 26, 22, `<div class="peek"><div class="art dim" data-art style="width:52px;height:52px;border-radius:14px"></div><div class="info"><div class="t1" data-k="title" style="font-size:14px"></div><div class="t2" data-k="artist" style="font-size:12px"></div>${seek("peek", 10)}</div>${ctrls(34, 42, 2, 22)}</div>`) },
+    B: { name: "Plus grande · 520 × 88", note: "Pochette 64, titre 15, boutons 38 / 48 / 38. Plus confortable à viser.",
+      html: () => island(520, 88, 28, 22, `<div class="peek" style="gap:14px;padding:0 14px 0 12px"><div class="art dim" data-art style="width:64px;height:64px;border-radius:16px"></div><div class="info"><div class="t1" data-k="title" style="font-size:15px"></div><div class="t2" data-k="artist" style="font-size:12.5px"></div>${seek("peek", 10)}</div>${ctrls(38, 48, 4, 24)}</div>`) },
+    C: { name: "Compacte · 430 × 68", note: "Pochette 46, boutons 32 / 38 / 32. Plus discrète, comme l'ancienne taille.",
+      html: () => island(430, 68, 24, 22, `<div class="peek" style="gap:10px"><div class="art dim" data-art style="width:46px;height:46px;border-radius:12px"></div><div class="info"><div class="t1" data-k="title" style="font-size:13px"></div><div class="t2" data-k="artist" style="font-size:11.5px"></div>${seek("peek", 10)}</div>${ctrls(32, 38, 1, 20)}</div>`) },
+  },
+  home: {
+    A: { name: "Disque festonné + spectre", note: "La pochette festonnée de l'onglet Média en petit (124 px) avec son anneau de spectre, fond teinté par la pochette.",
+      card: () => `<div class="wash" data-art></div><div class="wcol" style="gap:3px">
+        <div style="position:relative;width:124px;height:124px;margin:18px 0 22px"><canvas class="ringcv" data-ring="124" style="left:-26px;top:-26px;width:176px;height:176px"></canvas><div class="halo" data-art style="border-radius:50%"></div><div class="big sc" data-art data-sc="124"></div></div>
+        <div class="marq" style="width:100%;text-align:center;font-size:15px;font-weight:700"><span data-k="title"></span></div>
+        <div data-k="artist" style="font-size:12px;color:var(--accent);font-weight:500"></div>
+        <div style="width:100%;margin-top:6px">${seek("home", 10)}</div>
+        <div class="ctrls" style="gap:8px;margin-top:4px">${ib("prev", "skip_previous", 36, 22)}${play(46)}${ib("next", "skip_next", 36, 22)}</div></div>` },
+    B: { name: "Pochette pleine", note: "La pochette prend tout le haut de la carte, fondue vers le bas, titre en gras dessous. Très « affiche ».",
+      card: () => `<div class="art dim" data-art style="position:absolute;left:0;top:0;width:230px;height:230px;border-radius:22px 22px 0 0;transform-origin:50% 40%"></div>
+        <div style="position:absolute;left:0;top:150px;width:230px;height:84px;background:linear-gradient(180deg,transparent,var(--surface-c))"></div>
+        <div class="wcol" style="top:216px;justify-content:flex-start;align-items:stretch;gap:2px">
+        <div class="lbl">EN LECTURE · <span data-k="app"></span></div>
+        <div class="marq" style="font-size:17px;font-weight:700"><span data-k="title"></span></div>
+        <div data-k="artist" style="font-size:12.5px;color:var(--ink-variant)"></div>
+        <div style="margin-top:6px">${seek("home", 10)}</div>
+        <div class="ctrls" style="gap:8px;justify-content:center;margin-top:4px">${ib("prev", "skip_previous", 36, 22)}${play(46)}${ib("next", "skip_next", 36, 22)}</div></div>` },
+    C: { name: "Carte de la maquette", note: "La carte « En lecture » de la maquette, mise à la verticale : pochette arrondie, bouton festonné et état.",
+      card: () => `<div class="wash" data-art></div><div class="wcol" style="justify-content:flex-start;align-items:stretch;padding:18px 16px;gap:3px">
+        <div class="lbl">EN LECTURE · <span data-k="app"></span></div>
+        <div class="art dim" data-art style="width:198px;height:198px;border-radius:18px;margin:8px 0 10px;box-shadow:0 8px 20px #0006"></div>
+        <div class="marq" style="font-size:17px;font-weight:700"><span data-k="title"></span></div>
+        <div data-k="artist" style="font-size:12.5px;color:var(--ink-variant)"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">${play(42)}<span data-k="state" style="font-size:13px;font-weight:500;margin-right:auto"></span>${ib("prev", "skip_previous", 32, 20)}${ib("next", "skip_next", 32, 20)}</div>
+        <div style="margin-top:4px">${seek("home", 10)}</div></div>` },
+  },
+  media: {
+    A: { name: "Maquette · pochette festonnée", note: "La maquette validée, adaptée à 708 × 459 : pochette 156 + anneau, bouton blanc lumineux.",
+      page: () => mediaCol(156, true) },
+    B: { name: "Maquette · pochette arrondie", note: "Même colonne, pochette carrée arrondie de 172 avec halo, sans anneau.",
+      page: () => mediaCol(172, false) },
+    C: { name: "Côte à côte", note: "Pochette 230 à gauche, infos à droite alignées à gauche (l'ancienne disposition, au nouveau style).",
+      page: () => mediaSide() },
+  },
+  wheel: {
+    A: { name: "Volume général (actuel)", note: "La molette règle le volume du périphérique par défaut (ton casque), musique ou pas." },
+    B: { name: "Volume de l'appli qui joue", note: "Quand de la musique joue, la molette règle le volume de Spotify (mélangeur Windows) ; sinon le volume général. Maj + molette inchangé." },
+    C: { name: "Au choix dans les réglages", note: "Option dans Réglages > Lecteur, désactivée par défaut." },
+  },
+};
+
+function mediaCol(art, sc) {
+  const box = sc ? `<div style="position:relative;width:${art}px;height:${art}px;margin:30px 0 32px"><canvas class="ringcv" data-ring="${art}" style="left:-34px;top:-34px;width:${art + 68}px;height:${art + 68}px"></canvas><div class="halo" data-art></div><div class="big sc" data-art data-sc="${art}"></div></div>`
+    : `<div style="position:relative;width:${art}px;height:${art}px;margin:12px 0 16px"><div class="halo" data-art></div><div class="big" data-art style="border-radius:26px;box-shadow:0 14px 34px #0007"></div></div>`;
+  return `<div class="liquid"><i></i><i></i><i></i><i></i></div>
+    <div class="mcol" style="position:absolute;top:0;bottom:0;left:50%;width:340px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:left 500ms var(--emph),transform 500ms var(--emph)">
+      ${box}
+      <div class="chip" data-k="app"></div>
+      <div class="marq" style="width:100%;text-align:center;font-size:22px;font-weight:700;margin-top:4px"><span data-k="title"></span></div>
+      <div data-k="artist" style="font-size:15px;font-weight:500;color:var(--accent)"></div>
+      <div data-k="album" style="font-size:12px;color:#ffffff66;min-height:15px"></div>
+      <div style="width:100%;margin-top:8px">${seek("big", 11)}</div>
+      <div class="ctrls" style="gap:22px;margin-top:6px">${ib("prev", "skip_previous", 44, 30)}${play(58, true)}${ib("next", "skip_next", 44, 30)}</div>
+      <div class="vol" style="width:250px;margin-top:10px"><span class="ms">volume_up</span><div class="vtrack"><i></i><b></b></div></div>
+    </div>
+    <div class="lyrics" style="display:none"><div class="ly-list"></div></div>
+    <div style="position:absolute;right:14px;bottom:14px;display:flex;gap:6px"><button class="pastille" data-ly><span class="ms">lyrics</span>Paroles</button><button class="pastille"><span class="ms">queue_music</span>Playlists</button></div>`;
+}
+function mediaSide() {
+  return `<div class="liquid"><i></i><i></i><i></i><i></i></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;gap:30px;padding:0 36px">
+      <div style="position:relative;width:230px;height:230px;flex:none"><div class="halo" data-art></div><div class="big" data-art style="border-radius:28px;box-shadow:0 14px 34px #0007"></div></div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+        <div><span class="chip" data-k="app"></span></div>
+        <div class="marq" style="font-size:24px;font-weight:700;margin-top:4px"><span data-k="title"></span></div>
+        <div data-k="artist" style="font-size:16px;font-weight:500;color:var(--accent)"></div>
+        <div data-k="album" style="font-size:12px;color:#ffffff66"></div>
+        <div style="margin-top:10px">${seek("big", 11)}</div>
+        <div class="ctrls" style="gap:22px;justify-content:center;margin-top:6px">${ib("prev", "skip_previous", 44, 30)}${play(58, true)}${ib("next", "skip_next", 44, 30)}</div>
+        <div class="vol" style="width:250px;margin:10px auto 0"><span class="ms">volume_up</span><div class="vtrack"><i></i><b></b></div></div>
+      </div>
+    </div>
+    <div style="position:absolute;right:14px;top:12px;display:flex;gap:6px"><button class="pastille"><span class="ms">lyrics</span>Paroles</button><button class="pastille"><span class="ms">queue_music</span>Playlists</button></div>`;
+}
+
+// panneau complet (Panel.qml) autour d'une page
+function panel(tab, inner) {
+  const tabs = [["dashboard", "Accueil", "home"], ["music_note", "Média", "media"], ["tune", "Contrôles", ""], ["apps", "Apps", ""], ["settings", "", ""]]
+    .map(([i, l, id]) => `<div class="tab${id === tab ? " on" : ""}">${icon(i, 19)}${l ? `<span>${l}</span>` : ""}</div>`).join("");
+  return island(740, 540, 30, 22, `<div class="topbar"><div class="qs">${icon("share", 19)}</div><div class="tabs">${tabs}</div><div class="tools"><span>${icon("open_in_full", 19)}</span><span>${icon("lock_open", 19)}</span><span>${icon("close", 19)}</span></div></div><div class="pagearea">${inner}</div>`);
+}
+function homePage(card) {
+  const g = (x, y, w, h, t, extra = "") => `<div class="card ghost" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;${extra}">${t}</div>`;
+  return g(0, 0, 229, 62, "utilisateur") + g(239, 0, 229, 62, "météo") + g(0, 72, 130, 247, "heure", "background:var(--primary-container);color:#ffffff55")
+    + g(140, 72, 328, 247, "calendrier") + g(0, 329, 468, 68, "ressources") + g(0, 407, 468, 52, "volume", "border-radius:26px") + g(478, 407, 230, 50, "session", "border-radius:25px")
+    + `<div class="card" style="left:478px;top:0;width:230px;height:397px">${card}</div>`;
+}
+
+// ---------------------------------------------------------------- rendu des sections
+function render(sec) {
+  const el = $(`[data-sec=${sec}]`);
+  const vs = V[sec], cur = S.pick[sec];
+  $(".pick", el).innerHTML = Object.entries(vs).map(([k, v]) => `<button data-v="${k}" class="${k === cur ? "on" : ""}"><b>${k} · ${v.name}</b></button>`).join("");
+  $(".note", el).textContent = vs[cur].note;
+  const a = $(".anchor", el);
+  if (!a) return;
+  const v = vs[cur];
+  a.innerHTML = sec === "home" ? panel("home", homePage(v.card())) : sec === "media" ? panel("media", `<div class="mpage">${v.page()}</div>`) : v.html();
+  mount(a);
+  renderTrack(false);
+}
+$$("section").forEach(s => s.addEventListener("click", e => {
+  const b = e.target.closest(".pick button");
+  if (!b) return;
+  S.pick[s.dataset.sec] = b.dataset.v;
+  render(s.dataset.sec);
+  summary();
+}));
+function summary() {
+  const n = { mini: "Pilule repliée", peek: "Pilule survolée", home: "Widget accueil", media: "Onglet Média", wheel: "Molette" };
+  $("#sumTxt").textContent = Object.entries(S.pick).map(([k, v]) => `${n[k]} : ${v} (${V[k][v].name})`).join("\n");
+}
+$("#copy").addEventListener("click", () => {
+  const t = $("#sumTxt").textContent;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { $("#copy").lastChild.textContent = "Copié !"; }, () => {
+    const r = document.createRange(); r.selectNodeContents($("#sumTxt")); getSelection().removeAllRanges(); getSelection().addRange(r);
+  });
+});
+
+// ---------------------------------------------------------------- piste
+function renderTrack(anim) {
+  const t = cur();
+  $$("[data-art]").forEach(e => { e.style.backgroundImage = `url(${t.img})`; });
+  $$("[data-k=title]").forEach(e => { e.textContent = t.title; });
+  $$("[data-k=artist]").forEach(e => { e.textContent = t.artist; });
+  $$("[data-k=album]").forEach(e => { e.textContent = t.album; });
+  $$("[data-k=app]").forEach(e => { e.textContent = t.app; });
+  accent = accentOf(t.c[1]);
+  document.documentElement.style.setProperty("--accent", accent);
+  $$(".liquid i").forEach((e, i) => { e.style.background = t.c[i % 3]; });
+  if (anim) $$(".art, .big").forEach(e => { e.animate([{ scale: .7 }, { scale: 1 }], { duration: 560, easing: "cubic-bezier(.34,1.9,.5,1)" }); });
+  $$(".sc").forEach(e => { e.style.clipPath = scallop(+e.dataset.sc); });
+  buildLyrics();
+  requestAnimationFrame(() => $$(".marq").forEach(m => {
+    const sp = m.firstElementChild;
+    m.classList.remove("run");
+    const over = sp.scrollWidth - m.clientWidth;
+    if (over > 4) { m.style.setProperty("--dist", -over + "px"); m.style.setProperty("--dur", Math.max(6, over / 25 + 5) + "s"); m.classList.add("run"); }
+  }));
+  playState();
+}
+function playState() {
+  document.body.classList.toggle("playing", S.playing);
+  document.body.classList.toggle("paused", !S.playing);
+  $$(".play .ms").forEach(m => { m.textContent = S.playing ? "pause" : "play_arrow"; });
+  $$("[data-k=state]").forEach(e => { e.textContent = S.playing ? "Pause" : "Lecture"; });
+  $("#gPlay").innerHTML = `${icon(S.playing ? "pause" : "play_arrow", 18)}<span>${S.playing ? "Pause" : "Lecture"}</span>`;
+}
+function act(a) {
+  if (a === "toggle") S.playing = !S.playing;
+  else if (a === "next") { S.track = (S.track + 1) % TRACKS.length; S.pos = 0; renderTrack(true); }
+  else if (a === "prev") { if (S.pos > 3) S.pos = 0; else { S.track = (S.track + 2) % TRACKS.length; S.pos = 0; renderTrack(true); } }
+  playState();
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]");
+  if (b) act(b.dataset.act);
+  const ly = e.target.closest("[data-ly]");
+  if (ly) toggleLyrics(ly);
+});
+$("#gPlay").addEventListener("click", () => act("toggle"));
+$("#gNext").addEventListener("click", () => act("next"));
+
+// paroles (onglet Media, colonne)
+let lyTimes = [];
+function buildLyrics() {
+  const d = cur().dur;
+  lyTimes = LYRICS.map((_, i) => 6 + i * (d - 12) / LYRICS.length);
+  $$(".ly-list").forEach(l => { l.innerHTML = LYRICS.map(t => `<div class="ly">${t}</div>`).join(""); l.dataset.on = "-2"; });
+}
+function toggleLyrics(btn) {
+  S.lyrics = !S.lyrics;
+  const page = btn.closest(".mpage");
+  btn.classList.toggle("on", S.lyrics);
+  $(".lyrics", page).style.display = S.lyrics ? "" : "none";
+  const col = $(".mcol", page);
+  col.style.left = S.lyrics ? "24px" : "50%";
+  col.style.transform = S.lyrics ? "none" : "translateX(-50%)";
+}
+function updateLyrics() {
+  let a = -1;
+  for (let i = 0; i < lyTimes.length; i++) if (lyTimes[i] <= S.pos) a = i;
+  $$(".ly-list").forEach(l => {
+    if (+l.dataset.on === a) return;
+    l.dataset.on = a;
+    const els = $$(".ly", l);
+    els.forEach((e, i) => e.classList.toggle("on", i === a));
+    const t = els[Math.max(0, a)];
+    if (t) l.style.transform = `translateY(${-(t.offsetTop + t.offsetHeight / 2)}px)`;
+  });
+}
+
+// ---------------------------------------------------------------- formes
+function cookiePath(sz, m) {
+  const R = sz / 2 - 1, c = sz / 2, N = 120;
+  let d = "";
+  for (let i = 0; i <= N; i++) {
+    const th = i / N * Math.PI * 2;
+    const k = (1 - m) * 0.055 * Math.cos(5 * th) + m * 0.07 * Math.cos(9 * th);
+    const r = R * (0.93 + k);
+    d += (i ? "L" : "M") + (c + r * Math.cos(th)).toFixed(2) + " " + (c + r * Math.sin(th)).toFixed(2);
+  }
+  return d + "Z";
+}
+function scallop(sz) {
+  const c = sz / 2, N = 160;
+  let d = "";
+  for (let i = 0; i <= N; i++) {
+    const th = i / N * Math.PI * 2;
+    const r = c * (0.95 + 0.04 * Math.cos(12 * th));
+    d += (i ? "L" : "M") + (c + r * Math.cos(th)).toFixed(1) + " " + (c + r * Math.sin(th)).toFixed(1);
+  }
+  return `path("${d}Z")`;
+}
+
+// boutons lecture et barres : montes a chaque rendu de section
+let plays = [], seeks = [], rings = [];
+function mount(root) {
+  $$(".play", root).forEach(p => {
+    const sz = +p.dataset.size, white = p.classList.contains("white");
+    p.innerHTML = `<svg viewBox="0 0 ${sz} ${sz}" width="${sz}" height="${sz}"${white ? ` style="filter:drop-shadow(0 4px 12px var(--accent))"` : ""}><path/></svg><span class="ms" style="font-size:${Math.round(sz * .5)}px;color:${white ? "#000" : "var(--ink-primary)"}"></span>`;
+    plays.push({ p, path: $("path", p), sz, white, m: 1, rot: 0 });
+  });
+  $$("[data-seek]", root).forEach(e => seeks.push(new Seek(e)));
+  $$("[data-ring]", root).forEach(c => rings.push({ c, g: c.getContext("2d"), a: +c.dataset.ring }));
+  plays = plays.filter(x => x.p.isConnected);
+  seeks = seeks.filter(x => x.root.isConnected);
+  rings = rings.filter(x => x.c.isConnected);
+  playState();
+}
+class Seek {
+  constructor(root) {
+    this.root = root;
+    this.kind = root.dataset.seek;
+    const tpx = root.dataset.tpx;
+    this.thin = this.kind === "big" ? 4 : 3;
+    this.thick = this.kind === "big" ? 7 : 5.5;
+    root.innerHTML = `<span class="t" style="font-size:${tpx}px;width:${tpx * 3}px"></span><div class="hit"><canvas></canvas><div class="bubble"></div></div><span class="t r" style="font-size:${tpx}px;width:${tpx * 3.4}px"></span>`;
+    [this.tl, this.tr] = $$(".t", root);
+    this.hit = $(".hit", root); this.cv = $("canvas", root); this.bub = $(".bubble", root); this.g = this.cv.getContext("2d");
+    this.hover = false; this.drag = false; this.frac = 0; this.hf = 0; this.th = this.thin; this.amp = 0; this.handle = 0;
+    const at = e => { const r = this.hit.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); };
+    this.hit.addEventListener("pointerenter", () => { this.hover = true; });
+    this.hit.addEventListener("pointerleave", () => { this.hover = false; });
+    this.hit.addEventListener("pointermove", e => { this.hf = at(e); if (this.drag) this.frac = this.hf; });
+    this.hit.addEventListener("pointerdown", e => { this.hit.setPointerCapture(e.pointerId); this.drag = true; this.frac = this.hf = at(e); });
+    this.hit.addEventListener("pointerup", () => { if (this.drag) { this.drag = false; S.pos = this.frac * cur().dur; } });
+  }
+  draw(dt, phase) {
+    const d = cur().dur, active = this.hover || this.drag;
+    this.tl.textContent = fmt(this.drag ? this.frac * d : S.pos);
+    this.tr.textContent = "-" + fmt(d - (this.drag ? this.frac * d : S.pos));
+    const ease = 1 - Math.exp(-dt / 0.06);
+    this.th += ((active ? this.thick : this.thin) - this.th) * ease;
+    this.amp += ((S.playing ? (active ? 2.4 : 1.6) * (this.kind === "big" ? 1 : .8) : 0) - this.amp) * ease;
+    this.handle += ((active ? 1 : 0) - this.handle) * ease;
+    const f = this.drag ? this.frac : Math.min(1, S.pos / d);
+    this.bub.classList.toggle("on", active);
+    if (active) { const bf = this.drag ? this.frac : this.hf, w = this.hit.clientWidth; this.bub.textContent = fmt(bf * d); this.bub.style.left = Math.max(16, Math.min(w - 16, bf * w)) + "px"; }
+    const dpr = devicePixelRatio, W = this.cv.clientWidth, H = this.cv.clientHeight;
+    if (this.cv.width !== Math.round(W * dpr)) { this.cv.width = Math.round(W * dpr); this.cv.height = Math.round(H * dpr); }
+    const g = this.g;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const mid = H / 2, th = this.th, x = f * W, gap = 2 + this.handle * 4;
+    g.lineCap = "round"; g.lineWidth = th;
+    g.strokeStyle = this.kind === "big" ? "#ffffff33" : "#ffffff26";
+    const x0 = x + gap + th / 2;
+    if (x0 < W - th / 2) { g.beginPath(); g.moveTo(x0, mid); g.lineTo(W - th / 2, mid); g.stroke(); }
+    g.strokeStyle = accent;
+    const x1 = x - gap - th / 2, wl = this.kind === "big" ? 34 : 22;
+    if (x1 > th / 2) {
+      g.beginPath();
+      for (let px = th / 2; px <= x1; px += 1) { const y = mid + this.amp * Math.sin(px / wl * Math.PI * 2 - phase); px === th / 2 ? g.moveTo(px, y) : g.lineTo(px, y); }
+      g.stroke();
+    }
+    if (this.handle > .02) { g.globalAlpha = this.handle; g.fillStyle = accent; const hh = H * .85 * this.handle; g.beginPath(); g.roundRect(x - 2, mid - hh / 2, 4, hh, 2); g.fill(); g.globalAlpha = 1; }
+  }
+}
+
+// ---------------------------------------------------------------- spectre factice + boucle
+const bands = new Float32Array(24);
+let last = performance.now(), phase = 0, spin = 0;
+function frame(now) {
+  const dt = Math.min(.1, (now - last) / 1000);
+  last = now;
+  const t = now / 1000, beat = Math.exp(-((t % .5) / .11));
+  for (let i = 0; i < 24; i++) {
+    const v = S.playing ? Math.min(1, (i < 5 ? beat * (1 - i / 6) : 0) * .9 + (.25 + .2 * Math.sin(t * (1.3 + i * .37) + i)) * (1 - i / 34) * (.6 + .4 * Math.abs(Math.sin(t * 2.1 + i * .7)))) : 0;
+    bands[i] += (v - bands[i]) * .35;
+  }
+  if (S.playing) {
+    S.pos += dt; phase += dt * 5; spin += dt * 45;
+    if (S.pos >= cur().dur) act("next");
+  }
+  for (const b of plays) {
+    b.m += ((S.playing ? 1 : 0) - b.m) * (1 - Math.exp(-dt / .12));
+    if (S.playing) b.rot += dt * 25;
+    b.path.setAttribute("d", cookiePath(b.sz, b.m));
+    b.path.setAttribute("fill", b.white ? "#fff" : accent);
+    b.p.querySelector("svg").style.transform = `rotate(${b.rot}deg)`;
+  }
+  seeks.forEach(s => s.draw(dt, phase));
+  $$(".spin").forEach(e => { e.style.transform = `rotate(${spin % 360}deg)`; });
+  $$(".prog").forEach(e => { e.setAttribute("stroke-dashoffset", (69.1 * (1 - S.pos / cur().dur)).toFixed(1)); });
+  for (const r of rings) {
+    const W = r.c.clientWidth, dpr = devicePixelRatio;
+    if (r.c.width !== Math.round(W * dpr)) r.c.width = r.c.height = Math.round(W * dpr);
+    const g = r.g; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, W);
+    const c = W / 2, r0 = r.a / 2 + 5, n = r.a > 140 ? 72 : 56, lw = r.a > 140 ? 4 : 3, maxL = r.a > 140 ? 22 : 16;
+    g.lineCap = "round"; g.lineWidth = lw; g.strokeStyle = accent;
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2 - Math.PI / 2;
+      const v = bands[Math.round((1 - Math.abs(i / n * 2 - 1)) * 23)];
+      g.globalAlpha = .55 + v * .45;
+      g.beginPath(); g.moveTo(c + r0 * Math.cos(a), c + r0 * Math.sin(a)); g.lineTo(c + (r0 + 3 + v * maxL) * Math.cos(a), c + (r0 + 3 + v * maxL) * Math.sin(a)); g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+  $$(".liquid i").forEach((b, i) => {
+    const x = 50 + 32 * Math.sin(t * (.11 + i * .03) + i * 1.7) - 30, y = 50 + 30 * Math.cos(t * (.09 + i * .04) + i * 2.3) - 35;
+    b.style.transform = `translate(${x}%, ${y}%) scale(${1 + bands[1] * .15})`;
+  });
+  updateLyrics();
+  requestAnimationFrame(frame);
+}
+
+document.fonts.ready.then(() => {
+  TRACKS.forEach((t, i) => { t.img = makeArt(t, i); });
+  ["mini", "peek", "home", "media", "wheel"].forEach(render);
+  summary();
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

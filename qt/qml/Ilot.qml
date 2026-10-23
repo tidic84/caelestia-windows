@@ -26,7 +26,15 @@ Item {
         cc_on: true, cc_sound: true, cc_min: 30,
         // compagnon (Reglages > Compagnon)
         pet_color: "nature", pet_eyes: "dot", pet_hat: "none", pet_face: "none", pet_neck: "none", pet_name: "",
-        pet_trail: "sparkle", pet_afk: 90, pet_size: "m"
+        pet_trail: "sparkle", pet_afk: 90, pet_size: "m",
+        // lecteur (Reglages > Apparence > Lecteur) : barre ondulee ou plate,
+        // bouton festonne ou rond, pochette arrondie ou festonnee, onglet Media
+        // en colonne ou cote a cote, couleur (pochette, theme, #rrggbb), bouton
+        // de l'onglet Media blanc ou de la couleur du lecteur,
+        // glisser sur la pochette du survol pour changer de titre, molette sur
+        // la pilule pendant la musique = volume de l'appli qui joue
+        player_bar: "wave", player_btn: "cookie", player_art: "scallop", player_layout: "col",
+        player_color: "art", player_swipe: false, player_bigbtn: "white", player_wheel: false
     })
     signal settingsChanged()
 
@@ -211,13 +219,14 @@ Item {
             return big ? bigSize : openSize
         if (s === "peek") {
             // sans musique ni activite : le compagnon se montre a cote de l'heure
-            const p = hasMedia ? { w: 420, h: 66 } : Watch.actShown ? { w: 380, h: 60 }
+            const p = hasMedia ? { w: 460, h: 76 } : Watch.actShown ? { w: 380, h: 60 }
                 : { w: (weather ? 320 : 250) + (Watch.petShown ? 40 : 0), h: 50 }
             return Watch.dcShown ? { w: p.w + 70, h: p.h } : p
         }
         if (act)
             return act.size
-        let w = hasMedia ? 200 : 132
+        // musique : disque + anneau de 24 px (+ 10 d'espacement)
+        let w = hasMedia ? 183 : 132
         w += indCount * 24 + clockExtra
         if (timerShown)
             w += 70
@@ -296,6 +305,9 @@ Item {
     function setHovered(h) {
         hovered = h
         leaveTimer.stop()
+        // glisser de la barre de progression : pas de repli avant le relachement
+        if (!h && seekDrag)
+            return
         if (h) {
             if (mode === "collapsed" && !act)
                 setMode("peek")
@@ -442,7 +454,8 @@ Item {
     }
 
     // ================================================== lecteur
-    property var media: ({ has: false, title: "", artist: "", album: "", app: "", playing: false, position: 0, duration: 0 })
+    property var media: ({ has: false, title: "", artist: "", album: "", app: "", playing: false, position: 0, duration: 0,
+        can_seek: true, can_next: true, can_prev: true })
     property real mediaAt: 0
     property bool hasMedia: false
     property string art: ""
@@ -471,10 +484,45 @@ Item {
         Api.invoke("media_action", { action: action })
     }
     function seek(v) {
-        Api.invoke("media_action", { action: "seek", value: v })
+        // l'appli peut refuser, ou accepter sans bouger : la vraie position
+        // est relue (tout de suite si refus, sinon 1,5 s apres)
+        Api.invoke("media_action", { action: "seek", value: v }).then(ok => {
+            seekCheck.interval = ok ? 1500 : 10
+            seekCheck.restart()
+        })
         media = Object.assign({}, media, { position: v })
         mediaAt = Date.now()
         pos = v
+    }
+    property Timer seekCheck: Timer {
+        onTriggered: Api.invoke("media_get").then(m => root.applyMedia(m))
+    }
+    // glisser de la barre de progression en cours (voir setHovered) ;
+    // relache hors de l'ilot : il se replie
+    property bool seekDrag: false
+    function setSeekDrag(on, inside) {
+        seekDrag = on
+        if (!on && (!hovered || !inside))
+            setHovered(false)
+    }
+
+    // couleur du lecteur (Reglages > Apparence > Lecteur) : pochette, theme
+    // ou couleur fixe ; primaire et texte dessus, tires d'un schema Material
+    readonly property var playerArgb: {
+        const c = cfg.player_color || "art"
+        if (/^#[0-9a-fA-F]{6}$/.test(c))
+            return 0xff000000 | parseInt(c.slice(1), 16)
+        if (c === "art" && hasMedia && artArgb !== null)
+            return artArgb
+        return null
+    }
+    readonly property var playerPal: {
+        const src = playerArgb
+        if (src === null)
+            return { primary: Theme.primary, ink: Theme.inkPrimary }
+        const p = Theme.paletteOf(Theme.scheme(src, cfg.variant, dark))
+        // couleurs (pas de chaines) : Theme.lift et les shaders lisent .r .g .b
+        return { primary: Qt.lighter(p.primary, 1), ink: Qt.lighter(p.inkPrimary, 1) }
     }
     function fmtTime(s) {
         s = Math.max(0, Math.floor(s))
@@ -496,8 +544,12 @@ Item {
     // egaliseur de la pilule anime par le visualiseur (sinon : animation idle)
     property bool live: false
 
+    // qui lit le visualiseur (Ilot.shown) : le compagnon, le fond « aurore »
+    // et l'anneau de l'onglet Media (la pilule et l'accueil n'en ont plus)
+    readonly property bool vizNeed: Watch.petShown || cfg.island_bg === "aurora"
+    onVizNeedChanged: updateViz()
     function updateViz() {
-        const visible = mode !== "open" || currentTab === "home" || currentTab === "media"
+        const visible = vizNeed || (mode === "open" && currentTab === "media")
         const want = !!(hasMedia && media.playing && !fullscreen && visible)
         if (want === vizOn)
             return
@@ -988,10 +1040,13 @@ Item {
             root.applyTheme()
         })
     }
-    // couleur de la pochette, seulement si elle sert (Apparence > Couleur : Pochette)
+    // couleur de la pochette, seulement si elle sert (Apparence > Couleur :
+    // Pochette, ou couleur du lecteur : Pochette)
+    readonly property bool wantArt: cfg.color === "art" || (cfg.player_color || "art") === "art"
+    onWantArtChanged: artColor()
     property int artSeq: 0
     function artColor() {
-        if (cfg.color !== "art" || !art)
+        if (!wantArt || !art)
             return
         const id = ++artSeq
         Api.invoke("theme_source", { url: art, max: 64 }).then(argb => {
