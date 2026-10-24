@@ -34,7 +34,21 @@ Item {
         // glisser sur la pochette du survol pour changer de titre, molette sur
         // la pilule pendant la musique = volume de l'appli qui joue
         player_bar: "wave", player_btn: "cookie", player_art: "scallop", player_layout: "col",
-        player_color: "art", player_swipe: false, player_bigbtn: "white", player_wheel: false
+        player_color: "art", player_swipe: false, player_bigbtn: "white", player_wheel: false,
+        // player_btn : aussi "none" (icone seule) ; player_art : aussi "disc" (ronde).
+        // bouton : couleur "auto" (= player_bigbtn ci-dessus), "player", "white"
+        // ou "#rrggbb" ; icone "auto", "white" ou "black" ; rotation, morphose
+        // lecture / pause, saut de l'icone, lueur
+        player_btn_color: "auto", player_btn_ink: "auto",
+        player_btn_spin: true, player_btn_morph: true, player_btn_pop: true, player_btn_glow: true,
+        // barre : epaisseur thin / normal / thick, amplitude low / normal / high ;
+        // spectre : null = suit la pochette (festonnee -> spectre), sinon booleen
+        player_bar_size: "normal", player_bar_amp: "normal", player_spectrum: null,
+        // fond de l'onglet Media : flou low / medium / high, derive, assombrissement
+        // light / normal / strong
+        media_blur: "medium", media_drift: true, media_dim: "normal",
+        // pilule repliee : anneau de progression, disque qui tourne
+        player_mini_ring: true, player_mini_spin: true
     })
     signal settingsChanged()
 
@@ -534,6 +548,8 @@ Item {
         interval: 500
         repeat: true
         running: root.media.playing && root.mode !== "collapsed" && !root.fullscreen
+        // repliee sans anneau, la position n'est plus suivie : la relire tout de suite
+        triggeredOnStart: true
         onTriggered: root.pos = root.position()
     }
 
@@ -550,8 +566,12 @@ Item {
     // et l'anneau de l'onglet Media (la pilule et l'accueil n'en ont plus)
     readonly property bool vizNeed: Watch.petShown || cfg.island_bg === "aurora"
     onVizNeedChanged: updateViz()
+    // spectre autour de la pochette (null = seulement avec la pochette festonnee)
+    readonly property bool spectrumOn: cfg.player_spectrum === null || cfg.player_spectrum === undefined
+        ? (cfg.player_art || "scallop") === "scallop" : !!cfg.player_spectrum
+    onSpectrumOnChanged: updateViz()
     function updateViz() {
-        const visible = vizNeed || (mode === "open" && currentTab === "media")
+        const visible = vizNeed || (spectrumOn && mode === "open" && currentTab === "media")
         const want = !!(hasMedia && media.playing && !fullscreen && visible)
         if (want === vizOn)
             return

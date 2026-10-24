@@ -127,7 +127,8 @@ Item {
     }
     // couleur au survol d'un bouton plein : color-mix(primary 88 %, blanc)
     function lift(c) {
-        return mix(c, "#ffffff", 0.88)
+        // une couleur, pas la chaine "#ffffff" : mix lit .r .g .b
+        return mix(c, Qt.rgba(1, 1, 1, 1), 0.88)
     }
 
     // ------------------------------------------------------- Material You

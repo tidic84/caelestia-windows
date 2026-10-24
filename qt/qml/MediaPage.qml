@@ -112,53 +112,89 @@ Rectangle {
     // Reglages > Apparence > Lecteur : colonne centree (paroles a droite) ou
     // cote a cote (paroles en bandeau), pochette arrondie ou festonnee
     readonly property bool col: (Ilot.cfg.player_layout || "col") !== "side"
-    readonly property bool scallop: (Ilot.cfg.player_art || "scallop") === "scallop"
+    // pochette : "scallop" (festonnee), "round" (arrondie) ou "disc" (ronde)
+    readonly property string artKind: Ilot.cfg.player_art || "scallop"
+    readonly property bool scallop: artKind === "scallop"
+    // rayon des coins de la pochette arrondie / ronde (hors festonnee)
+    readonly property real artRadius: artKind === "disc" ? main.artSize / 2 : 28
+    // anneau de spectre : par defaut seulement avec la pochette festonnee
+    readonly property bool spectrum: Ilot.cfg.player_spectrum === null || Ilot.cfg.player_spectrum === undefined
+        ? scallop : !!Ilot.cfg.player_spectrum
+    // reglages du fond « art » (1 : par defaut)
+    readonly property real blurK: ({ low: 0.5, high: 1.6 })[Ilot.cfg.media_blur] || 1
+    readonly property real dimA: ({ light: 0.30, strong: 0.70 })[Ilot.cfg.media_dim] || 0.47
+    readonly property bool drift: Ilot.cfg.media_drift !== false
     readonly property bool playing: Ilot.hasMedia && Ilot.media.playing
     function pm(c) {
         return Qt.vector4d(c.r * c.a, c.g * c.a, c.b * c.a, c.a)
     }
 
     // pochette floutee : tres floue (decodee en 48 px), saturee, qui derive
-    // lentement (le flou est calcule une fois, seul le deplacement bouge)
+    // lentement (le flou est calcule une fois, seul le deplacement bouge).
+    // clip ne rogne pas les arrondis : le fond passe par un masque a la forme
+    // de la page (layer seulement en mode « art », comme Island.qml)
     Item {
-        id: bgSrc
+        id: bgClip
         anchors.fill: parent
-        anchors.margins: -60
-        visible: false
-        Image {
+        layer.enabled: bgFx.visible
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: bgMask
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1.0
+        }
+        Item {
+            id: bgSrc
             anchors.fill: parent
-            source: Ilot.hasMedia ? Ilot.art : ""
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            smooth: true
-            sourceSize.width: 48
+            anchors.margins: -60
+            visible: false
+            Image {
+                anchors.fill: parent
+                source: Ilot.hasMedia ? Ilot.art : ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                smooth: true
+                sourceSize.width: 48
+            }
+        }
+        MultiEffect {
+            id: bgFx
+            anchors.fill: bgSrc
+            source: bgSrc
+            visible: page.bg === "art" && Ilot.hasMedia && Ilot.art !== "" && page.visible
+            blurEnabled: true
+            // flou : 64 par defaut ; « fort » passe par blurMultiplier
+            // (blurMax est plafonne a 64 par MultiEffect)
+            blurMax: Math.min(64, Math.round(64 * page.blurK))
+            blurMultiplier: Math.max(0, page.blurK - 1)
+            blur: 1
+            saturation: 0.8
+            opacity: Theme.light ? 0.4 : 0.85
+            scale: 1.15
+            property real t: 0
+            // derive desactivee : position neutre, animation arretee
+            transform: Translate {
+                x: page.drift ? 36 * Math.sin(bgFx.t * 0.7) : 0
+                y: page.drift ? 28 * Math.cos(bgFx.t * 0.5) : 0
+            }
+            NumberAnimation on t {
+                from: 0
+                to: Math.PI * 20
+                duration: 180000
+                loops: Animation.Infinite
+                // en pause (pas arretee) : la derive reprend la ou elle s'etait figee
+                running: bgFx.visible && page.drift
+                paused: running && !(page.shown && page.playing && !Theme.reduced)
+            }
         }
     }
-    MultiEffect {
-        id: bgFx
-        anchors.fill: bgSrc
-        source: bgSrc
-        visible: page.bg === "art" && Ilot.hasMedia && Ilot.art !== "" && page.visible
-        blurEnabled: true
-        blurMax: 64
-        blur: 1
-        saturation: 0.8
-        opacity: Theme.light ? 0.4 : 0.85
-        scale: 1.15
-        property real t: 0
-        transform: Translate {
-            x: 36 * Math.sin(bgFx.t * 0.7)
-            y: 28 * Math.cos(bgFx.t * 0.5)
-        }
-        NumberAnimation on t {
-            from: 0
-            to: Math.PI * 20
-            duration: 180000
-            loops: Animation.Infinite
-            // en pause (pas arretee) : la derive reprend la ou elle s'etait figee
-            running: bgFx.visible
-            paused: running && !(page.shown && page.playing && !Theme.reduced)
-        }
+    // masque fixe (hors du scale/Translate de bgFx : les coins ne bougent pas)
+    Rectangle {
+        id: bgMask
+        anchors.fill: parent
+        radius: page.radius
+        visible: false
+        layer.enabled: bgClip.layer.enabled
     }
     // assombri vers le bas (lisibilite des commandes)
     Rectangle {
@@ -167,7 +203,7 @@ Rectangle {
         radius: page.radius
         gradient: Gradient {
             GradientStop { position: 0.4; color: "transparent" }
-            GradientStop { position: 1; color: Qt.rgba(0, 0, 0, 0.47) }
+            GradientStop { position: 1; color: Qt.rgba(0, 0, 0, page.dimA) }
         }
     }
 
@@ -187,23 +223,28 @@ Rectangle {
         Behavior on anchors.bottomMargin { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
         // cote a cote : ecart pochette / infos et place de l'anneau
         readonly property real gap: 28
-        readonly property real ringPad: page.scallop ? 30 : 0
+        readonly property real ringPad: page.spectrum ? 30 : 0
         // colonne : marges au-dessus et au-dessous de la pochette (anneau de
-        // spectre : 30 / 32 ; pochette arrondie : 12 / 16)
-        readonly property real padTop: page.scallop ? 30 : 12
-        readonly property real padBot: page.scallop ? 32 : 16
+        // spectre : 30 / 32 ; sans anneau : 12 / 16)
+        readonly property real padTop: page.spectrum ? 30 : 12
+        readonly property real padBot: page.spectrum ? 32 : 16
+        // anneau autour de la pochette arrondie : il passe au-dela des coins,
+        // ex = (racine 2 - 1) * (cote / 2 - 28) de plus de chaque cote
+        readonly property real exK: page.spectrum && page.artKind === "round" ? Math.SQRT2 - 1 : 0
+        readonly property real ex: exK * Math.max(0, artSize / 2 - 28)
         property real artMax: page.lyricsOn ? 190 : 260
         Behavior on artMax { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
         // colonne : 156 (festonnee) ou 172 (arrondie) a 459 px de haut ; grandit
         // avec la hauteur (panneau agrandi), plafonnee a 300, sans deborder
+        // (taille + 2 * ex compris : la borne est resolue pour la taille)
         readonly property real colArt: Math.round(Math.max(90, Math.min((page.scallop ? 156 : 172) + Math.max(0, page.height - 459) * 0.5, 300,
-            page.height - meta.height - padTop - padBot - 16)))
+            (page.height - meta.height - padTop - padBot - 16 + 56 * exK) / (1 + exK))))
         readonly property real artSize: page.col
             ? colArt
-            : Math.max(90, Math.min(artMax, height - ringPad * 2, width * 0.42))
+            : Math.max(90, Math.min(artMax, (height - ringPad * 2 + 56 * exK) / (1 + exK), width * 0.42))
         // colonne de 340 (plus large si la pochette grandit)
         readonly property real colW: Math.min(page.width - 48, Math.max(340, artSize + 184))
-        readonly property real stackH: artSize + padTop + padBot + meta.height
+        readonly property real stackH: artSize + padTop + padBot + ex * 2 + meta.height
 
         // grande pochette : halo de ses couleurs en lecture, reduite et
         // assombrie en pause, inclinee en 3D au survol
@@ -211,8 +252,8 @@ Rectangle {
             id: art
             width: main.artSize
             height: main.artSize
-            x: page.col ? (main.width - width) / 2 : main.ringPad
-            y: page.col ? Math.max(0, (main.height - main.stackH) / 2) + main.padTop : (main.height - height) / 2
+            x: page.col ? (main.width - width) / 2 : main.ringPad + main.ex
+            y: page.col ? Math.max(0, (main.height - main.stackH) / 2) + main.padTop + main.ex : (main.height - height) / 2
             property real rx: 0
             property real ry: 0
             Behavior on rx { NumberAnimation { duration: 200 } }
@@ -263,18 +304,19 @@ Rectangle {
             RectangularShadow {
                 visible: !page.scallop
                 anchors.fill: parent
-                radius: 28
+                radius: page.artRadius
                 offset.y: 12
                 blur: 40
                 color: Qt.rgba(0, 0, 0, Theme.light ? 0.18 : 0.35)
             }
 
-            // anneau de spectre autour de la pochette festonnee
+            // anneau de spectre autour de la pochette (au-dela des coins de la
+            // pochette arrondie : main.ex)
             ShaderEffect {
-                readonly property bool on: page.scallop && page.shown && Ilot.live
+                readonly property bool on: page.spectrum && page.shown && Ilot.live
                 visible: on
                 anchors.centerIn: parent
-                width: parent.width + 68
+                width: parent.width + 68 + main.ex * 2
                 height: width
                 fragmentShader: "qrc:/shaders/ring.frag.qsb"
                 function lv(i) {
@@ -282,7 +324,7 @@ Rectangle {
                     return Qt.vector4d(s[i] || 0, s[i + 1] || 0, s[i + 2] || 0, s[i + 3] || 0)
                 }
                 property size size: Qt.size(Math.max(1, width), Math.max(1, height))
-                property real r0: art.width / 2 + 5
+                property real r0: art.width / 2 + main.ex + 5
                 property real maxLen: 22
                 property vector4d l0: on ? lv(0) : Qt.vector4d(0, 0, 0, 0)
                 property vector4d l1: on ? lv(4) : Qt.vector4d(0, 0, 0, 0)
@@ -301,7 +343,7 @@ Rectangle {
                 Rectangle {
                     anchors.fill: parent
                     visible: !page.scallop || !scImg.ok
-                    radius: page.scallop ? width / 2 : 28
+                    radius: page.scallop ? width / 2 : page.artRadius
                     color: Theme.surfaceHighest
                     Ms {
                         anchors.centerIn: parent
@@ -313,13 +355,13 @@ Rectangle {
                 ArtImage {
                     visible: !page.scallop
                     anchors.fill: parent
-                    radius: 28
+                    radius: page.artRadius
                 }
                 // voile de pause (pochette arrondie)
                 Rectangle {
                     visible: !page.scallop && opacity > 0
                     anchors.fill: parent
-                    radius: 28
+                    radius: page.artRadius
                     color: "black"
                     opacity: Ilot.hasMedia && !Ilot.media.playing ? 0.45 : 0
                     Behavior on opacity { NumberAnimation { duration: 400 } }
@@ -363,8 +405,8 @@ Rectangle {
 
         Column {
             id: meta
-            x: page.col ? (main.width - width) / 2 : art.x + art.width + main.ringPad + main.gap
-            y: page.col ? art.y + art.height + main.padBot : (main.height - height) / 2
+            x: page.col ? (main.width - width) / 2 : art.x + art.width + main.ringPad + main.ex + main.gap
+            y: page.col ? art.y + art.height + main.padBot + main.ex : (main.height - height) / 2
             width: page.col ? main.colW : main.width - x
             // colonne : pas d'ecart, seulement les marges de la maquette
             spacing: page.col ? 0 : 4

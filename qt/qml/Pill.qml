@@ -135,7 +135,10 @@ Item {
             height: 24
             anchors.verticalCenter: parent.verticalCenter
             readonly property real frac: Ilot.media.duration > 0 ? Math.max(0, Math.min(1, Ilot.pos / Ilot.media.duration)) : 0
+            // Reglages > Lecteur : anneau de progression, rotation du disque
+            readonly property bool ringOn: Ilot.cfg.player_mini_ring !== false
             Shape {
+                visible: disc.ringOn
                 anchors.fill: parent
                 preferredRendererType: Shape.CurveRenderer
                 ShapePath {
@@ -156,7 +159,7 @@ Item {
                 size: 18
                 visible: Ilot.art !== ""
                 anchors.centerIn: parent
-                spinning: Ilot.media.playing && mini.on
+                spinning: Ilot.media.playing && mini.on && Ilot.cfg.player_mini_spin !== false
                 period: 8000
             }
             Ms {
@@ -172,7 +175,7 @@ Item {
                 interval: 2000
                 repeat: true
                 triggeredOnStart: true
-                running: disc.visible && mini.on && Ilot.media.playing && !Ilot.fullscreen
+                running: disc.visible && disc.ringOn && mini.on && Ilot.media.playing && !Ilot.fullscreen
                 onTriggered: Ilot.pos = Ilot.position()
             }
         }

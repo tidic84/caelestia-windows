@@ -13,22 +13,16 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
-- 🔴 **`Theme.lift` rend une couleur transparente** : `Theme.qml:129`. Il
-  appelle `mix(c, "#ffffff", 0.88)`, et `mix` lit `.r` sur la chaîne, ce qui
-  donne NaN puis `#00000000`. C'est l'agent `relecteur` qui l'a vu, avec
-  `qml.exe` le 2026-10-23. Au survol, les `IconBtn filled`, `TextBtn primary`
-  et `BarContent` perdent donc leur fond. Correction :
-  `mix(c, Qt.rgba(1, 1, 1, 1), 0.88)`. Pas corrigé, car ça change l'aspect de
-  plusieurs boutons. `PlayBtn` le contourne déjà.
-- 🟠 **Boucle de liaison `overIsland`** : `Main.qml:65`. Le journal Qt
-  affiche « Binding loop detected » à l'entrée dans l'îlot : `overIsland`
-  appelle `setHovered`, puis `setMode`, `Ilot.size`, `hoverZone`, et revient à
-  `overIsland`. Vu le 2026-10-23. Ça existait sans doute avant la refonte du
-  lecteur, mais ce n'est pas vérifié.
 - 🟢 **Lecteur, une seule session** : seule `GetCurrentSession()` est suivie,
   donc on ne choisit pas entre deux applis qui jouent. Il n'y a pas non plus
   d'aléatoire ni de répétition, qui demanderaient du Rust en plus. Voir
   `PLAN-MEDIA.md`, « Hors plan ».
+- 🟢 **Fond « art » de l'onglet Média** : le masque des coins (layer +
+  MultiEffect sur `bgClip`, `MediaPage.qml`) refait 2 passes GPU par image
+  pendant la dérive. À mesurer (`docs/perf-*.md`). Option : couper la dérive.
+- 🟢 **Réglage spectre** : une fois touché, `player_spectrum` devient un
+  booléen et ne suit plus la forme de la pochette (pas de retour à « auto »
+  dans l'UI).
 
 - 🟢 **Infobulle au-dessus d'un menu natif** : `Btn.qml`. Après un clic sur
   une icône de la zone de notification, le menu de l'appli capture la souris.
@@ -68,6 +62,9 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Rust (`src/`), à voir selon l'usage
 
+- 🟢 **Lot suivant du lecteur** (touche `src/media.rs`) : clic sur la pochette
+  pour ramener l'appli au premier plan. Aléatoire, répétition et choix de
+  l'appli suivie sont déjà notés plus haut (« Lecteur, une seule session »).
 - 🟠 **Deux piles TLS** : `ureq` garde ses fonctions par défaut, donc rustls
   est compilé en plus de native-tls. `system.rs` (`http_get`) et
   `google.rs:135` n'utilisent pas `crate::http()`. Derrière un proxy
@@ -143,6 +140,10 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Fait
 
+- 2026-10-24, 0.4.18 : `Theme.lift` rend de nouveau une couleur opaque, donc
+  les `IconBtn filled`, `TextBtn primary` et `BarContent` sont éclaircis au
+  survol au lieu de perdre leur fond. Boucle de liaison `overIsland` corrigée
+  (survol de l'îlot).
 - 2026-10-20 : onglet Tâches regroupé comme Windows (`procgroup.rs`) :
   hôtes de service par ligne, applis du Store par paquet, statuts Suspendu /
   Ne répond pas / Mode efficacité, ligne Interruptions système, icônes et

@@ -32,6 +32,9 @@ Item {
         NumberAnimation { duration: 500 }
     }
     readonly property real frac: dragging ? dragFrac : shownFrac
+    // Reglages > Lecteur : epaisseur et amplitude de l'onde (1 : par defaut)
+    readonly property real thK: ({ thin: 0.7, thick: 1.6 })[Ilot.cfg.player_bar_size] || 1
+    readonly property real ampK: ({ low: 0.5, high: 1.7 })[Ilot.cfg.player_bar_amp] || 1
     implicitHeight: 20
 
     Txt {
@@ -67,9 +70,9 @@ Item {
         opacity: sb.canSeek || !Ilot.hasMedia ? 1 : 0.45
 
         // epaisseur, ondulation et poignee : animees au survol
-        property real th: sb.active ? (sb.small ? 5.5 : 7) : (sb.small ? 3 : 4)
+        property real th: (sb.active ? (sb.small ? 5.5 : 7) : (sb.small ? 3 : 4)) * sb.thK
         Behavior on th { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-        property real amp: sb.wave && Ilot.media.playing && sb.dur > 0 ? (sb.active ? 2.4 : 1.6) * (sb.small ? 0.8 : 1) : 0
+        property real amp: sb.wave && Ilot.media.playing && sb.dur > 0 ? (sb.active ? 2.4 : 1.6) * (sb.small ? 0.8 : 1) * sb.ampK : 0
         Behavior on amp { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
         property real handleK: sb.active ? 1 : 0
         Behavior on handleK { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
@@ -77,6 +80,11 @@ Item {
         ShaderEffect {
             id: line
             anchors.fill: parent
+            // trait epais + forte onde : deborde verticalement au lieu d'etre
+            // rogne (0 avec les reglages par defaut ; le milieu ne bouge pas)
+            readonly property real pad: Math.max(0, Math.ceil(7 * sb.thK / 2 + 2.4 * sb.ampK + 1 - track.height / 2))
+            anchors.topMargin: -pad
+            anchors.bottomMargin: -pad
             fragmentShader: "qrc:/shaders/wave.frag.qsb"
             function pm(c) { return Qt.vector4d(c.r * c.a, c.g * c.a, c.b * c.a, c.a) }
             property size size: Qt.size(Math.max(1, width), Math.max(1, height))

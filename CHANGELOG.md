@@ -4,6 +4,13 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.18 — 2026-10-24
+
+- **Onglet Média** : les coins du fond « pochette floutée » ne dépassent plus de l'arrondi.
+- **Nouveaux réglages du lecteur** (Réglages › Apparence › Lecteur) : forme du bouton lecture (festonné, rond, icône seule), sa couleur (auto, couleur du lecteur, blanc, couleur fixe), couleur de l'icône, rotation / changement de forme / rebond / ombre activables ; épaisseur et amplitude de la barre de progression ; pochette ronde et spectre activables séparément ; flou, dérive et assombrissement du fond ; anneau et rotation du disque de la pilule repliée. Les valeurs par défaut gardent le lecteur de la 0.4.16.
+- **Plus léger** : le spectre coupé arrête aussi la capture du son.
+- **Correctifs** : survol des boutons pleins (Theme.lift rendait une couleur transparente : ils sont maintenant éclaircis au survol), boucle de liaison au survol de l'îlot (overIsland).
+
 ## 0.4.17 — 2026-10-24
 
 - **Nouvel addon « Claude »** (Réglages › Addons) : les limites de ton abonnement Claude, comme `/usage` dans Claude Code. Session de 5 h et semaine (plus Opus / Sonnet si ton compte en a), avec le temps avant la remise à zéro. Utilise la connexion de Claude Code, rien à saisir.

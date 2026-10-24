@@ -614,12 +614,6 @@ Item {
                     current: page.cfg.anim || "normal"
                     onPicked: v => Ilot.setCfg({ anim: v })
                 }
-                SubTitle { text: "Fond de l'onglet Média" }
-                Chips {
-                    model: [["art", "Pochette floutée"], ["color", "Couleur"], ["gradient", "Dégradé"], ["none", "Aucun"]]
-                    current: page.cfg.media_bg || "art"
-                    onPicked: v => Ilot.setCfg({ media_bg: v })
-                }
 
                 // lecteur : survol de la pilule, onglet Media, carte de l'accueil
                 SetRow {
@@ -654,30 +648,205 @@ Item {
                         }
                     }
                 }
-                SubTitle { text: "Barre de progression" }
+
+                // bouton lecture
+                SetRow {
+                    icon: "pause_circle"
+                    title: "Bouton lecture"
+                }
+                SubTitle { text: "Forme" }
+                Chips {
+                    model: [["cookie", "Festonné"], ["round", "Rond"], ["none", "Icône seule"]]
+                    current: page.cfg.player_btn || "cookie"
+                    onPicked: v => Ilot.setCfg({ player_btn: v })
+                }
+                SubTitle { text: "Couleur" }
+                Chips {
+                    id: btnColorChips
+                    // "#rrggbb" = couleur fixe ; "fixed" n'est jamais stocke
+                    // (player_bigbtn reste lu par PlayBtn en mode auto)
+                    readonly property string val: page.cfg.player_btn_color || "auto"
+                    property string lastFixed: val.charAt(0) === "#" ? val : ""
+                    model: [["auto", "Auto"], ["player", "Couleur du lecteur"], ["white", "Blanc"], ["fixed", "Couleur fixe"]]
+                    current: val.charAt(0) === "#" ? "fixed" : val
+                    onPicked: v => Ilot.setCfg({ player_btn_color: v !== "fixed" ? v : (lastFixed || page.swatches[0]) })
+                }
+                Txt {
+                    visible: btnColorChips.current === "auto"
+                    topPadding: 6
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    px: 11.5
+                    color: Theme.inkVariant
+                    // ancien reglage « gros bouton : couleur du lecteur » encore lu en auto
+                    text: page.cfg.player_bigbtn === "accent"
+                        ? "Auto : couleur du lecteur partout (ancien réglage conservé)"
+                        : "Auto : blanc lumineux dans l'onglet Média, couleur du lecteur ailleurs"
+                }
+                Flow {
+                    visible: btnColorChips.current === "fixed"
+                    width: parent.width
+                    topPadding: 8
+                    spacing: 6
+                    Repeater {
+                        model: page.swatches
+                        Swatch {
+                            required property var modelData
+                            fill: modelData
+                            on: page.cfg.player_btn_color === modelData
+                            onClicked: {
+                                btnColorChips.lastFixed = modelData;
+                                Ilot.setCfg({ player_btn_color: modelData });
+                            }
+                        }
+                    }
+                }
+                SubTitle { text: "Couleur de l'icône" }
+                Chips {
+                    enabled: page.cfg.player_btn !== "none"
+                    opacity: enabled ? 1 : 0.5
+                    model: [["auto", "Auto"], ["white", "Blanche"], ["black", "Noire"]]
+                    current: page.cfg.player_btn_ink || "auto"
+                    onPicked: v => Ilot.setCfg({ player_btn_ink: v })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Rotation pendant la lecture"
+                    toggle: true
+                    checked: page.cfg.player_btn_spin !== false
+                    // sans morphose la forme ne tourne pas (PlayBtn)
+                    disabled: (page.cfg.player_btn || "cookie") !== "cookie" || page.cfg.player_btn_morph === false
+                    onToggled: on => Ilot.setCfg({ player_btn_spin: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Change de forme entre pause et lecture"
+                    toggle: true
+                    checked: page.cfg.player_btn_morph !== false
+                    disabled: (page.cfg.player_btn || "cookie") !== "cookie"
+                    onToggled: on => Ilot.setCfg({ player_btn_morph: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Petit rebond de l'icône au clic"
+                    toggle: true
+                    checked: page.cfg.player_btn_pop !== false
+                    onToggled: on => Ilot.setCfg({ player_btn_pop: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Ombre colorée"
+                    toggle: true
+                    checked: page.cfg.player_btn_glow !== false
+                    // la lueur n'existe que sous un bouton blanc (PlayBtn)
+                    disabled: page.cfg.player_btn === "none" || btnColorChips.val === "player"
+                        || (btnColorChips.val.charAt(0) === "#" && btnColorChips.val.toLowerCase() !== "#ffffff")
+                    onToggled: on => Ilot.setCfg({ player_btn_glow: on })
+                }
+
+                // barre de progression
+                SetRow {
+                    icon: "graphic_eq"
+                    title: "Barre de progression"
+                }
+                SubTitle { text: "Style" }
                 Chips {
                     model: [["wave", "Ondulée"], ["flat", "Plate"]]
                     current: page.cfg.player_bar || "wave"
                     onPicked: v => Ilot.setCfg({ player_bar: v })
                 }
-                SubTitle { text: "Bouton lecture" }
+                SubTitle { text: "Épaisseur" }
                 Chips {
-                    model: [["cookie", "Festonné"], ["round", "Rond"]]
-                    current: page.cfg.player_btn || "cookie"
-                    onPicked: v => Ilot.setCfg({ player_btn: v })
+                    model: [["thin", "Fine"], ["normal", "Normale"], ["thick", "Épaisse"]]
+                    current: page.cfg.player_bar_size || "normal"
+                    onPicked: v => Ilot.setCfg({ player_bar_size: v })
                 }
-                SubTitle { text: "Bouton lecture de l'onglet Média" }
+                SubTitle { text: "Amplitude de l'onde" }
                 Chips {
-                    model: [["white", "Blanc lumineux"], ["accent", "Couleur du lecteur"]]
-                    current: page.cfg.player_bigbtn || "white"
-                    onPicked: v => Ilot.setCfg({ player_bigbtn: v })
+                    enabled: page.cfg.player_bar !== "flat"
+                    opacity: enabled ? 1 : 0.5
+                    model: [["low", "Faible"], ["normal", "Normale"], ["high", "Forte"]]
+                    current: page.cfg.player_bar_amp || "normal"
+                    onPicked: v => Ilot.setCfg({ player_bar_amp: v })
                 }
-                SubTitle { text: "Pochette de l'onglet Média" }
+
+                // pilule repliee
+                SetRow {
+                    icon: "pill"
+                    title: "Pilule repliée"
+                }
+                SetRow {
+                    subRow: true
+                    title: "Anneau de progression autour du disque"
+                    toggle: true
+                    checked: page.cfg.player_mini_ring !== false
+                    onToggled: on => Ilot.setCfg({ player_mini_ring: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Le disque tourne pendant la lecture"
+                    toggle: true
+                    checked: page.cfg.player_mini_spin !== false
+                    onToggled: on => Ilot.setCfg({ player_mini_spin: on })
+                }
+
+                // pochette de l'onglet Media
+                SetRow {
+                    icon: "album"
+                    title: "Pochette de l'onglet Média"
+                }
+                SubTitle { text: "Forme" }
                 Chips {
-                    model: [["round", "Arrondie"], ["scallop", "Festonnée, avec spectre"]]
+                    model: [["round", "Arrondie"], ["scallop", "Festonnée"], ["disc", "Ronde"]]
                     current: page.cfg.player_art || "scallop"
                     onPicked: v => Ilot.setCfg({ player_art: v })
                 }
+                SetRow {
+                    subRow: true
+                    title: "Spectre autour de la pochette"
+                    toggle: true
+                    // null = suit la pochette (festonnee -> spectre), sinon booleen
+                    checked: page.cfg.player_spectrum === null || page.cfg.player_spectrum === undefined
+                        ? (page.cfg.player_art || "scallop") === "scallop" : !!page.cfg.player_spectrum
+                    onToggled: on => Ilot.setCfg({ player_spectrum: on })
+                }
+
+                // fond de l'onglet Media
+                SetRow {
+                    icon: "wallpaper"
+                    title: "Fond de l'onglet Média"
+                }
+                SubTitle { text: "Fond" }
+                Chips {
+                    model: [["art", "Pochette floutée"], ["color", "Couleur"], ["gradient", "Dégradé"], ["none", "Aucun"]]
+                    current: page.cfg.media_bg || "art"
+                    onPicked: v => Ilot.setCfg({ media_bg: v })
+                }
+                Column {
+                    visible: (page.cfg.media_bg || "art") === "art"
+                    width: parent.width
+                    SubTitle { text: "Flou" }
+                    Chips {
+                        model: [["low", "Léger"], ["medium", "Moyen"], ["high", "Fort"]]
+                        current: page.cfg.media_blur || "medium"
+                        onPicked: v => Ilot.setCfg({ media_blur: v })
+                    }
+                    SetRow {
+                        subRow: true
+                        title: "Le fond dérive lentement"
+                        toggle: true
+                        checked: page.cfg.media_drift !== false
+                        onToggled: on => Ilot.setCfg({ media_drift: on })
+                    }
+                    SubTitle { text: "Assombrissement en bas" }
+                    Chips {
+                        model: [["light", "Léger"], ["normal", "Normal"], ["strong", "Fort"]]
+                        current: page.cfg.media_dim || "normal"
+                        onPicked: v => Ilot.setCfg({ media_dim: v })
+                    }
+                }
+
+                // onglet Media : disposition ; survol de la pilule : glisser, molette
                 SubTitle { text: "Disposition de l'onglet Média" }
                 Chips {
                     model: [["col", "Colonne (paroles à droite)"], ["side", "Côte à côte (paroles en bas)"]]

@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Réglages du lecteur</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block" rel="stylesheet">
+<style>
+/* Maquette du lot « lecteur 0.4.17 » : correctif des coins de l'onglet Média
+   et nouveaux réglages. Même langage visuel que media.html (thème sombre de
+   qt/qml/Theme.qml). Chaque réglage s'applique en direct aux trois endroits
+   où le lecteur apparaît : survol de la pilule, accueil, onglet Média. */
+:root {
+  --primary: #cfbdfe; --ink-primary: #36265d; --primary-container: #4d3d75;
+  --secondary-container: #4a4458;
+  --surface: #141218; --surface-c: #211f26; --surface-high: #2b2930; --surface-highest: #36343b;
+  --ink: #e6e0e9; --ink-variant: #cac4d0; --outline: #938f99; --error: #ffb4ab;
+  --emph: cubic-bezier(0.05, 0.7, 0.1, 1); --spatial: cubic-bezier(0.38, 1.21, 0.22, 1);
+  --accent: #ffb1c8;              /* couleur du lecteur (tirée de la pochette) */
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: #0d0c10; color: var(--ink); font-family: Rubik, system-ui, sans-serif; display: flex; overflow: hidden; user-select: none; }
+.ms { font-family: "Material Symbols Rounded"; font-weight: 400; font-style: normal; font-size: 22px; line-height: 1; white-space: nowrap; font-variation-settings: "FILL" 1, "opsz" 24; -webkit-font-smoothing: antialiased; }
+
+/* ------------------------------------------------ écran simulé */
+#screen { flex: 1; min-width: 0; overflow: auto; position: relative;
+  background: radial-gradient(1200px 700px at 20% 110%, #2a2250 0%, transparent 60%),
+              radial-gradient(900px 600px at 90% -10%, #3a1f33 0%, transparent 55%),
+              linear-gradient(160deg, #15131c, #0c0b10); }
+#stack { color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 16px 40px; }
+.cap { font-size: 11px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: #ffffff59; margin-top: 10px; }
+.island { background: var(--surface); box-shadow: 0 10px 30px #0008, inset 0 0 0 1px #ffffff0d; position: relative; }
+
+/* pilule repliée */
+#mini { width: 200px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px 0 5px; }
+#mini .discbox { position: relative; width: 22px; height: 22px; }
+#mini .disc { position: absolute; inset: 3px; border-radius: 50%; background-size: cover; }
+#mini svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+#mini .eq { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+#mini .eq i { width: 3px; border-radius: 2px; background: var(--accent); height: 4px; }
+
+/* survol de la pilule */
+#peek { width: 430px; height: 76px; border-radius: 38px; display: flex; align-items: center; gap: 12px; padding: 0 14px 0 12px; }
+#peek .art { width: 52px; height: 52px; border-radius: 14px; flex: none; background-size: cover; }
+#peek .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.title { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.artist { font-size: 12px; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctrls { display: flex; align-items: center; gap: 2px; flex: none; }
+
+/* panneau ouvert */
+#panel { width: 760px; height: 560px; border-radius: 30px; display: flex; }
+.rail { width: 56px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 14px; }
+.rail button { width: 40px; height: 40px; border-radius: 14px; border: 0; background: transparent; color: var(--ink-variant); display: grid; place-items: center; cursor: pointer; }
+.rail button.on { background: var(--primary-container); color: var(--ink); }
+.rail button:disabled { opacity: .25; cursor: default; }
+.pages { flex: 1; position: relative; margin: 8px 8px 8px 0; border-radius: 22px; overflow: hidden; background: var(--surface-c); }
+.page { position: absolute; inset: 0; display: none; }
+.page.on { display: block; }
+
+/* boutons ronds discrets */
+.ib { position: relative; border: 0; background: transparent; color: var(--ink); display: grid; place-items: center; cursor: pointer; border-radius: 50%; padding: 0; }
+.ib::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #ffffff14; transform: scale(.35); opacity: 0; transition: transform 140ms, opacity 140ms; }
+.ib:hover::before { transform: scale(1); opacity: 1; }
+.ib .ms { position: relative; }
+
+/* bouton lecture */
+.play { position: relative; border: 0; background: transparent; padding: 0; cursor: pointer; display: grid; place-items: center; transition: transform 300ms var(--spatial); flex: none; }
+.play:active { transform: scale(.88); }
+.play canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.play .glow { position: absolute; inset: 10%; border-radius: 50%; filter: blur(12px); opacity: .7; transition: opacity 300ms; }
+.play .ms { position: relative; }
+@keyframes pop { from { transform: scale(.55); } to { transform: scale(1); } }
+
+/* barre de progression */
+.seek { display: flex; align-items: center; gap: 8px; width: 100%; }
+.seek .t { font-size: 11px; font-weight: 500; color: var(--ink-variant); font-variant-numeric: tabular-nums; min-width: 30px; }
+.seek .t.r { text-align: right; }
+.seek canvas { flex: 1; height: 22px; min-width: 0; cursor: pointer; }
+
+/* onglet Média */
+#media { overflow: hidden; }
+#media.bug, .pages.bug { overflow: visible; }   /* Panel.qml ne rogne pas les pages */
+.bgwrap { position: absolute; inset: 0; overflow: hidden; border-radius: 22px; }
+#media.bug .bgwrap { border-radius: 0; }
+.bgart { position: absolute; inset: -60px; background-size: cover; background-position: center; transform: scale(1.15); }
+@keyframes drift { 0%, 100% { transform: scale(1.15) translate(0, 0); } 50% { transform: scale(1.15) translate(-18px, 12px); } }
+.dim { position: absolute; inset: 0; border-radius: 22px; }
+.mark { position: absolute; bottom: -10px; width: 46px; height: 46px; border: 2px dashed var(--error); border-radius: 50%; display: none; pointer-events: none; }
+.mark.l { left: -10px; } .mark.r { right: -10px; }
+#media.bug .mark { display: block; }
+.player { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 150px; }
+.artbox { position: relative; flex: none; margin-bottom: 18px; }
+.artbox .halo { position: absolute; inset: 0; border-radius: 28px; background-size: cover; filter: blur(28px) saturate(1.7); opacity: .7; transform: scale(1.1); }
+.artbox .art { position: absolute; inset: 0; background-size: cover; background-position: center; box-shadow: 0 14px 34px #0007; }
+.artbox canvas { position: absolute; inset: -34px; width: calc(100% + 68px); height: calc(100% + 68px); pointer-events: none; }
+.chip { font-size: 11px; padding: 3px 9px; border-radius: 9px; background: #ffffff14; color: var(--ink-variant); margin-bottom: 6px; }
+.big-title { font-size: 24px; font-weight: 700; }
+.big-artist { font-size: 16px; font-weight: 500; color: var(--accent); margin-top: 3px; }
+.big-album { font-size: 12px; color: #ffffff66; margin-top: 3px; }
+.player .seek { margin-top: 12px; }
+.big-ctrls { display: flex; align-items: center; gap: 22px; margin-top: 8px; }
+.vol { display: flex; align-items: center; gap: 10px; width: 240px; margin-top: 12px; color: var(--ink-variant); }
+.vol .ms { font-size: 18px; }
+.vol i { flex: 1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--ink) 70%, #ffffff26 70%); }
+
+/* accueil */
+#home { padding: 22px; }
+.np { position: relative; border-radius: 24px; padding: 18px; display: flex; gap: 20px; background: var(--surface-high); overflow: hidden; box-shadow: inset 0 0 0 1px #ffffff12; }
+.np .wash { position: absolute; inset: 0; opacity: .35; filter: blur(40px) saturate(1.5); background-size: cover; transform: scale(1.3); }
+.np .art { position: relative; width: 136px; height: 136px; border-radius: 18px; box-shadow: 0 8px 20px #0006; background-size: cover; flex: none; }
+.np .col { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.np .lbl { font-size: 11px; font-weight: 600; letter-spacing: 1.6px; color: var(--accent); }
+.np .ttl { font-size: 22px; font-weight: 700; }
+.np .sub { font-size: 14px; color: var(--ink-variant); }
+.np .row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.np .state { font-size: 13px; font-weight: 500; margin-right: auto; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+.tile { height: 92px; border-radius: 20px; background: var(--surface-high); opacity: .45; display: grid; place-items: center; color: var(--ink-variant); font-size: 12px; }
+
+/* ------------------------------------------------ réglages (à la manière de SettingsPage) */
+#bench { width: 380px; flex: none; height: 100%; overflow-y: auto; background: #17151c; border-left: 1px solid #ffffff12; padding: 20px 20px 40px; font-size: 13px; }
+#bench header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 6px; }
+#bench header div { flex: 1; }
+#bench h1 { font-size: 17px; margin: 0 0 4px; }
+#bench header p { color: var(--ink-variant); margin: 0; line-height: 1.45; font-size: 12.5px; }
+.tonal { border: 0; height: 36px; padding: 0 14px; border-radius: 18px; background: var(--primary); color: var(--ink-primary); font: 500 13px Rubik, sans-serif; display: flex; align-items: center; gap: 6px; cursor: pointer; flex: none; }
+.tonal .ms { font-size: 18px; }
+.card { background: var(--surface-c); border-radius: 20px; padding: 14px 16px 16px; margin-top: 14px; }
+.card h2 { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--primary); margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.card h2 .ms { font-size: 18px; }
+.sub { font-size: 12px; color: var(--ink-variant); margin: 12px 0 7px; }
+.card > .sub:first-of-type { margin-top: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid #ffffff26; background: transparent; color: var(--ink-variant); font: 500 12.5px Rubik, sans-serif; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: background 150ms; }
+.chips button:hover { background: #ffffff0d; }
+.chips button.on { background: var(--secondary-container); border-color: transparent; color: var(--ink); padding-left: 8px; }
+.chips button.on::before { content: "check"; font-family: "Material Symbols Rounded"; font-size: 16px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.swatches button { width: 24px; height: 24px; border-radius: 50%; border: 0; cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px #ffffff26; }
+.swatches button.on { box-shadow: 0 0 0 2px #17151c, 0 0 0 4px var(--ink); }
+.setrow { display: flex; align-items: center; gap: 12px; padding: 7px 0; }
+.setrow span { flex: 1; color: var(--ink); line-height: 1.35; }
+.sw { width: 52px; height: 32px; border-radius: 16px; border: 2px solid var(--outline); background: var(--surface-highest); position: relative; cursor: pointer; flex: none; transition: background 200ms, border-color 200ms; }
+.sw::after { content: ""; position: absolute; top: 6px; left: 6px; width: 16px; height: 16px; border-radius: 50%; background: var(--outline); transition: all 250ms var(--spatial); }
+.sw.on { background: var(--primary); border-color: var(--primary); }
+.sw.on::after { left: 22px; top: 2px; width: 24px; height: 24px; background: var(--ink-primary); }
+.new { font-size: 10px; font-weight: 600; background: var(--primary-container); color: var(--primary); border-radius: 6px; padding: 1px 6px; margin-left: 6px; letter-spacing: .3px; vertical-align: 1px; }
+.dimmed { opacity: .38; pointer-events: none; }
+.hint { font-size: 11.5px; color: #ffffff66; margin-top: 6px; line-height: 1.4; }
+.batch.later { opacity: .75; }
+.batch.later .n { background: var(--surface-highest); color: var(--ink-variant); }
+
+/* ------------------------------------------------ plan */
+dialog { border: 0; border-radius: 28px; background: var(--surface-c); color: var(--ink); padding: 26px; max-width: 760px; width: calc(100% - 32px); box-shadow: 0 20px 60px #000a; }
+dialog::backdrop { background: #000a; backdrop-filter: blur(4px); }
+dialog h2 { margin: 0 0 6px; font-size: 22px; }
+dialog > p { color: var(--ink-variant); margin: 0 0 18px; line-height: 1.5; font-size: 14px; }
+.batches { display: grid; gap: 12px; }
+.batch { background: var(--surface-high); border-radius: 18px; padding: 14px 16px; display: flex; gap: 14px; }
+.batch .n { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: var(--ink-primary); display: grid; place-items: center; font-weight: 600; flex: none; }
+.batch h3 { margin: 4px 0 6px; font-size: 15px; }
+.batch ul { margin: 0; padding-left: 18px; line-height: 1.6; color: var(--ink-variant); font-size: 13.5px; }
+.batch b { color: var(--ink); font-weight: 500; }
+code { font: 12px Consolas, monospace; background: #ffffff12; padding: 1px 5px; border-radius: 5px; }
+dialog .close { margin-top: 18px; margin-left: auto; }
+
+@media (max-width: 980px) {
+  body { flex-direction: column; overflow: auto; }
+  #screen { overflow: visible; }
+  #bench { width: auto; height: auto; border-left: 0; border-top: 1px solid #ffffff12; }
+}
+</style>
+</head>
+<body>
+
+<div id="screen">
+  <div id="stack">
+    <div class="cap">Pilule repliée</div>
+    <div class="island" id="mini">
+      <div class="discbox">
+        <svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="none" stroke="#ffffff22" stroke-width="2"/><circle id="miniRing" cx="11" cy="11" r="10" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-dasharray="62.83"/></svg>
+        <div class="disc" id="miniDisc" data-art></div>
+      </div>
+      <div class="eq"><i></i><i></i><i></i></div>
+    </div>
+
+    <div class="cap">Survol de la pilule</div>
+    <div class="island" id="peek">
+      <div class="art" data-art></div>
+      <div class="info">
+        <div class="title">Néons sur la Loire</div>
+        <div class="artist">Les Phares Bleus</div>
+        <div class="seek" data-seek="peek"></div>
+      </div>
+      <div class="ctrls">
+        <button class="ib" style="width:34px;height:34px"><span class="ms">skip_previous</span></button>
+        <button class="play" data-play="peek" data-size="42"></button>
+        <button class="ib" style="width:34px;height:34px"><span class="ms">skip_next</span></button>
+      </div>
+    </div>
+
+    <div class="cap">Panneau ouvert</div>
+    <div class="island" id="panel">
+      <div class="rail">
+        <button data-tab="home" title="Accueil"><span class="ms">home</span></button>
+        <button data-tab="media" class="on" title="Média"><span class="ms">music_note</span></button>
+        <button disabled><span class="ms">calendar_month</span></button>
+        <button disabled><span class="ms">monitoring</span></button>
+        <button disabled><span class="ms">settings</span></button>
+      </div>
+      <div class="pages" id="pages">
+        <div class="page" id="home" data-page="home">
+          <div class="np">
+            <div class="wash" data-art></div>
+            <div class="art" data-art></div>
+            <div class="col">
+              <div class="lbl">EN LECTURE · SPOTIFY</div>
+              <div class="ttl">Néons sur la Loire</div>
+              <div class="sub">Les Phares Bleus</div>
+              <div class="row">
+                <button class="play" data-play="home" data-size="42"></button>
+                <span class="state" data-state></span>
+                <button class="ib" style="width:36px;height:36px"><span class="ms">skip_previous</span></button>
+                <button class="ib" style="width:36px;height:36px"><span class="ms">skip_next</span></button>
+              </div>
+              <div class="seek" data-seek="home"></div>
+            </div>
+          </div>
+          <div class="tiles"><div class="tile">reste de l'accueil</div><div class="tile">inchangé</div><div class="tile">(météo, agenda…)</div></div>
+        </div>
+
+        <div class="page on" id="media" data-page="media">
+          <div class="bgwrap" id="bgwrap"><div class="bgart" id="bgart" data-art></div></div>
+          <div class="dim" id="dim"></div>
+          <div class="mark l"></div><div class="mark r"></div>
+          <div class="player">
+            <div class="artbox" id="artbox">
+              <div class="halo" id="halo" data-art></div>
+              <canvas id="ring"></canvas>
+              <div class="art" id="bigArt" data-art></div>
+            </div>
+            <div class="chip">Spotify</div>
+            <div class="big-title">Néons sur la Loire</div>
+            <div class="big-artist">Les Phares Bleus</div>
+            <div class="big-album">Marée basse</div>
+            <div class="seek" data-seek="media"></div>
+            <div class="big-ctrls">
+              <button class="ib" style="width:44px;height:44px"><span class="ms" style="font-size:30px">skip_previous</span></button>
+              <button class="play" data-play="media" data-size="58"></button>
+              <button class="ib" style="width:44px;height:44px"><span class="ms" style="font-size:30px">skip_next</span></button>
+            </div>
+            <div class="vol"><span class="ms">volume_up</span><i></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<aside id="bench">
+  <header>
+    <div>
+      <h1>Lecteur : réglages 0.4.17</h1>
+      <p>Chaque réglage s'applique en direct à la pilule, à l'accueil et à l'onglet Média. Les valeurs par défaut reproduisent le lecteur actuel. Clic sur un bouton lecture : pause / lecture.</p>
+    </div>
+    <button class="tonal" id="planBtn"><span class="ms">checklist</span>Plan</button>
+  </header>
+  <div id="cards"></div>
+</aside>
+
+<dialog id="plan">
+  <h2>Plan en 3 batches</h2>
+  <p>Les réglages sont stockés dans <code>settings.json</code> via <code>Ilot.setCfg</code>, sans toucher au Rust. Les noms des clés sont fixés avant le batch 1, ce qui permet aux agents de travailler en parallèle sans conflit. Les valeurs par défaut gardent le comportement actuel, et <code>player_bigbtn</code> reste lu pour les anciennes configurations.</p>
+  <div class="batches">
+    <div class="batch"><div class="n">1</div><div><h3>Correctifs et fondations</h3><ul>
+      <li><b>Agent A</b> : coins de <code>MediaPage.qml</code>. Le fond flou est enveloppé dans un Item masqué par un rectangle arrondi qui ne suit pas la dérive. Le survol et l'accueil sont vérifiés aussi.</li>
+      <li><b>Agent B</b> : nouvelles clés dans <code>Ilot.qml</code>. <code>PlayBtn.qml</code> lit les clés (forme, couleur, icône, animations, ombre). Il corrige aussi <code>Theme.lift</code> et la boucle de liaison <code>overIsland</code> (<code>Main.qml:65</code>).</li>
+    </ul></div></div>
+    <div class="batch"><div class="n">2</div><div><h3>Réglages et composants</h3><ul>
+      <li><b>Agent C</b> : section Lecteur de <code>SettingsPage.qml</code>, organisée comme sur cette maquette.</li>
+      <li><b>Agent D</b> : <code>SeekBar.qml</code> (épaisseur, amplitude), pochette ronde et spectre séparé dans <code>MediaPage.qml</code>, options du fond, réglages de la pilule repliée dans <code>Pill.qml</code>.</li>
+    </ul></div></div>
+    <div class="batch"><div class="n">3</div><div><h3>Vérification</h3><ul>
+      <li><b>Moi</b> : <code>build.cmd</code> et <code>qmllint</code>, puis installation.</li>
+      <li><b>2 relecteurs</b> en parallèle : rendu QML et shaders d'un côté ; réglages et anciennes configurations de l'autre.</li>
+      <li><b>Exécutant</b> : ETAT, BACKLOG, CHANGELOG, version 0.4.17.</li>
+    </ul></div></div>
+    <div class="batch later"><div class="n"><span class="ms" style="font-size:18px">schedule</span></div><div><h3>Lot suivant, à part (touche au Rust : <code>src/media.rs</code>)</h3><ul>
+      <li>Aléatoire et répétition dans l'onglet Média.</li>
+      <li>Choix de l'appli suivie quand plusieurs jouent en même temps.</li>
+      <li>Clic sur la pochette pour ramener l'appli au premier plan.</li>
+    </ul></div></div>
+  </div>
+  <button class="tonal close" onclick="document.getElementById('plan').close()">Fermer</button>
+</dialog>
+
+<script>
+"use strict";
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+// ------------------------------------------------ couleurs
+const THEME = { primary: "#cfbdfe", ink: "#36265d" };      // accent du thème
+const ART = { primary: "#ffb1c8", ink: "#5e1133" };        // tirée de la pochette
+const SWATCHES = ["#ff8a80", "#ffb74d", "#ffd54f", "#aed581", "#4db6ac", "#4fc3f7", "#7986cb", "#ba68c8", "#f06292", "#a1887f", "#90a4ae", "#ffffff"];
+function lum(h) { const n = parseInt(h.slice(1), 16); return (.299 * (n >> 16) + .587 * ((n >> 8) & 255) + .114 * (n & 255)) / 255; }
+function inkOn(h) { return lum(h) > .6 ? "#1b1b1f" : "#ffffff"; }
+
+// ------------------------------------------------ réglages (défauts = lecteur actuel)
+const S = {
+  playerColor: "art", playerFixed: "#4fc3f7",               // player_color (existant)
+  btn: "cookie",                                            // player_btn
+  btnColor: "auto", btnFixed: "#ffffff", btnInk: "auto",    // player_btn_color / _ink
+  spin: true, morph: true, pop: true, glow: true,           // player_btn_spin / _morph / _pop / _glow
+  bar: "wave", barSize: "normal", barAmp: "normal",         // player_bar / _size / _amp
+  art: "scallop", spectrum: true,                           // player_art / player_spectrum
+  bg: "art", blur: "medium", drift: true, dim: "normal",    // media_bg / media_blur / _drift / _dim
+  miniRing: true, miniSpin: true,                           // player_mini_ring / _spin
+};
+// simulation, hors réglages du lecteur
+const SIM = { fixCorners: true };
+let playing = true, pos = 0.38;
+
+function playerPal() {
+  if (S.playerColor === "theme") return THEME;
+  if (S.playerColor === "fixed") return { primary: S.playerFixed, ink: inkOn(S.playerFixed) };
+  return ART;
+}
+// couleur du bouton selon l'endroit ; « auto » = comportement actuel
+function btnPal(where) {
+  const p = playerPal();
+  let fill, ink;
+  if (S.btnColor === "auto") [fill, ink] = where === "media" ? ["#ffffff", "#000000"] : [p.primary, p.ink];
+  else if (S.btnColor === "player") [fill, ink] = [p.primary, p.ink];
+  else if (S.btnColor === "white") [fill, ink] = ["#ffffff", "#000000"];
+  else [fill, ink] = [S.btnFixed, inkOn(S.btnFixed)];
+  if (S.btnInk === "white") ink = "#ffffff";
+  else if (S.btnInk === "black") ink = "#000000";
+  return { fill, ink, glow: fill === "#ffffff" ? p.primary : fill };
+}
+
+// ------------------------------------------------ pochette factice
+const artCanvas = (() => {
+  const c = document.createElement("canvas"); c.width = c.height = 320;
+  const g = c.getContext("2d");
+  let lg = g.createLinearGradient(0, 0, 320, 320);
+  lg.addColorStop(0, "#d6336c"); lg.addColorStop(1, "#f59f00");
+  g.fillStyle = lg; g.fillRect(0, 0, 320, 320);
+  const rg = g.createRadialGradient(90, 230, 10, 90, 230, 190);
+  rg.addColorStop(0, "#5f3dc4"); rg.addColorStop(1, "transparent");
+  g.fillStyle = rg; g.fillRect(0, 0, 320, 320);
+  g.globalAlpha = .18; g.fillStyle = "#fff";
+  for (let k = 0; k < 6; k++) g.fillRect(0, 200 + k * 18, 320, 6);
+  g.globalAlpha = 1; g.fillStyle = "#ffffffd8"; g.font = "700 30px Rubik, sans-serif";
+  g.fillText("LES PHARES", 22, 50);
+  return c;
+})();
+const ART_URL = artCanvas.toDataURL();
+$$("[data-art]").forEach(e => e.style.backgroundImage = `url(${ART_URL})`);
+
+// ------------------------------------------------ bouton lecture (forme de cookie.frag)
+function btnShape(g, sz, m, shape) {
+  const c = sz / 2, R = sz / 2 - 1, N = 160;
+  g.beginPath();
+  for (let i = 0; i <= N; i++) {
+    const a = i / N * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+    let r;
+    if (shape === "cookie") r = R * (.93 + (1 - m) * .055 * Math.cos(5 * a) + m * .07 * Math.cos(9 * a));
+    else r = R;
+    i ? g.lineTo(c + r * ca, c + r * sa) : g.moveTo(c + r * ca, c + r * sa);
+  }
+  g.closePath();
+}
+const plays = $$("[data-play]").map(el => {
+  const sz = +el.dataset.size;
+  el.style.width = el.style.height = sz + "px";
+  el.innerHTML = `<div class="glow"></div><canvas></canvas><span class="ms"></span>`;
+  const cv = $("canvas", el), dpr = devicePixelRatio || 1;
+  cv.width = cv.height = Math.round(sz * dpr);
+  const b = { el, where: el.dataset.play, sz, cv, g: cv.getContext("2d"), dpr, icon: $(".ms", el), glow: $(".glow", el), m: 1, rot: 0 };
+  el.onclick = () => { playing = !playing; refreshIcons(true); };
+  return b;
+});
+function refreshIcons(anim) {
+  for (const b of plays) {
+    b.icon.textContent = playing ? "pause" : "play_arrow";
+    if (anim && S.pop) { b.icon.style.animation = "none"; void b.icon.offsetWidth; b.icon.style.animation = "pop 480ms cubic-bezier(.34,1.56,.64,1)"; }
+  }
+  $("[data-state]").textContent = playing ? "En lecture" : "En pause";
+}
+
+// ------------------------------------------------ barre de progression
+const THICK = { thin: .7, normal: 1, thick: 1.6 }, AMP = { low: .5, normal: 1, high: 1.7 };
+const seeks = $$("[data-seek]").map(el => {
+  const kind = el.dataset.seek;
+  el.innerHTML = kind === "peek" ? `<canvas></canvas>` : `<span class="t"></span><canvas></canvas><span class="t r"></span>`;
+  const cv = $("canvas", el);
+  cv.onclick = e => { const r = cv.getBoundingClientRect(); pos = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); };
+  return { kind, cv, g: cv.getContext("2d"), t: $$(".t", el) };
+});
+const DUR = 214;
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+function drawSeek(s, phase) {
+  const dpr = devicePixelRatio || 1, W = s.cv.clientWidth, H = s.cv.clientHeight;
+  if (!W) return;
+  if (s.cv.width !== Math.round(W * dpr)) { s.cv.width = Math.round(W * dpr); s.cv.height = Math.round(H * dpr); }
+  const g = s.g; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const base = s.kind === "peek" ? 3 : 4, lw = base * THICK[S.barSize];
+  const amp = (s.kind === "peek" ? 2.5 : 3.5) * AMP[S.barAmp], y = H / 2, x0 = lw / 2 + 1, x1 = W - lw / 2 - 1;
+  const xp = x0 + (x1 - x0) * pos, gap = 6;
+  g.lineCap = "round"; g.lineWidth = lw;
+  g.strokeStyle = playerPal().primary; g.beginPath();
+  for (let x = x0; x <= xp - gap; x += 1.5) {
+    const yy = S.bar === "wave" && playing ? y + amp * Math.sin(x / 6 - phase) : y;
+    x === x0 ? g.moveTo(x, yy) : g.lineTo(x, yy);
+  }
+  g.stroke();
+  g.strokeStyle = "#ffffff26"; g.beginPath(); g.moveTo(Math.min(x1, xp + gap), y); g.lineTo(x1, y); g.stroke();
+  g.fillStyle = playerPal().primary; g.beginPath(); g.roundRect(xp - 2, y - lw - 5, 4, lw * 2 + 10, 2); g.fill();
+  if (s.t.length) { s.t[0].textContent = fmt(pos * DUR); s.t[1].textContent = "-" + fmt(DUR - pos * DUR); }
+}
+
+// ------------------------------------------------ pochette et spectre
+const ring = $("#ring"), ringG = ring.getContext("2d"), bands = new Float32Array(48);
+function layoutArt() {
+  const box = $("#artbox"), art = $("#bigArt"), halo = $("#halo");
+  const sz = S.art === "scallop" ? 172 : S.art === "disc" ? 190 : 200;
+  box.style.width = box.style.height = sz + "px";
+  box.style.margin = S.spectrum ? "26px 0 34px" : "0 0 18px";
+  const rad = S.art === "round" ? "28px" : "50%";
+  art.style.borderRadius = halo.style.borderRadius = rad;
+  art.style.clipPath = "none";
+  art.style.boxShadow = S.art === "scallop" ? "none" : "";
+  halo.style.display = S.art === "scallop" ? "none" : "";
+}
+function scallopClip(sz, rot) {
+  const c = sz / 2; let d = "";
+  for (let i = 0; i <= 160; i++) {
+    const a = i / 160 * Math.PI * 2, r = c * (.95 + .04 * Math.cos(12 * (a + rot)));
+    d += (i ? "L" : "M") + (c + r * Math.cos(a)).toFixed(1) + " " + (c + r * Math.sin(a)).toFixed(1);
+  }
+  return `path("${d}Z")`;
+}
+function drawRing(t) {
+  const dpr = devicePixelRatio || 1, W = ring.clientWidth;
+  if (ring.width !== Math.round(W * dpr)) ring.width = ring.height = Math.round(W * dpr);
+  ringG.setTransform(dpr, 0, 0, dpr, 0, 0); ringG.clearRect(0, 0, W, W);
+  if (!S.spectrum) return;
+  const beat = Math.exp(-((t % .5) / .11));
+  for (let i = 0; i < bands.length; i++) {
+    const v = playing ? Math.min(1, (i < 8 ? beat * (1 - i / 10) : 0) * .9 + (.25 + .2 * Math.sin(t * (1.3 + i * .37) + i)) * (1 - i / 70) * (.6 + .4 * Math.abs(Math.sin(t * 2.1 + i * .7)))) : 0;
+    bands[i] += (v - bands[i]) * .35;
+  }
+  const A = $("#artbox").clientWidth, c = W / 2, n = 72;
+  const r0 = S.art === "round" ? A / 2 * 1.08 + 6 : A / 2 + 6;
+  ringG.lineCap = "round"; ringG.lineWidth = 4; ringG.strokeStyle = playerPal().primary;
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2 - Math.PI / 2, v = bands[Math.round(Math.abs(i / n * 2 - 1) * (bands.length - 1))];
+    ringG.globalAlpha = .55 + v * .45;
+    ringG.beginPath(); ringG.moveTo(c + r0 * Math.cos(a), c + r0 * Math.sin(a));
+    ringG.lineTo(c + (r0 + 3 + v * 22) * Math.cos(a), c + (r0 + 3 + v * 22) * Math.sin(a)); ringG.stroke();
+  }
+  ringG.globalAlpha = 1;
+}
+
+// ------------------------------------------------ fond de l'onglet Média
+const BLUR = { low: 20, medium: 40, high: 64 }, DIM = { light: .3, normal: .47, strong: .7 };
+function applyBg() {
+  const media = $("#media"), bgart = $("#bgart"), dim = $("#dim"), wrap = $("#bgwrap"), p = playerPal();
+  const bug = !SIM.fixCorners && S.bg === "art", base = "#0b0a0f";
+  media.classList.toggle("bug", bug);
+  $("#pages").classList.toggle("bug", bug);
+  wrap.style.display = S.bg === "art" ? "" : "none";
+  bgart.style.filter = `blur(${BLUR[S.blur]}px) saturate(1.3)`;
+  bgart.style.animation = S.drift ? "drift 10s ease-in-out infinite" : "none";
+  media.style.background = S.bg === "color" ? `color-mix(in srgb, ${p.primary} 22%, ${base})`
+    : S.bg === "gradient" ? `linear-gradient(160deg, color-mix(in srgb, ${p.primary} 35%, ${base}), ${base} 70%)`
+    : S.bg === "none" ? "var(--surface-c)" : "#0b0a0f";
+  dim.style.background = S.bg === "art" ? `linear-gradient(to bottom, rgba(0,0,0,.28) 0%, rgba(0,0,0,.28) 40%, rgba(0,0,0,${DIM[S.dim] + .25}))` : "none";
+}
+
+// ------------------------------------------------ boucle
+let last = performance.now(), phase = 0, artRot = 0, miniRot = 0;
+const eqBars = $$("#mini .eq i");
+function frame(now) {
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  const anim = playing;
+  if (playing) { pos += dt / DUR; if (pos > 1) pos = 0; }
+  if (anim) phase += dt * 5;
+  const k = 1 - Math.exp(-dt / .12);
+  for (const b of plays) {
+    const { fill, ink, glow } = btnPal(b.where);
+    b.m += (((playing && S.morph) ? 1 : 0) - b.m) * k;
+    if (anim && S.spin && S.btn === "cookie") b.rot += dt * 25;
+    const g = b.g, sz = b.sz;
+    g.setTransform(b.dpr, 0, 0, b.dpr, 0, 0); g.clearRect(0, 0, sz, sz);
+    if (S.btn !== "none") {
+      g.translate(sz / 2, sz / 2); g.rotate(b.rot * Math.PI / 180); g.translate(-sz / 2, -sz / 2);
+      btnShape(g, sz, b.m, S.btn); g.fillStyle = fill; g.fill();
+    }
+    b.icon.style.color = S.btn === "none" ? fill : ink;
+    b.icon.style.fontSize = Math.round(sz * (S.btn === "none" ? .72 : .5)) + "px";
+    b.glow.style.background = glow;
+    b.glow.style.opacity = S.glow && S.btn !== "none" ? .7 : 0;
+  }
+  seeks.forEach(s => drawSeek(s, phase));
+  // pilule repliée : anneau de progression, disque qui tourne, égaliseur
+  $("#miniRing").style.display = S.miniRing ? "" : "none";
+  $("#miniRing").setAttribute("stroke-dashoffset", (62.83 * (1 - pos)).toFixed(2));
+  if (anim && S.miniSpin) miniRot = (miniRot + dt * 40) % 360;
+  $("#miniDisc").style.transform = `rotate(${miniRot}deg)`;
+  const t = now / 1000;
+  eqBars.forEach((e, i) => e.style.height = (anim ? 4 + 8 * Math.abs(Math.sin(t * (3 + i * 1.3) + i)) : 4) + "px");
+  if (S.art === "scallop") {
+    if (anim) artRot += dt * .15;
+    $("#bigArt").style.clipPath = scallopClip($("#artbox").clientWidth, artRot);
+  }
+  drawRing(now / 1000);
+  requestAnimationFrame(frame);
+}
+
+// ------------------------------------------------ panneau de réglages
+const cards = $("#cards");
+const deps = [];                                   // [élément, () => actif ?, "hide" ?]
+const syncs = [];                                  // remettent les contrôles d'accord avec l'état
+function card(icon, title) {
+  const c = document.createElement("div"); c.className = "card";
+  c.innerHTML = `<h2><span class="ms">${icon}</span>${title}</h2>`;
+  cards.appendChild(c); return c;
+}
+function label(c, text, isNew) {
+  const d = document.createElement("div"); d.className = "sub";
+  d.innerHTML = text + (isNew ? `<span class="new">NOUVEAU</span>` : "");
+  c.appendChild(d); return d;
+}
+function chips(c, text, key, opts, isNew, obj = S) {
+  const l = label(c, text, isNew);
+  const w = document.createElement("div"); w.className = "chips";
+  const btns = opts.map(([v, t]) => {
+    const b = document.createElement("button"); b.textContent = t;
+    b.onclick = () => { obj[key] = v; sync(); update(); };
+    w.appendChild(b); return [v, b];
+  });
+  const sync = () => btns.forEach(([v, b]) => b.classList.toggle("on", obj[key] === v));
+  syncs.push(sync); sync();
+  c.appendChild(w);
+  return [l, w];
+}
+function swatches(c, key, when) {
+  const w = document.createElement("div"); w.className = "swatches";
+  const sync = () => {
+    w.innerHTML = "";
+    for (const col of SWATCHES) {
+      const b = document.createElement("button"); b.style.background = col; b.classList.toggle("on", S[key] === col);
+      b.onclick = () => { S[key] = col; sync(); update(); };
+      w.appendChild(b);
+    }
+  };
+  syncs.push(sync); sync(); c.appendChild(w);
+  deps.push([w, when, "hide"]);
+}
+function toggle(c, text, key, isNew, obj = S) {
+  const r = document.createElement("div"); r.className = "setrow";
+  r.innerHTML = `<span>${text}${isNew ? `<span class="new">NOUVEAU</span>` : ""}</span>`;
+  const b = document.createElement("button"); b.className = "sw";
+  b.onclick = () => { obj[key] = !obj[key]; sync(); update(); };
+  const sync = () => b.classList.toggle("on", obj[key]);
+  syncs.push(sync); sync();
+  r.appendChild(b); c.appendChild(r); return r;
+}
+function hint(c, text) { const d = document.createElement("div"); d.className = "hint"; d.textContent = text; c.appendChild(d); return d; }
+// Couleur du lecteur (existant)
+let c = card("palette", "Couleur du lecteur");
+chips(c, "Couleur de la barre, du spectre et de l'artiste", "playerColor", [["art", "Pochette"], ["theme", "Thème"], ["fixed", "Couleur fixe"]], false);
+swatches(c, "playerFixed", () => S.playerColor === "fixed");
+
+// Bouton lecture
+c = card("play_circle", "Bouton lecture");
+chips(c, "Forme", "btn", [["cookie", "Festonné"], ["round", "Rond"], ["none", "Icône seule"]], true);
+hint(c, "« Festonné » et « Rond » existent déjà ; « Icône seule » est nouvelle.");
+chips(c, "Couleur", "btnColor", [["auto", "Auto"], ["player", "Couleur du lecteur"], ["white", "Blanc"], ["fixed", "Couleur fixe"]], true);
+const autoHint = hint(c, "Auto = comportement actuel : blanc lumineux dans l'onglet Média, couleur du lecteur ailleurs.");
+swatches(c, "btnFixed", () => S.btnColor === "fixed");
+const [inkL, inkW] = chips(c, "Couleur de l'icône", "btnInk", [["auto", "Auto"], ["white", "Blanche"], ["black", "Noire"]], true);
+label(c, "Animations", true);
+const spinRow = toggle(c, "Rotation pendant la lecture", "spin", false);
+const morphRow = toggle(c, "Change de forme entre pause et lecture", "morph", false);
+toggle(c, "Petit rebond de l'icône au clic", "pop", false);
+const glowRow = toggle(c, "Ombre colorée", "glow", false);
+deps.push([autoHint, () => S.btnColor === "auto", "hide"], [inkL, () => S.btn !== "none"], [inkW, () => S.btn !== "none"],
+          [spinRow, () => S.btn === "cookie"], [morphRow, () => S.btn === "cookie"], [glowRow, () => S.btn !== "none"]);
+
+// Barre de progression
+c = card("linear_scale", "Barre de progression");
+chips(c, "Style", "bar", [["wave", "Ondulée"], ["flat", "Plate"]], false);
+chips(c, "Épaisseur", "barSize", [["thin", "Fine"], ["normal", "Normale"], ["thick", "Épaisse"]], true);
+const [ampL, ampW] = chips(c, "Amplitude de l'onde", "barAmp", [["low", "Faible"], ["normal", "Normale"], ["high", "Forte"]], true);
+deps.push([ampL, () => S.bar === "wave"], [ampW, () => S.bar === "wave"]);
+
+// Pilule repliée
+c = card("radio_button_checked", "Pilule repliée");
+toggle(c, "Anneau de progression autour du disque", "miniRing", true);
+toggle(c, "Le disque tourne pendant la lecture", "miniSpin", true);
+
+// Pochette
+c = card("album", "Pochette de l'onglet Média");
+chips(c, "Forme", "art", [["round", "Arrondie"], ["scallop", "Festonnée"], ["disc", "Ronde"]], false);
+hint(c, "« Ronde » est nouvelle. Aujourd'hui, le spectre n'existe qu'avec la pochette festonnée.");
+toggle(c, "Spectre autour de la pochette", "spectrum", true);
+
+// Fond
+c = card("wallpaper", "Fond de l'onglet Média");
+chips(c, "Fond", "bg", [["art", "Pochette floutée"], ["color", "Couleur"], ["gradient", "Dégradé"], ["none", "Aucun"]], false);
+const bgOpts = [];
+bgOpts.push(...chips(c, "Flou", "blur", [["low", "Léger"], ["medium", "Moyen"], ["high", "Fort"]], true));
+bgOpts.push(toggle(c, "Le fond dérive lentement", "drift", true));
+bgOpts.push(...chips(c, "Assombrissement en bas", "dim", [["light", "Léger"], ["normal", "Normal"], ["strong", "Fort"]], true));
+bgOpts.forEach(e => deps.push([e, () => S.bg === "art"]));
+
+// Correctif des coins (simulation)
+c = card("rounded_corner", "Correctif des coins");
+chips(c, "Coins de l'onglet Média (fond « Pochette floutée »)", "fixCorners", [[false, "Aujourd'hui"], [true, "Après correctif"]], false, SIM);
+hint(c, "Aujourd'hui, le flou carré dépasse de l'arrondi et les coins du bas restent clairs (entourés en rouge).");
+// onglets du panneau
+$$(".rail [data-tab]").forEach(b => b.onclick = () => {
+  $$(".rail [data-tab]").forEach(x => x.classList.toggle("on", x === b));
+  $$(".page").forEach(p => p.classList.toggle("on", p.dataset.page === b.dataset.tab));
+});
+$("#planBtn").onclick = () => $("#plan").showModal();
+
+function update() {
+  for (const [el, ok, mode] of deps) {
+    if (mode === "hide") el.style.display = ok() ? "" : "none";
+    else el.classList.toggle("dimmed", !ok());
+  }
+  document.documentElement.style.setProperty("--accent", playerPal().primary);
+  layoutArt(); applyBg();
+}
+update(); refreshIcons(false);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

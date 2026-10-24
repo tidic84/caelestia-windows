@@ -4,11 +4,11 @@
 chaque session : ce qui a été fait, ce qui a été vérifié ou non, et où
 reprendre.
 
-## Où on en est (mis à jour le 2026-10-23)
+## Où on en est (mis à jour le 2026-10-24)
 
-- **Version** : 0.4.16 dans `Cargo.toml` (nouveau lecteur de musique),
-  installée sur le poste, publiée le 2026-10-23 par le tag `v0.4.16`
-  (GitHub Action `release.yml`). La 0.4.8 n'a jamais été publiée seule : elle
+- **Version** : 0.4.18 (patch du lecteur), publiée le 2026-10-24 par le tag
+  `v0.4.18` (GitHub Action `release.yml`). La 0.4.17 (addon Claude, hooks
+  WSL, Apex) l'a été le même jour. La 0.4.8 n'a jamais été publiée seule : elle
   est incluse dans la 0.4.9.
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
   un raccourci dans le dossier Démarrage. Elle a été construite depuis les
@@ -19,11 +19,31 @@ reprendre.
 - **Lecteur de musique (0.4.16)** : une première version, validée par
   l'utilisateur. Il reste à le tester à la main (voir « Non vérifié » dans le
   journal du 2026-10-23).
-- **Prochaine étape** : aucune n'est imposée. Option encore en attente de son
-  accord : « Redémarrer » dans le clic droit de la ligne `explorer`.
-  Ensuite, piocher dans `BACKLOG.md`.
+- **Prochaine étape** : vérification visuelle par l'utilisateur (coins de
+  l'onglet Média, pochette ronde + spectre, réglages du fond, nouvelle section
+  Réglages), puis lot Rust média (`BACKLOG.md`, « Lot suivant du lecteur »).
+  Option encore en attente de son accord, hors lecteur : « Redémarrer » dans
+  le clic droit de la ligne `explorer`.
 
 ## Journal
+
+### 2026-10-24 : 0.4.18 (patch lecteur)
+
+- Maquette `docs/dev/maquettes/lecteur-reglages.html` validée.
+- Correctif des coins de l'onglet Média.
+- Nouveaux réglages du lecteur. Clés : `player_btn` (none), `player_btn_color`,
+  `player_btn_ink`, `player_btn_spin` / `player_btn_morph` / `player_btn_pop` /
+  `player_btn_glow`, `player_bar_size` / `player_bar_amp`, `player_art` (disc),
+  `player_spectrum` (null = suit la pochette), `media_blur` / `media_drift` /
+  `media_dim`, `player_mini_ring` / `player_mini_spin`.
+- `Theme.lift` et boucle `overIsland` corrigés (voir `BACKLOG.md`, « Fait »).
+- `Ilot.spectrumOn` coupe la capture audio.
+- Numéro : prévu en 0.4.17, mais une autre session avait publié la 0.4.17
+  (addon Claude) entre-temps ; rebasé et publié en 0.4.18.
+- Vérifié : build + install OK, qmllint sans nouveau type d'avertissement,
+  journal Qt vide au démarrage, 2 relectures (aucun bloquant).
+- Non vérifié à l'écran : rendu des coins, pochette ronde + spectre, réglages
+  du fond, nouvelle section Réglages.
 
 ### 2026-10-24 : addon « Claude », utilisation de l'abonnement
 

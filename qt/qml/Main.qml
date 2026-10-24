@@ -69,7 +69,17 @@ Window {
             return p.x >= hoverZone.x && p.x < hoverZone.x + hoverZone.width
                 && p.y >= hoverZone.y && p.y < hoverZone.y + hoverZone.height
         }
-        onOverIslandChanged: Ilot.setHovered(overIsland)
+        // differe : setHovered change la taille de l'ilot, donc hoverZone, dont
+        // depend overIsland (boucle de liaison si on l'appelle tout de suite)
+        onOverIslandChanged: Qt.callLater(syncHover)
+        // dernier etat envoye : setHovered seulement s'il a vraiment change
+        property bool sentHover: false
+        function syncHover() {
+            if (overIsland === sentHover)
+                return
+            sentHover = overIsland
+            Ilot.setHovered(overIsland)
+        }
 
         // Echap : referme la feuille, le jour du calendrier, puis l'ilot.
         // Touche Windows remappee (F24) : quand l'ilot a le clavier, elle
