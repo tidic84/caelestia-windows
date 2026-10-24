@@ -1673,7 +1673,7 @@ Item {
                     subRow: true
                     title: "Hooks Claude Code"
                     sub: page.ccHooksErr || (page.ccHooks === null ? "…" : page.ccHooks
-                        ? "Installés dans ~/.claude/settings.json"
+                        ? "Installés dans ~/.claude/settings.json (Windows et WSL)"
                         : "Pas installés : sans eux, l'îlot ne sait pas quand Claude travaille")
                     TextBtn {
                         visible: page.ccHooks !== null

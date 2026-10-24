@@ -25,6 +25,23 @@ reprendre.
 
 ## Journal
 
+### 2026-10-24 : hooks Claude Code aussi pour Claude lancé dans WSL
+
+- **Constat.** `ilot.exe --claude` marche déjà depuis WSL : l'interop lance
+  l'exe Windows, le JSON passe par stdin, l'événement arrive dans l'îlot
+  (≈ 70 ms). Il manquait seulement les hooks dans le `~/.claude/settings.json`
+  **côté Linux**, que Claude Code dans WSL lit à la place de celui de Windows.
+- **`src/claude.rs`.** Le bouton « Installer » / « Retirer » traite aussi les
+  distributions WSL (`wsl.exe --list --quiet`, sans `docker-desktop*`) : pour
+  chaque `\\wsl.localhost\<distro>\home\*\.claude` (et `/root`) existant,
+  mêmes hooks avec la commande `'/mnt/c/.../ilot.exe' --claude`. L'état ne
+  regarde que les distributions déjà démarrées (`--running`), pour ne pas
+  réveiller WSL en ouvrant les réglages. Libellé : « (Windows et WSL) ».
+- **Vérifié.** `cargo test` : nouveau test `chemin_wsl`. Clippy sans
+  avertissement dans `claude.rs`. Build complet OK. Détection testée : seul
+  `Ubuntu/home/tidic/.claude` est trouvé, état « pas installé » tant que WSL
+  n'a pas les hooks.
+
 ### 2026-10-23 (suite) : variantes choisies dans l'atelier, intégrées
 
 Page de variantes `docs/dev/maquettes/atelier.html`, aux dimensions réelles

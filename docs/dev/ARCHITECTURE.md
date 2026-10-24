@@ -94,7 +94,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── discord.rs    RPC Discord (pipe IPC), identifiants DPAPI
 ├── soundboard.rs Soundboard vers câble virtuel ├── decode.rs  Décodage audio (symphonia)
 ├── captions.rs   Sous-titres (LiveCaptions via UI Automation)
-├── claude.rs     Hooks Claude Code dans ~/.claude/settings.json (installer, retirer, état)
+├── claude.rs     Hooks Claude Code dans ~/.claude/settings.json, Windows et WSL (installer, retirer, état)
 ├── translate.rs  Traduction Google « gtx »
 ├── mail.rs       IMAP (mots de passe DPAPI)    ├── google.rs  OAuth 2 Gmail (PKCE)
 ├── update.rs     Mises à jour GitHub Releases (toutes les 6 h)
