@@ -25,6 +25,25 @@ reprendre.
 
 ## Journal
 
+### 2026-10-24 : Apex, plus de minuteur ni de fausse « Partie trouvée »
+
+- **Constat (utilisateur).** Dans Apex, un minuteur apparaissait sans
+  recherche lancée, et parfois « Partie trouvée » sans recherche. Cause :
+  hors Valorant, l'îlot ne sait pas si on est en file. Il prenait « autre
+  fenêtre au premier plan » pour « en attente » (minuteur), et une lecture
+  disque > 25 Mo/s pendant 2 s pour « carte en chargement » ; Apex lit autant
+  dans le lobby.
+- **Choix de l'utilisateur.** Minuteur retiré hors du jeu (Valorant garde son
+  vrai temps de file). Détection : clignotement de la fenêtre seulement.
+- **`src/activity.rs`.** `MatchWatch` ne garde que `HSHELL_FLASH` ; retrait de
+  `read_bytes`, `LOAD_RATE` et des imports devenus inutiles.
+- **`Watch.qml`.** La pilule et l'aperçu n'affichent plus « En attente
+  depuis » ; le minuteur QML ne passe plus à 1 s hors du jeu.
+- **Vérifié.** Build complet, `cargo test` 27/27, clippy sans nouvel
+  avertissement, aucune erreur QML au démarrage. **Pas testé en jeu** : reste
+  à voir si Apex fait clignoter sa fenêtre quand la partie est trouvée (sinon,
+  plus d'alerte pour Apex).
+
 ### 2026-10-24 : hooks Claude Code aussi pour Claude lancé dans WSL
 
 - **Constat.** `ilot.exe --claude` marche déjà depuis WSL : l'interop lance

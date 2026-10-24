@@ -137,7 +137,7 @@ Item {
     // relu pour faire avancer le temps de jeu affiche
     property real tick: Date.now()
     Timer {
-        interval: (w.game && w.game.away) || w.valoLive ? 1000 : 30000
+        interval: w.valoLive ? 1000 : 30000
         running: !!w.game || w.valoLive
         repeat: true
         onTriggered: w.tick = Date.now()
@@ -183,10 +183,8 @@ Item {
             const inst = dl.phase === "install"
             return { icon: inst ? "install_desktop" : "download", text: Math.floor(dlPct(dl)) + " %", hot: false, away: false }
         }
+        // hors du jeu : pas de minuteur, rien ne dit qu'une recherche est lancee
         if (game) {
-            const awayFor = game.away ? Ilot.fmtTime((Date.now() - game.away) / 1000) : ""
-            if (awayFor)
-                return { icon: "hourglass_top", text: awayFor, hot: false, away: true }
             const mins = Math.max(0, Math.floor((Date.now() - game.since) / 60000))
             return { icon: "sports_esports", text: gpu ? gpu.temp + "°" : mins < 60 ? mins + " min" : Math.floor(mins / 60) + " h " + Ilot.pad(mins % 60), hot: !!gpu && gpu.temp >= 80, away: false }
         }
@@ -228,12 +226,10 @@ Item {
         if (game) {
             const mins = Math.max(0, Math.floor((Date.now() - game.since) / 60000))
             const time = mins < 60 ? mins + " min" : Math.floor(mins / 60) + " h " + Ilot.pad(mins % 60)
-            const awayFor = game.away ? Ilot.fmtTime((Date.now() - game.away) / 1000) : ""
             const stats = [gpu && "GPU " + gpu.load + " % · " + gpu.temp + " °C", sys && "CPU " + Math.round(sys.cpu) + " %"].filter(Boolean).join(" · ")
             return {
                 pic: cover(game.id), icon: "sports_esports", title: game.name, bar: -1,
-                sub: awayFor ? "En attente depuis " + awayFor + (cfg.match_alert ? " · alerte quand la partie est trouvée" : "")
-                    : "En jeu depuis " + time + (stats ? " · " + stats : "")
+                sub: "En jeu depuis " + time + (stats ? " · " + stats : "")
             }
         }
         if (gpu)

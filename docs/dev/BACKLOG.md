@@ -100,6 +100,12 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 - 🟢 `ilot.exe --claude` lancé à la main depuis mintty (Git Bash) attend
   stdin. Ce n'est pas un problème avec Claude Code, qui ferme stdin.
 
+## Alerte « partie trouvée » (hors Valorant)
+
+- 🟢 Seul signal : le clignotement de la fenêtre du jeu. À confirmer pour
+  Apex (s'il ne clignote pas, pas d'alerte). Pas de minuteur de file, faute
+  de savoir si une recherche est lancée.
+
 ## Relevés encore sondés
 
 - 🟠 **Tube Discord en vocal** : `discord.rs:395`, lu toutes les 60 ms. Une

@@ -24,8 +24,7 @@ use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 use crate::host::AppHandle;
 
 use windows::core::{w, BOOL};
-use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::System::Threading::{GetProcessIoCounters, OpenProcess, IO_COUNTERS, PROCESS_QUERY_LIMITED_INFORMATION};
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, EnumWindows, GetForegroundWindow, GetMessageW, GetWindowTextLengthW,
     GetWindowThreadProcessId, IsIconic, IsWindowVisible, RegisterClassW, RegisterShellHookWindow, RegisterWindowMessageW,
@@ -400,49 +399,27 @@ fn fg_pid() -> u32 {
     pid
 }
 
-fn read_bytes(pid: u32) -> Option<u64> {
-    unsafe {
-        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
-        let mut io = IO_COUNTERS::default();
-        let ok = GetProcessIoCounters(h, &mut io).is_ok();
-        let _ = CloseHandle(h);
-        ok.then_some(io.ReadTransferCount)
-    }
-}
-
 /// Partie trouvee pendant que le joueur est ailleurs : le jeu fait clignoter sa
-/// fenetre (CS2, LoL, Dota...) ou se met a charger la carte (lecture disque
-/// soutenue, cas d'Apex).
+/// fenetre (CS2, LoL, Dota...). La lecture disque (chargement de carte) n'est
+/// plus un signal : Apex lit autant dans le lobby, d'ou de fausses alertes.
 struct MatchWatch {
-    last: Option<u64>,
-    hot: u32,
     since: u64,
     fired: bool,
 }
 
-/// lecture disque du jeu au-dela de laquelle on considere qu'il charge une carte
-const LOAD_RATE: f64 = 25.0 * 1024.0 * 1024.0;
-
 impl MatchWatch {
-    fn new(pid: u32) -> Self {
-        MatchWatch { last: if pid != 0 { read_bytes(pid) } else { None }, hot: 0, since: now_ms(), fired: false }
+    fn new() -> Self {
+        MatchWatch { since: now_ms(), fired: false }
     }
 
-    fn check(&mut self, pid: u32, dt: f64) -> bool {
+    fn check(&mut self, pid: u32) -> bool {
         if self.fired {
             return false;
         }
         let flashed = FLASH_PID.load(Ordering::Relaxed) == pid && FLASH_AT.load(Ordering::Relaxed) > self.since;
-        let now = read_bytes(pid);
-        let loading = match (self.last, now) {
-            (Some(a), Some(b)) if dt > 0.2 => (b.saturating_sub(a) as f64 / dt) > LOAD_RATE,
-            _ => false,
-        };
-        self.last = now;
-        self.hot = if loading { self.hot + 1 } else { 0 };
         // quelques secondes de calme d'abord : la sortie du jeu ne compte pas
         let settled = now_ms().saturating_sub(self.since) > 5000;
-        if settled && (flashed || self.hot >= 2) {
+        if settled && flashed {
             self.fired = true;
         }
         self.fired
@@ -575,7 +552,7 @@ pub fn watch(app: AppHandle) {
         // jeux en cours de mise a jour au tour precedent
         let mut updating: HashMap<String, String> = HashMap::new();
         let mut session = Session::default();
-        let mut watch_mm = MatchWatch::new(0);
+        let mut watch_mm = MatchWatch::new();
         // jeu deja vu au premier plan : avant, le joueur n'est pas « sorti du
         // jeu », il attend qu'il se lance (launcher, chargement initial)
         let mut seen: Option<String> = None;
@@ -704,11 +681,11 @@ pub fn watch(app: AppHandle) {
                 let away = away && seen.as_ref() == Some(&g.id);
                 if away && g.away == 0 {
                     g.away = now_ms();
-                    watch_mm = MatchWatch::new(pid);
+                    watch_mm = MatchWatch::new();
                 } else if !away && g.away != 0 {
                     g.away = 0;
                 }
-                if away && watch_mm.check(pid, dt) {
+                if away && watch_mm.check(pid) {
                     let _ = app.emit("match-found", g.name.clone());
                 }
             }
