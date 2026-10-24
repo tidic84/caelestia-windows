@@ -103,6 +103,8 @@ Item {
           // parties de l'addon, a desactiver une a une (cfg)
           parts: [{ key: "assist_tr", label: "Traduction", sub: "Traduction de textes et sous-titres en direct" },
                   { key: "assist_claude", label: "Claude", sub: "Questions envoyées à l'application Claude" }] },
+        { id: "cusage", icon: "auto_awesome", label: "Claude", page: "ClaudeUsagePage", tip: "Utilisation de Claude",
+          desc: "Limites de ton abonnement Claude : session de 5 h et semaine, avec leur remise à zéro (connexion de Claude Code)" },
         { id: "walls", icon: "wallpaper", label: "Fonds", page: "WallsPage",
           desc: "Vos fonds d'écran et ceux de Wallpaper Engine ; choisir un fond recalcule les couleurs" },
         { id: "settings", icon: "settings", label: "", tip: "Réglages", page: "SettingsPage", core: true }

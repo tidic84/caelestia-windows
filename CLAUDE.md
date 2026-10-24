@@ -63,6 +63,10 @@ l'appli). Pour publier, pousser un tag `v*` : la CI publie
 - **Commandes QML → Rust** : ce sont des chaînes sans vérification à la
   compilation. Après avoir ajouté une commande, vérifie le nom dans le `match`
   de `src/lib.rs` (`call()`).
+- **Icônes** : `qt/fonts/MaterialSymbolsRounded.ttf` est un sous-ensemble
+  (≈ 300 ligatures). Un nom absent s'affiche en texte : vérifier que l'icône
+  est déjà utilisée ailleurs dans `qt/qml`, ou lister les ligatures avec
+  fontTools.
 - **`sourceSize`** est déjà multiplié par le DPI par Qt avant d'arriver au
   provider `image://ilot`.
 - **CPU « comme le Gestionnaire des tâches »** : c'est

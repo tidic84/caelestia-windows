@@ -399,6 +399,7 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "cc_hooks_status" => json(claude::hooks_status()?),
         "cc_hooks_install" => json(claude::hooks_install()?),
         "cc_hooks_remove" => json(claude::hooks_remove()?),
+        "cc_usage" => json(claude::usage(a!("fresh"))?),
         // soundboard
         "sb_devices" => json(soundboard::sb_devices()),
         "sb_config" => json(soundboard::sb_config(app, a!("cfg"))),
@@ -502,6 +503,7 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
     valorant::watch(app);
     health::watch(app);
     status::watch(app);
+    claude::watch(app);
     privacy::watch(app);
     update::watch(app);
     quickshare::init(app.state());

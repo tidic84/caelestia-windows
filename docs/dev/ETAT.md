@@ -25,6 +25,46 @@ reprendre.
 
 ## Journal
 
+### 2026-10-24 : addon « Claude », utilisation de l'abonnement
+
+- **Demande.** Afficher l'utilisation de Claude, à la semaine et « au jour ».
+  Claude ne publie pas de limite journalière : on montre la **session de
+  5 h** et la **semaine** (plus Opus / Sonnet s'ils existent), comme `/usage`
+  dans Claude Code.
+- **Source.** `GET https://api.anthropic.com/api/oauth/usage` (en-tête
+  `anthropic-beta: oauth-2025-04-20`) avec le jeton OAuth de Claude Code
+  (`~/.claude/.credentials.json`, Windows puis WSL démarrés ; le jeton
+  valable le plus longtemps). On ne le rafraîchit **jamais** : le jeton de
+  rafraîchissement changerait et Claude Code serait déconnecté. Expiré :
+  message « relance Claude Code ». Réponse gardée 1 min (10 s si Actualiser).
+- **Fichiers.** `src/claude.rs` (`usage`, commande `cc_usage` dans
+  `lib.rs`), nouveau `qt/qml/ClaudeUsagePage.qml`, entrée `cusage` du
+  catalogue dans `Ilot.qml`. Relevé à l'ouverture puis toutes les 2 min,
+  seulement quand la page se voit : rien en arrière-plan.
+- **Projection.** Rythme moyen depuis le début de la fenêtre (5 h ou 7 j,
+  déduit de `resets_at`) : « ≈ 68 % à la remise à zéro » ou « limite
+  atteinte vers 16:10 », et partie claire de la barre jusqu'au niveau prévu.
+  Rien d'affiché avant 5 % de la fenêtre écoulée (trop peu de recul).
+- **Graphique façon Agent Burn** (Melvynx, `agent-burn.melvynx.dev`) :
+  nouveau `qt/qml/UsageChart.qml` (Canvas). Utilisation sur toute la fenêtre
+  (choix Session / Semaine), relevés en trait plein, prévision en tirets
+  jusqu'à la remise à zéro (ou jusqu'à 100 %), rythme régulier en pointillés,
+  point « maintenant ». Phrase d'état au-dessus (« De la marge… », « Rythme
+  serré », « Limite atteinte vers… »). Contrairement à Agent Burn, l'axe
+  montre l'utilisé (comme les cartes), pas le restant.
+- **Historique.** `claude::record` garde les relevés dans
+  `%LOCALAPPDATA%\Ilot\claude-usage.json` (fenêtre en cours seulement ; un
+  point par changement ou toutes les 15 min). `claude::watch` relève toutes
+  les 5 min tant que l'addon `cusage` est activé. Le jeton WSL n'est cherché
+  que si celui de Windows ne sert pas (évite `wsl.exe` toutes les 5 min).
+  `iso_ms` convertit `resets_at` (test `date_iso`).
+- **Pièges.** Police d'icônes en sous-ensemble (`data_usage` absente, noté
+  dans `CLAUDE.md`). Une propriété `data` sur un `Item` masque ses enfants
+  (onglet vide) : renommée `usage`.
+- **Vérifié.** Point d'accès testé avec `curl` (session 47 %, semaine 40 %).
+  Build complet OK, clippy sans avertissement dans `claude.rs`, pas d'erreur
+  QML au démarrage.
+
 ### 2026-10-24 : Apex, plus de minuteur ni de fausse « Partie trouvée »
 
 - **Constat (utilisateur).** Dans Apex, un minuteur apparaissait sans

@@ -94,7 +94,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── discord.rs    RPC Discord (pipe IPC), identifiants DPAPI
 ├── soundboard.rs Soundboard vers câble virtuel ├── decode.rs  Décodage audio (symphonia)
 ├── captions.rs   Sous-titres (LiveCaptions via UI Automation)
-├── claude.rs     Hooks Claude Code dans ~/.claude/settings.json, Windows et WSL (installer, retirer, état)
+├── claude.rs     Hooks Claude Code dans ~/.claude/settings.json, Windows et WSL (installer, retirer, état) ; limites de l'abonnement (addon Claude)
 ├── translate.rs  Traduction Google « gtx »
 ├── mail.rs       IMAP (mots de passe DPAPI)    ├── google.rs  OAuth 2 Gmail (PKCE)
 ├── update.rs     Mises à jour GitHub Releases (toutes les 6 h)
@@ -127,9 +127,10 @@ Singletons    Api (invoke/call/listen) · Ilot (état global : réglages, thème
               Watch (jeux, absence, Valorant, extinction, caméra/micro, services) · Theme (Material You, polices, courbes)
 Fenêtres      Main (îlot) · Bar (écrans sans îlot) · Captions · TipWindow · PetWindow (promenade du compagnon)
 Îlot          Island · Pill · PillClock · Panel · BarContent · BarTask · TaskIcon · TaskPreview · QuickShare · Ear
-Pages         HomePage · MediaPage · CtrlPage · AppsPage · ClipsPage · WallsPage · MailPage · TasksPage · PcPage
+Pages         HomePage · MediaPage · CtrlPage · AppsPage · ClipsPage · WallsPage · MailPage · TasksPage · PcPage · ClaudeUsagePage
               SoundsPage · AssistPage · SettingsPage
 Cartes PC     PcCard · ServicesCard · HealthCard · ShutdownCard · SensCard
+Addon Claude  UsageChart (graphique de ClaudeUsagePage)
 Compagnon     Pet (10 espèces, expressions, tours)
 Décor         Aurora · WxFx (météo animée) · Glow · Eq · VizBars
 Composants    Btn · IconBtn · TextBtn · M3Switch · M3Slider · Seg · Field · Area · CtxMenu · Card · Chip · Empty

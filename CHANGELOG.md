@@ -4,6 +4,13 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.17 — 2026-10-24
+
+- **Nouvel addon « Claude »** (Réglages › Addons) : les limites de ton abonnement Claude, comme `/usage` dans Claude Code. Session de 5 h et semaine (plus Opus / Sonnet si ton compte en a), avec le temps avant la remise à zéro. Utilise la connexion de Claude Code, rien à saisir.
+- **Prévision** : à ton rythme actuel, combien tu auras utilisé à la remise à zéro, ou à quelle heure tu atteindras la limite. Graphique façon Agent Burn : relevés, prévision et rythme régulier sur toute la session ou la semaine. L'historique se remplit au fil des relevés (toutes les 5 min tant que l'addon est activé).
+- **Claude Code dans WSL** : le bouton « Installer » des hooks (Réglages › Addons › Claude Code) les ajoute aussi dans les distributions WSL où Claude Code est installé. L'animation de la pilule marche donc aussi quand Claude tourne dans WSL.
+- **Assistant de jeu** : plus de minuteur « en attente » dès qu'on quitte le jeu (Apex notamment), puisque l'îlot ne peut pas savoir si une recherche est lancée. L'alerte « Partie trouvée » ne se déclenche plus sur un simple chargement du jeu, seulement quand le jeu fait clignoter sa fenêtre. Valorant garde son vrai temps de file.
+
 ## 0.4.16 — 2026-10-23
 
 - **Nouveau lecteur de musique**, inspiré de Swiftify : barre de progression ondulée qui s'anime pendant la lecture, bouton lecture festonné qui tourne, couleurs tirées de la pochette.
