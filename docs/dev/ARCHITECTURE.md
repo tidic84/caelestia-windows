@@ -129,7 +129,7 @@ Singletons    Api (invoke/call/listen) · Ilot (état global : réglages, thème
 Fenêtres      Main (îlot) · Bar (écrans sans îlot) · Captions · TipWindow · PetWindow (promenade du compagnon)
 Îlot          Island · Pill · PillClock · Panel · BarContent · BarTask · TaskIcon · TaskPreview · QuickShare · Ear
 Pages         HomePage · MediaPage · CtrlPage (+ Mixer : pastilles de sorties, applis groupées) · AppsPage · ClipsPage · WallsPage · MailPage · TasksPage · PcPage · ClaudeUsagePage
-              SoundsPage · AssistPage · SettingsPage
+              SoundsPage · AssistPage · SettingsPage (onglet Son : sorties affichées, noms choisis)
 Cartes PC     PcCard · ServicesCard · HealthCard · ShutdownCard · SensCard
 Addon Claude  UsageChart (graphique de ClaudeUsagePage)
 Compagnon     Pet (10 espèces, expressions, tours)
@@ -139,3 +139,17 @@ Composants    Btn · IconBtn · TextBtn · M3Switch · M3Slider · Seg · Field 
               NotifRow · TimerBody
 Modules JS    calc · emoji · ical · rank (frécence du lanceur) · mcu (material-color-utilities)
 ```
+
+**Sorties audio affichées** (Réglages › Son, depuis la 0.4.20). Tout est en
+QML, sans code Rust.
+- **Stockage** : `cfg.audio_hidden` (`{id: nom Windows}` ; `null` = tri
+  automatique « essentiel » du mélangeur) et `cfg.audio_alias`
+  (`{id: nom choisi}`).
+- **Outils communs** (`Ilot.qml`) : `outInfo` (nom court, libellé, icône),
+  `outVirtual`, `outHidden`, `outLabel`, `outSig`.
+- **Écriture** : `setOutCfg` regroupe les envois sur 400 ms, avec un envoi
+  synchrone à la fermeture.
+- **Utilisation** : `Mixer.rebuild` (pastilles, « +N ») et
+  `CtrlPage.shownDevices` (feuille « Sortie audio »). Ils doivent rester
+  cohérents avec `SettingsPage.outRows` (même ordre, même numérotation, même
+  règle automatique). La soundboard n'est pas filtrée.

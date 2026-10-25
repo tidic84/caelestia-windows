@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sorties affichées</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,1,0">
+<style>
+:root{
+  --primary:#cfbdfe; --inkPrimary:#36265d; --primaryC:#4d3d75; --inkPrimaryC:#e9ddff;
+  --secC:#4a4458; --inkSecC:#e8def8;
+  --surface:#141218; --surfaceLow:#1d1b20; --surfaceC:#211f26; --surfaceHigh:#2b2930; --surfaceHighest:#36343b;
+  --ink:#e6e0e9; --inkVar:#cac4d0; --outline:#938f99; --outlineVar:#49454f; --error:#ffb4ab;
+  --emph:cubic-bezier(.05,.7,.1,1);
+}
+*{box-sizing:border-box}
+body{margin:0;background:#0b0a0d;color:var(--ink);font:13px Rubik,sans-serif;padding:20px 16px 48px}
+h1{font-weight:500;font-size:20px;margin:0 0 6px}
+.lead{color:var(--inkVar);max-width:1240px;line-height:1.5;margin:0 0 14px}
+.ms{font-family:"Material Symbols Rounded";font-size:19px;line-height:1;user-select:none;font-weight:normal;font-style:normal}
+button{font:inherit;color:inherit}
+.sim{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--surfaceC);border-radius:16px;padding:10px 14px;margin:0 0 22px;max-width:1240px}
+.sim .t{color:var(--inkVar);margin:0 4px 0 6px}
+.btn{height:34px;border-radius:12px;border:0;background:var(--surfaceHigh);display:inline-flex;align-items:center;gap:6px;padding:0 12px;cursor:pointer}
+.btn:hover{background:var(--surfaceHighest)}
+.btn.on{background:var(--primaryC);color:var(--inkPrimaryC)}
+.btn .ms{font-size:17px}
+.wrap{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.col>h2{font-size:12px;font-weight:500;color:var(--outline);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px 6px}
+.island{background:var(--surface);border-radius:28px;padding:10px}
+
+/* ====================== Contrôle (copie de CtrlPage + Mixer) */
+.ctrl{width:470px;height:340px;background:var(--surfaceC);border-radius:22px;position:relative;overflow:hidden;display:flex;flex-direction:column;padding:8px}
+.out{height:38px;border-radius:14px;background:var(--surfaceHigh);display:flex;align-items:center;gap:10px;padding:0 12px;flex:none;cursor:pointer}
+.out:hover{background:var(--surfaceHighest)}
+.out .ms{color:var(--inkVar)}
+.out b{font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chanbar{display:flex;gap:6px;margin:6px 0 4px;flex:none}
+.cpill{flex:1;min-width:0;height:46px;border-radius:14px;background:var(--surfaceHigh);position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;cursor:ns-resize}
+.cpill .f{position:absolute;left:0;bottom:0;right:0;opacity:.24}
+.cpill .ms{font-size:17px;position:relative}
+.cpill .l{font-size:10.5px;position:relative;color:var(--inkVar);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 6px}
+.cpill .n{position:absolute;top:4px;right:6px;font-size:9.5px;color:var(--outline);font-variant-numeric:tabular-nums}
+.cpill.wide{flex-direction:row;gap:8px;justify-content:flex-start;padding:0 12px;cursor:ew-resize}
+.cpill.wide .l{font-size:11.5px;padding:0}
+.cpill.wide .l b{font-weight:500;color:var(--ink)}
+.cpill.wide .v{position:relative;margin-left:auto;font-size:12px;color:var(--inkVar);padding-right:4px}
+.cpill.wide .n{display:none}
+.cpill.hid{opacity:.5}
+.cpill.more{flex:none;width:46px;cursor:pointer}
+.cpill.more:hover{background:var(--surfaceHighest)}
+.cpill.more .l{font-size:12px;color:var(--inkVar)}
+.cpill.more i{position:absolute;top:6px;right:7px;width:6px;height:6px;border-radius:3px;background:var(--primary)}
+.scroll{flex:1;min-height:0;overflow:auto;padding-right:4px;margin-right:-2px}
+.scroll::-webkit-scrollbar{width:4px}.scroll::-webkit-scrollbar-thumb{background:var(--outlineVar);border-radius:4px}
+.glab{display:flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 6px;border-radius:9px;font-size:11px;color:var(--c);cursor:pointer}
+.glab:hover{background:color-mix(in srgb,var(--c) 10%,var(--surfaceC))}
+.glab .ms{font-size:15px}
+.glab .chev{color:var(--outline);font-size:17px;transition:transform .3s var(--emph)}
+.gwrap.closed .chev{transform:rotate(-90deg)}
+.glab .k{color:var(--outline)}
+.glab .rule{flex:1;height:1px;background:color-mix(in srgb,var(--c) 30%,transparent);margin:0 2px}
+.glab .mini{display:flex;gap:3px}
+.glab .mini .b{width:16px;height:16px;font-size:9px;border-radius:5px}
+.glab .hidtag{color:var(--outline);font-size:10.5px}
+.gwrap.closed .body{display:none}
+.app{display:flex;align-items:center;gap:6px;height:34px;padding:0 2px 0 4px;border-radius:12px}
+.ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none}
+.b{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:600;color:#fff;flex:none}
+.name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;padding-left:2px}
+.dot{width:24px;height:24px;flex:none;position:relative}
+.dot i{position:absolute;left:8px;top:8px;width:8px;height:8px;border-radius:4px;background:var(--c)}
+.sl{position:relative;width:140px;height:24px;flex:none}
+.sl .tr{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:8px;border-radius:99px;background:var(--surfaceHighest);overflow:hidden}
+.sl .fi{height:100%;background:var(--primary)}
+.sl .th{position:absolute;top:50%;transform:translate(-50%,-50%);width:10px;height:24px;border-radius:5px;background:var(--surfaceC);display:flex;justify-content:center;align-items:center}
+.sl .th i{display:block;width:4px;height:18px;border-radius:2px;background:var(--primary)}
+.val{width:24px;text-align:right;color:var(--inkVar);font-size:12px;flex:none;margin-right:22px}
+.empty{color:var(--outline);font-size:11.5px;padding:10px 12px}
+
+/* feuille (copie du composant Sheet de CtrlPage) */
+.sheet{position:absolute;inset:0;z-index:2;background:var(--surfaceC);border-radius:22px;padding:12px;display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateY(16px);transition:opacity .2s,transform .35s var(--emph)}
+.sheet.on{opacity:1;pointer-events:auto;transform:none}
+.shead{height:26px;position:relative;display:flex;align-items:center;justify-content:space-between;flex:none;margin-bottom:10px}
+.shead b{position:absolute;left:50%;transform:translateX(-50%);font-weight:500;font-size:14px}
+.ib{width:26px;height:26px;border-radius:13px;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--inkVar);flex:none;position:relative}
+.ib:hover{background:var(--surfaceHighest);color:var(--ink)}
+.ib .ms{font-size:18px}
+.ib[data-tip]:hover::after{content:attr(data-tip);position:absolute;top:30px;right:0;white-space:nowrap;background:var(--surfaceHighest);color:var(--ink);font-size:11px;padding:4px 8px;border-radius:8px;z-index:5}
+.sbody{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.dev{height:40px;border-radius:16px;display:flex;align-items:center;gap:12px;padding:0 12px;cursor:pointer;flex:none}
+.dev:hover{background:var(--surfaceHigh)}
+.dev b{flex:1;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dev.def{background:var(--secC);color:var(--inkSecC)}
+.dev .ms{color:inherit}
+.hidline{display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:12px;color:var(--outline);font-size:12px;cursor:pointer;flex:none;margin-top:2px}
+.hidline:hover{background:var(--surfaceHigh);color:var(--inkVar)}
+.hidline .ms{font-size:17px}
+.tip{display:flex;align-items:center;gap:10px;background:var(--secC);color:var(--inkSecC);border-radius:16px;padding:8px 6px 8px 12px;font-size:12px;line-height:1.35;flex:none;margin-bottom:4px}
+.tip .x{flex:1}
+.tip .go{border:0;border-radius:14px;background:var(--primary);color:var(--inkPrimary);height:28px;padding:0 12px;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap}
+.tip .ib{color:var(--inkSecC)}
+
+/* ====================== Réglages (copie de SettingsPage) */
+.set{width:780px;height:640px;display:flex;gap:12px}
+.rail{width:176px;flex:none;display:flex;flex-direction:column;gap:3px}
+.nav{height:38px;border-radius:19px;display:flex;align-items:center;gap:11px;padding:0 12px;cursor:default;color:var(--ink)}
+.nav .ms{color:var(--inkVar)}
+.nav.on{background:var(--secC);color:var(--inkSecC);font-weight:500}
+.nav.on .ms{color:var(--inkSecC)}
+.nav.new::after{content:"nouveau";margin-left:auto;font-size:9.5px;color:var(--primary);font-weight:400}
+.content{flex:1;min-width:0;overflow:auto;padding-right:4px}
+.content::-webkit-scrollbar{width:4px}.content::-webkit-scrollbar-thumb{background:var(--outlineVar);border-radius:4px}
+.blk{background:var(--surfaceC);border-radius:22px;padding:14px;margin-bottom:10px;transition:box-shadow .4s}
+.blk.flash{box-shadow:0 0 0 2px var(--primary)}
+.sr{display:flex;align-items:center;gap:14px;min-height:52px;padding:6px 0}
+.sr .pic{width:40px;height:40px;border-radius:14px;background:var(--secC);color:var(--inkSecC);display:grid;place-items:center;flex:none;transition:background .2s,color .2s}
+.sr .tx{flex:1;min-width:0}
+.sr .tx .t{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500}
+.sr .tx .t span.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr .tx .s{font-size:12px;color:var(--inkVar);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr.head .tx .s{white-space:normal;line-height:1.4}
+.sr .cnt{font-size:12px;color:var(--outline);flex:none}
+.sr.off .pic{background:var(--surfaceHigh);color:var(--outline)}
+.sr.off .tx .t{color:var(--inkVar)}
+.sr.gone{opacity:.55}
+.chip{font-size:10.5px;font-weight:400;padding:1px 8px;border-radius:99px;background:var(--primaryC);color:var(--inkPrimaryC);white-space:nowrap;flex:none}
+.chip.o{background:transparent;box-shadow:inset 0 0 0 1px var(--outline);color:var(--inkVar)}
+.subt{display:flex;align-items:center;justify-content:space-between;padding-top:14px;font-size:12px;font-weight:500;color:var(--inkVar);min-height:40px}
+.tb{height:30px;border-radius:15px;border:0;background:transparent;color:var(--primary);padding:0 12px;cursor:pointer;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.tb:hover{background:var(--surfaceHigh)}
+.tb .ms{font-size:16px}
+.sw{width:52px;height:32px;border-radius:16px;background:var(--surfaceHighest);position:relative;flex:none;cursor:pointer;border:2px solid var(--outline);transition:background .2s,border-color .2s}
+.sw:after{content:"";position:absolute;top:6px;left:6px;width:16px;height:16px;border-radius:8px;background:var(--outline);transition:all .25s var(--emph)}
+.sw.on{background:var(--primary);border-color:var(--primary)}
+.sw.on:after{left:22px;top:2px;width:24px;height:24px;border-radius:12px;background:var(--inkPrimary)}
+input.ed{flex:1;min-width:0;height:30px;border-radius:10px;border:2px solid var(--primary);background:var(--surfaceLow);color:var(--ink);font:500 14px Rubik;padding:0 8px;outline:none}
+.ren{width:32px;height:32px;border-radius:16px}
+.ren .ms{font-size:17px}
+
+.dec{max-width:1240px;margin:30px 0 0;background:var(--surfaceC);border-radius:16px;padding:12px 18px;color:var(--inkVar);line-height:1.55;font-size:12.5px}
+.dec h3{margin:0 0 6px;font-size:14px;font-weight:500;color:var(--ink)}
+.dec ol{margin:0;padding-left:18px}
+.dec b{color:var(--ink);font-weight:500}
+</style>
+</head>
+<body>
+<h1>Sorties audio : tri dans Réglages › Son</h1>
+<p class="lead">L'onglet Contrôle garde son apparence actuelle. Seul ce qui s'affiche change : la feuille « Sortie audio » (clic sur le bouton du haut) et les pastilles du mélangeur ne montrent que les sorties choisies. Le tri se règle à droite, dans le nouvel onglet <b>Son</b> des Réglages. Tout est cliquable.</p>
+
+<div class="sim">
+  <button class="btn on" data-pc="me"><span class="ms">computer</span>Ton PC (Sonar)</button>
+  <button class="btn" data-pc="friend"><span class="ms">group</span>PC d'un ami (Voicemeeter)</button>
+  <span class="t">Simuler :</span>
+  <button class="btn" id="s-first"><span class="ms">restart_alt</span>Premier lancement</button>
+  <button class="btn" id="s-plug"><span class="ms">headphones</span><span>Brancher un casque neuf</span></button>
+  <button class="btn" id="s-unplug"><span class="ms">tv_off</span><span>Débrancher un écran</span></button>
+  <button class="btn" id="s-obs"><span class="ms">videocam</span><span>OBS joue sur une sortie masquée</span></button>
+</div>
+
+<div class="wrap">
+  <div class="col"><h2>Îlot › Contrôle</h2>
+    <div class="island"><div class="ctrl" id="ctrl"></div></div></div>
+  <div class="col"><h2>Îlot › Réglages</h2>
+    <div class="island"><div class="set" id="set"></div></div></div>
+</div>
+
+<div class="dec">
+  <h3>Ce qui est retenu</h3>
+  <ol>
+    <li><b>L'onglet Contrôle ne change pas d'apparence.</b> On garde le bouton « Sortie audio », les pastilles, les groupes et les curseurs. Il n'affiche simplement plus les sorties masquées.</li>
+    <li><b>La feuille « Sortie audio »</b> ne liste que les sorties affichées. En haut à droite, le bouton <span class="ms" style="font-size:15px;vertical-align:-3px">tune</span> ouvre Réglages › Son. En bas, une ligne discrète « N sorties masquées » mène au même endroit.</li>
+    <li><b>On masque, on ne « garde » pas.</b> Un casque qu'on branche s'affiche tout seul. Il n'y a <b>aucun masquage automatique</b>, car chez quelqu'un qui a Voicemeeter, la sortie virtuelle est justement celle qu'il utilise. Le bouton « Masquer les virtuelles » est une aide en un clic, qu'on peut annuler.</li>
+    <li><b>Tant que rien n'est réglé</b>, le mélangeur garde son mode « essentiel » actuel (sorties Sonar, sorties où une appli joue, « +N »). <b>Dès qu'un choix existe</b>, c'est ce choix qui décide. « +N » montre toujours les sorties masquées, et un point signale qu'une appli y joue.</li>
+    <li><b>La sortie par défaut reste toujours visible</b>, même si elle est masquée. Les lignes ne changent jamais de place quand on bascule un interrupteur.</li>
+    <li><b>Renommer (crayon)</b> : le nom choisi remplace le nom Windows dans le bouton, la feuille, les pastilles et les groupes. Un champ vide rend le nom d'origine.</li>
+    <li><b>Une sortie débranchée</b> qu'on avait masquée reste listée, grisée et marquée « Absente », avec « Oublier ». La soundboard n'est pas concernée par le tri.</li>
+  </ol>
+</div>
+
+<script>
+// ---------------------------------------------------------------- données
+const PCS = {
+  me: {
+    devs: [
+      {id:"sg", name:"SteelSeries Sonar - Gaming (SteelSeries Sonar Virtual Audio Device)", lvl:100},
+      {id:"sc", name:"SteelSeries Sonar - Chat (SteelSeries Sonar Virtual Audio Device)", lvl:66},
+      {id:"sm", name:"SteelSeries Sonar - Media (SteelSeries Sonar Virtual Audio Device)", lvl:100},
+      {id:"sa", name:"SteelSeries Sonar - Aux (SteelSeries Sonar Virtual Audio Device)", lvl:50},
+      {id:"sx", name:"SteelSeries Sonar - Microphone (SteelSeries Sonar Virtual Audio Device)", lvl:100},
+      {id:"spk", name:"Haut-parleurs (Realtek(R) Audio)", lvl:80},
+      {id:"h1", name:"HDMI (NVIDIA High Definition Audio)", lvl:100},
+      {id:"h2", name:"HDMI (NVIDIA High Definition Audio)", lvl:100},
+      {id:"shu", name:"Casque (Shure MV7)", lvl:70},
+    ],
+    def:"sg", gone:"h2", obsOn:"h2",
+    apps: {sg:[["Rocket League","#1f6fd1","R"],["Steam","#1b2838","S"],["Chrome","#e8a317","C"]], sc:[["Discord","#5865f2","D"]], sx:[["SteelSeriesSonar","#ff5200","S"]]},
+  },
+  friend: {
+    devs: [
+      {id:"vm1", name:"Voicemeeter Input (VB-Audio Voicemeeter VAIO)", lvl:100},
+      {id:"vm2", name:"Voicemeeter AUX Input (VB-Audio Voicemeeter AUX VAIO)", lvl:80},
+      {id:"vm3", name:"Voicemeeter VAIO3 Input (VB-Audio Voicemeeter VAIO3)", lvl:70},
+      {id:"cab", name:"CABLE Input (VB-Audio Virtual Cable)", lvl:100},
+      {id:"spk", name:"Haut-parleurs (Realtek(R) Audio)", lvl:60},
+      {id:"h1", name:"LG ULTRAGEAR (NVIDIA High Definition Audio)", lvl:100},
+      {id:"h2", name:"LG ULTRAGEAR (NVIDIA High Definition Audio)", lvl:100},
+      {id:"nvb", name:"Haut-parleurs (NVIDIA Broadcast)", lvl:100},
+    ],
+    def:"vm1", gone:"h2", obsOn:"cab",
+    apps: {vm1:[["Rocket League","#1f6fd1","R"],["Chrome","#e8a317","C"]], vm2:[["Discord","#5865f2","D"]], vm3:[["Spotify","#1db954","S"]], spk:[["voicemeeter.exe","#3a3a3a","V"]], h1:[["voicemeeter.exe","#3a3a3a","V"]]},
+  },
+};
+const NEW = {id:"new", name:"Casque (Arctis Nova 7 Wireless)", lvl:100};
+const VIRT = /voicemeeter|vb-audio|cable|broadcast|sonar|wave link|virtual|virtuel/i;
+const NEUTRAL = ["#cac4d0","#ffb59c","#b5d0f0","#c8e6a0","#f0d8a0"];
+const SONAR = {gaming:["Game","sports_esports","#cfbdfe"],game:["Game","sports_esports","#cfbdfe"],chat:["Chat","forum","#a8c8ff"],media:["Media","music_note","#9ad8a8"],aux:["Aux","tune","#efb8c8"],microphone:["Micro","mic","#a0dcd8"]};
+
+// état par PC (settings.json + Windows + UI)
+const ST = {};
+function fresh(pc){ ST[pc] = {hidden:null, alias:{}, tipDone:false, def:PCS[pc].def, plugged:false, gone:false, obs:false, showAll:false, sheet:false, closed:new Set(), editing:null}; }
+fresh("me"); fresh("friend");
+let pc = "me";
+const S = () => ST[pc];
+
+// --- copie de Mixer.chanInfo (+ alias)
+function chanInfo(d, n){
+  const al = S().alias[d.id];
+  const m = /sonar\s*-\s*(gaming|game|chat|media|aux|microphone)/i.exec(d.name);
+  let r;
+  if (m){ const s = SONAR[m[1].toLowerCase()]; r = {short:s[0], label:"Sonar · "+s[0], icon:s[1], col:s[2], sonar:true, base:s[0]}; }
+  else {
+    const hd = /hdmi|displayport/i.exec(d.name);
+    const s = hd ? (hd[0].toLowerCase()==="hdmi"?"HDMI":"DisplayPort") : d.name.replace(/\s*\([^)]*\)/g,"").trim() || d.name;
+    r = {short:s, label:d.name.replace(/\s*\([^()]*\)\s*$/,"") || d.name,
+         icon:/casque|headphone|headset|écouteur|airpods|buds/i.test(d.name)?"headphones":hd?"monitor":"speaker",
+         col:NEUTRAL[n % NEUTRAL.length], sonar:false};
+  }
+  if (al){ r.short = al; r.label = al; }
+  return r;
+}
+const present = () => PCS[pc].devs.filter(d => !(S().gone && d.id===PCS[pc].gone)).concat(S().plugged?[NEW]:[]);
+const appsOf = id => (PCS[pc].apps[id]||[]).concat(S().obs && id===PCS[pc].obsOn ? [["OBS Studio","#302e31","O"]] : []);
+const isHidden = id => !!S().hidden && id in S().hidden;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fullName = d => S().alias[d.id] || d.name;
+
+// règle d'affichage du mélangeur
+function channels(){
+  const s = S(), list = present();
+  const ch = list.map((d,i) => Object.assign({d, def:d.id===s.def, apps:appsOf(d.id)}, chanInfo(d,i)));
+  // suffixes « HDMI 2 » pour les doublons (comme rebuild)
+  const seen = {}; ch.forEach(c => { if (!s.alias[c.d.id]){ seen[c.short]=(seen[c.short]||0)+1; if (seen[c.short]>1) c.short += " " + seen[c.short]; } });
+  const sonar = ch.some(c => c.sonar && c.base!=="Micro");
+  ch.forEach(c => {
+    const real = c.apps.some(a => a[0]!=="voicemeeter.exe") ;
+    c.auto = c.def || real || (sonar && c.sonar && c.base!=="Micro");     // mode essentiel actuel
+    c.user = c.def || !isHidden(c.d.id);                                   // choix de l'utilisateur
+    c.vis = s.hidden===null ? c.auto : c.user;
+  });
+  // Sonar d'abord, puis l'ordre Windows
+  return ch.filter(c=>c.sonar).concat(ch.filter(c=>!c.sonar));
+}
+
+// ---------------------------------------------------------------- Contrôle
+function renderCtrl(){
+  const s = S(), ch = channels(), list = present();
+  const vis = ch.filter(c => c.vis), hid = ch.filter(c => !c.vis);
+  const pills = vis.concat(s.showAll ? hid : []);
+  const wide = pills.length <= 3;
+  const cur = list.find(d => d.id===s.def);
+  const busy = hid.some(c => c.apps.some(a => a[0]!=="voicemeeter.exe"));
+  let h = `<div class="out" data-a="sheet"><span class="ms">speaker</span><b>${esc(cur?fullName(cur):"Sortie audio")}</b><span class="ms">unfold_more</span></div>`;
+  if (ch.length > 1){
+    h += `<div class="chanbar">` + pills.map(c => {
+      const n = c.apps.length;
+      return wide
+        ? `<div class="cpill wide ${c.vis?"":"hid"}" title="${esc(c.d.name)}"><div class="f" style="top:0;right:auto;width:${c.d.lvl}%;background:${c.col}"></div><span class="ms" style="color:${c.col}">${c.icon}</span><span class="l"><b>${esc(c.short)}</b>${c.def?' <span class="ms" style="font-size:12px;color:var(--primary);vertical-align:-2px">star</span>':""}<span style="color:var(--outline)"> · ${n}</span></span><span class="v">${c.d.lvl}</span></div>`
+        : `<div class="cpill ${c.vis?"":"hid"}" title="${esc(c.d.name)}"><div class="f" style="height:${c.d.lvl}%;background:${c.col}"></div><span class="n">${c.d.lvl}</span><span class="ms" style="color:${c.col}">${c.icon}</span><span class="l">${esc(c.short)}</span></div>`;
+    }).join("") + (hid.length ? `<div class="cpill more" data-a="more" title="${s.showAll?"Masquer":"Voir"} les sorties ${s.hidden===null?"peu utilisées":"masquées dans Réglages › Son"}">${busy&&!s.showAll?"<i></i>":""}<span class="l">${s.showAll?'<span class="ms" style="font-size:17px">close</span>':"+"+hid.length}</span></div>` : "") + `</div>`;
+  }
+  // liste des applis
+  const groups = pills.filter(c => c.apps.length);
+  h += `<div class="scroll">` + (groups.length ? groups.map(c => {
+    const closed = s.closed.has(c.d.id);
+    return `<div class="gwrap ${closed?"closed":""}" style="--c:${c.col}">
+      <div class="glab" data-a="fold" data-id="${c.d.id}"><span class="ms chev">expand_more</span><span class="ms">${c.icon}</span>${esc(c.label)}${c.def?'<span class="ms" style="font-size:12px">star</span>':""}<span class="k">· ${c.apps.length}</span>${c.vis?"":'<span class="hidtag">· masquée</span>'}<span class="rule"></span>${closed?`<div class="mini">${c.apps.map(a=>`<div class="b" style="background:${a[1]}">${a[2]}</div>`).join("")}</div>`:""}</div>
+      <div class="body">${c.apps.map(a => `<div class="app"><div class="ico"><div class="b" style="background:${a[1]}">${a[2]}</div></div><div class="name">${esc(a[0])}</div>${ch.length>1?`<div class="dot" style="--c:${c.col}"><i></i></div>`:""}<div class="sl"><div class="tr"><div class="fi" style="width:100%"></div></div><div class="th" style="left:calc(100% - 5px)"><i></i></div></div><div class="val">100</div></div>`).join("")}</div></div>`;
+  }).join("") : `<div class="empty">Aucune application ne joue de son.</div>`) + `</div>`;
+
+  // feuille « Sortie audio »
+  const shown = list.filter(d => d.id===s.def || !isHidden(d.id));
+  const nHid = list.length - shown.length;
+  const virtN = list.filter(d => VIRT.test(d.name)).length;
+  const tip = s.hidden===null && !s.tipDone && virtN >= 3;
+  h += `<div class="sheet ${s.sheet?"on":""}">
+    <div class="shead"><button class="ib" data-a="back" data-tip="Retour" style="--x:0"><span class="ms">arrow_back</span></button><b>Sortie audio</b><button class="ib" data-a="go" data-tip="Gérer les sorties"><span class="ms">tune</span></button></div>
+    <div class="sbody">
+      ${tip?`<div class="tip"><span class="ms">tune</span><span class="x">${list.length} sorties, dont ${virtN} virtuelles. Choisis celles à afficher.</span><button class="go" data-a="go">Choisir</button><button class="ib" data-a="tipx" data-tip="Plus tard"><span class="ms">close</span></button></div>`:""}
+      ${shown.map(d => `<div class="dev ${d.id===s.def?"def":""}" data-a="def" data-id="${d.id}"><span class="ms">${/casque|headphone|headset/i.test(d.name)?"headphones":"speaker"}</span><b>${esc(fullName(d))}</b>${d.id===s.def?'<span class="ms">check</span>':""}</div>`).join("")}
+      ${nHid?`<div class="hidline" data-a="go"><span class="ms">visibility_off</span>${nHid} sortie${nHid>1?"s":""} masquée${nHid>1?"s":""} · Gérer</div>`:""}
+    </div></div>`;
+  document.getElementById("ctrl").innerHTML = h;
+}
+
+// ---------------------------------------------------------------- Réglages
+const SECTIONS = [["settings","Général"],["dashboard","Barre"],["palette","Apparence"],["pill","Pilule"],["volume_up","Son","on new"],["emoji_emotions","Compagnon"],["sports_esports","Jeu et absence"],["accessibility_new","Accessibilité"],["partly_cloudy_day","Météo et agenda"],["keyboard","Raccourcis"],["grid_view","Addons"],["system_update","Mises à jour"]];
+
+function devRow(d, i, gone, dup){
+  const s = S(), off = isHidden(d.id), isDef = d.id===s.def && !gone, info = chanInfo(d, i);
+  if (dup && !s.alias[d.id]) info.label += " " + dup;
+  let sub = s.alias[d.id] ? d.name : (info.label !== d.name ? d.name : "");
+  if (isDef) sub = off ? "Affichée tant qu'elle est la sortie par défaut" : "Sortie par défaut : toujours affichée";
+  if (gone) sub = "Débranchée, ou son pilote a changé";
+  const icon = info.icon;
+  const title = s.editing===d.id
+    ? `<input class="ed" id="ed" maxlength="24" value="${esc(s.alias[d.id]||info.label)}" placeholder="${esc(info.label)}">`
+    : `<div class="t"><span class="nm">${esc(s.alias[d.id]||info.label)}</span>${isDef?'<span class="chip">Par défaut</span>':""}${gone?'<span class="chip o">Absente</span>':""}${d.id==="new"?'<span class="chip o">Nouvelle</span>':""}</div>`;
+  const ctl = gone
+    ? `<button class="tb" data-a="forget" data-id="${d.id}"><span class="ms">delete</span>Oublier</button>`
+    : `<button class="ib ren" data-a="ren" data-id="${d.id}" data-tip="Renommer"><span class="ms">edit</span></button><div class="sw ${off?"":"on"}" data-a="tog" data-id="${d.id}" title="${off?"Afficher":"Masquer"}"></div>`;
+  return `<div class="sr ${off?"off":""} ${gone?"gone":""}"><div class="pic"><span class="ms">${icon}</span></div><div class="tx">${title}${s.editing===d.id||!sub?"":`<div class="s">${esc(sub)}</div>`}</div>${ctl}</div>`;
+}
+
+function renderSet(){
+  const s = S(), list = present();
+  const all = list.map((d,i) => [d,i,false]);
+  if (s.hidden) Object.keys(s.hidden).forEach(id => { if (!list.some(d=>d.id===id)) all.push([{id, name:s.hidden[id]}, all.length, true]); });
+  // « HDMI 2 » : même numérotation que le mélangeur
+  const seen = {}; all.forEach(x => { const l = chanInfo(x[0], 0).label; seen[l] = (seen[l]||0) + 1; if (seen[l] > 1) x[3] = seen[l]; });
+  const phys = all.filter(x => !VIRT.test(x[0].name)), virt = all.filter(x => VIRT.test(x[0].name));
+  const vp = virt.filter(x => !x[2]), allV = vp.length && vp.every(x => isHidden(x[0].id));
+  const nVis = list.filter(d => d.id===s.def || !isHidden(d.id)).length;
+  let h = `<div class="rail">` + SECTIONS.map(([ic,l,c]) => `<div class="nav ${c||""}"><span class="ms">${ic}</span>${l}</div>`).join("") + `</div><div class="content">`;
+  h += `<div class="blk" id="blk">
+    <div class="sr head"><div class="pic"><span class="ms">speaker_group</span></div><div class="tx"><div class="t">Sorties affichées</div><div class="s">Choisis les sorties proposées dans « Sortie audio » et dans le mélangeur. Une sortie masquée continue de fonctionner dans Windows et dans la soundboard.</div></div><span class="cnt">${nVis} sur ${list.length}</span></div>
+    <div class="subt">Appareils</div>
+    ${phys.map(x => devRow(...x)).join("")}
+    ${virt.length?`<div class="subt">Virtuelles<button class="tb" data-a="virt"><span class="ms">${allV?"visibility":"visibility_off"}</span>${allV?"Afficher les virtuelles":"Masquer les virtuelles"}</button></div>${virt.map(x => devRow(...x)).join("")}`:""}
+    <div style="padding-top:6px"><button class="tb" data-a="reset"><span class="ms">restart_alt</span>Tout afficher</button></div>
+  </div>`;
+  h += `</div>`;
+  document.getElementById("set").innerHTML = h;
+  const ed = document.getElementById("ed"); if (ed){ ed.focus(); ed.select(); }
+}
+
+function render(){ renderCtrl(); renderSet(); }
+
+// ---------------------------------------------------------------- actions
+function setHidden(id, on, name){ const s = S(); s.hidden = Object.assign({}, s.hidden||{}); if (on) s.hidden[id]=name; else delete s.hidden[id]; }
+function commitEdit(save){
+  const s = S(), ed = document.getElementById("ed"); if (!ed) return;
+  if (save){ const v = ed.value.trim(), d = present().find(x=>x.id===s.editing);
+    s.alias = Object.assign({}, s.alias); delete s.alias[s.editing];
+    if (v && (!d || v !== chanInfo(d,0).label)) s.alias[s.editing] = v; }
+  s.editing = null; render();
+}
+document.body.addEventListener("click", e => {
+  const t = e.target.closest("[data-a],[data-pc]"); if (!t) return;
+  if (t.dataset.pc){ pc = t.dataset.pc; document.querySelectorAll("[data-pc]").forEach(b => b.classList.toggle("on", b===t)); syncSim(); return render(); }
+  const s = S(), a = t.dataset.a, id = t.dataset.id, list = present();
+  if (s.editing && a!=="ren") commitEdit(true);
+  if (a==="tog"){ const d = list.find(x=>x.id===id); setHidden(id, !isHidden(id), d.name); }
+  else if (a==="ren"){ if (s.editing===id) return commitEdit(true); s.editing = id; }
+  else if (a==="forget") setHidden(id, false);
+  else if (a==="virt"){ const v = list.filter(d=>VIRT.test(d.name)), allV = v.every(d=>isHidden(d.id)); v.forEach(d => setHidden(d.id, !allV, d.name)); }
+  else if (a==="reset") s.hidden = {};
+  else if (a==="sheet") s.sheet = true;
+  else if (a==="back") s.sheet = false;
+  else if (a==="def"){ s.def = id; s.sheet = false; }
+  else if (a==="more") s.showAll = !s.showAll;
+  else if (a==="fold") s.closed.has(id) ? s.closed.delete(id) : s.closed.add(id);
+  else if (a==="tipx") s.tipDone = true;
+  else if (a==="go"){ s.tipDone = true; if (s.hidden===null) s.hidden = {}; s.sheet = false;
+    render(); const b = document.getElementById("blk"); b.scrollIntoView({behavior:"smooth", block:"nearest"}); b.classList.add("flash"); setTimeout(()=>b.classList.remove("flash"), 1200); return; }
+  render();
+});
+document.body.addEventListener("keydown", e => {
+  if (e.target.id!=="ed") return;
+  if (e.key==="Enter") commitEdit(true);
+  if (e.key==="Escape") commitEdit(false);
+});
+function syncSim(){
+  const s = S(), f = (id, on, a, b) => { const el = document.getElementById(id); el.classList.toggle("on", on); el.lastElementChild.textContent = on ? b : a; };
+  f("s-plug", s.plugged, "Brancher un casque neuf", "Débrancher le casque");
+  f("s-unplug", s.gone, "Débrancher un écran", "Rebrancher l'écran");
+  f("s-obs", s.obs, "OBS joue sur une sortie masquée", "Arrêter OBS");
+}
+document.getElementById("s-first").onclick = () => { fresh(pc); syncSim(); render(); };
+document.getElementById("s-plug").onclick = () => { const s = S(); s.plugged = !s.plugged; if (!s.plugged && s.def==="new") s.def = PCS[pc].def; syncSim(); render(); };
+document.getElementById("s-unplug").onclick = () => { const s = S(); s.gone = !s.gone; if (s.gone && s.def===PCS[pc].gone) s.def = PCS[pc].def; syncSim(); render(); };
+document.getElementById("s-obs").onclick = () => { const s = S(); s.obs = !s.obs; syncSim(); render(); };
+render();
+</script>
+</body>
+</html>

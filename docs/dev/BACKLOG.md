@@ -19,6 +19,34 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 - 🟢 **Code mort des profils de volume** : `Watch.qml` (`mixProfiles`,
   `saveProfile`, `applyProfile`, `gameMix`) et `cfg.mix_auto` ne servent
   plus depuis la 0.4.19.
+- 🟠 **Échap ne marche plus après avoir changé d'onglet** (déjà avant la
+  0.4.20). Un champ a pris le focus (recherche du lanceur, ville, raccourci,
+  renommage d'une sortie), puis on change d'onglet. Le Loader de la page est
+  désactivé (`enabled: shown`, `Panel.qml`), le focus tombe sur l'item racine
+  de la fenêtre, et `Keys.onPressed` de `Main.qml` ne reçoit plus Échap.
+  Correctif proposé : dans `Main.qml`, si `activeFocusItem === contentItem`,
+  rendre le focus à `root`. Relevé par un relecteur, confirmé par un test
+  `qmltestrunner`.
+- 🟢 **Sorties affichées (0.4.20), restes connus** :
+  - Le nom choisi d'une sortie débranchée, mais pas masquée, reste dans
+    `audio_alias` sans moyen de l'oublier. « Tout afficher » oublie aussi les
+    sorties « Absente ».
+  - La détection des virtuelles se fait par le nom : « Speakers (Virtual
+    Surround) » de Realtek ou Nahimic est rangée dans « Virtuelles ».
+  - La soundboard garde les noms Windows.
+  - Si la page faisait moins d'environ 470 px de large (aujourd'hui au moins
+    708), le titre « Sorties affichées · N sur M » passerait sur deux lignes
+    au premier choix, et les lignes descendraient de 17 px. Correctif :
+    `elide` sur ce titre, ou le compteur ailleurs.
+  - Le point de « +N » s'allume aussi pour une appli en pause : `mixer_all`
+    ne dit pas si une session est active. Il faudrait renvoyer un champ
+    `active`, côté Rust.
+  - À la fermeture, l'envoi synchrone peut passer avant un envoi asynchrone
+    parti juste avant (fenêtre de quelques ms). L'avant-dernier choix
+    l'emporterait alors.
+  - Doublons : la numérotation se fait sur le nom court et s'ajoute au
+    libellé (« LG (HDMI) » et « Samsung (HDMI) » donnent « LG » et
+    « Samsung 2 »). Cette règle existait déjà dans le mélangeur.
 - 🟢 **Mélangeur, `Ilot.later`** : les rafraîchissements différés après un
   changement de sortie peuvent arriver après le déchargement de la page
   (TypeError dans le journal, sans effet).

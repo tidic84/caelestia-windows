@@ -96,6 +96,20 @@ l'appli). Pour publier, pousser un tag `v*` : la CI publie
   `docs/dev/maquettes/melangeur.html`. Le poste a 9 sorties de rendu (Sonar
   Game/Chat/Media/Aux/Microphone, Speakers, 2 HDMI de même nom, casque Shure) :
   tester avec ce cas. Mode « essentiel » dans `rebuild()`.
+- **Tester une page en vrai, clics compris** : les clics et les touches
+  simulés (`mouse_event` et `SendKeys`) marchent dans l'îlot **déjà ouvert**
+  par `ILOT_QT_SHOT_TAB`. Pour ouvrir directement une section ou une
+  feuille, change le temps du test la valeur initiale (par exemple
+  `settingsSection: "sound" // TEMP-TEST`), puis retire-la. Avant le test,
+  sauvegarde `%APPDATA%\io.github.tidic84.ilot\settings.json` et
+  `%LOCALAPPDATA%\Ilot\ui.json`, et remets-les après.
+  `qt\build\ilot.exe --check-all <fichier>` liste les identifiants des
+  sorties audio.
+  Scripts d'exemple : session du 2026-10-25 dans `ETAT.md`.
+- **Réglages › Son** (`audio_hidden`, `audio_alias`) : le nommage des
+  sorties est commun (`Ilot.outInfo`). L'ordre, la numérotation et le tri
+  automatique doivent rester identiques dans `Mixer.rebuild` et
+  `SettingsPage.outRows`.
 - **Ne pas tester l'îlot pendant que l'utilisateur joue** (plein écran) :
   arrêter l'appli le dérange et la capture est blanche. Vérifier avant
   `Get-Process RocketLeague` (ou autre jeu) et relancer l'appli installée

@@ -6,9 +6,10 @@ reprendre.
 
 ## Où on en est (mis à jour le 2026-10-25)
 
-- **Version** : 0.4.19 (mélangeur multi-sorties, voir le journal), publiée
-  le 2026-10-25. Prochaine étape : les retours de l'utilisateur sur le
-  mélangeur (`qt/qml/Mixer.qml`). Avant :
+- **Version** : 0.4.20 (sorties affichées, Réglages › Son), installée sur le
+  poste, ni commitée ni publiée au moment de l'écrire. Prochaine étape :
+  tester à la main (voir le journal), puis publier si l'utilisateur le veut.
+  Avant : 0.4.19 (mélangeur multi-sorties), publiée le 2026-10-25. Avant :
   0.4.18 (patch du lecteur), publiée le 2026-10-24 par le tag
   `v0.4.18` (GitHub Action `release.yml`). La 0.4.17 (addon Claude, hooks
   WSL, Apex) l'a été le même jour. La 0.4.8 n'a jamais été publiée seule : elle
@@ -29,6 +30,61 @@ reprendre.
   le clic droit de la ligne `explorer`.
 
 ## Journal
+
+### 2026-10-25 : 0.4.20 (sorties affichées, Réglages › Son)
+
+- **Demande** : pour les amis qui ont Voicemeeter, VB-Cable, Sonar…, choisir
+  les sorties montrées par l'îlot.
+- **Maquette validée** : `docs/dev/maquettes/sorties.html` (le style de
+  Contrôle et de Réglages y est recopié du QML).
+- **Choix de conception**, issus de 3 agents (UX, utilisateur de Voicemeeter,
+  avocat du diable) :
+  - liste noire, sans aucun masquage automatique (chez un utilisateur de
+    Voicemeeter, la sortie virtuelle est celle qu'il utilise) ;
+  - la sortie par défaut est toujours visible ;
+  - avant le premier choix, le tri automatique est inchangé, et le premier
+    choix part de son état ;
+  - on peut renommer une sortie.
+- **QML seul** :
+  - nouvel onglet Son dans `SettingsPage` (composant `OutRow`) ;
+  - filtrage dans `Mixer.rebuild` et dans `CtrlPage` : feuille, icône tune,
+    ligne « N sorties masquées », encart du premier lancement ;
+  - outils communs dans `Ilot.qml`.
+- **Correctif lié** : le nom court du mélangeur abîmait « Speakers
+  (Realtek(R) Audio) » en « Speakers Audio) ». Le nommage est maintenant
+  commun au mélangeur et aux Réglages (`Ilot.outInfo`).
+- **Colonne d'onglets de Réglages** : 12 onglets ne tenaient plus à la taille
+  normale. Les boutons passent à 36 px et l'espacement à 2 px.
+- **Relectures** : 6 séries, chaque fois par 2 agents `relecteur` neufs
+  (13 relecteurs en tout). Les dernières se sont appuyées sur des bancs
+  `qmltestrunner` qui reproduisent la vraie hiérarchie : focus, Échap,
+  clics, `loadOuts`. Les défauts trouvés ont été corrigés au fur et à
+  mesure : Échap entre deux renommages, focus rendu à la racine de la
+  fenêtre, chargement initial vide, envoi à la fermeture, débordement de la
+  colonne d'onglets, clics dans les marges. La dernière série (2 relecteurs)
+  a tout validé.
+- **Vérifié** :
+  - compilation, et qmllint sans avertissement nouveau (hors singletons non
+    résolus) ;
+  - expressions régulières testées sous node ;
+  - capture réelle de Contrôle en tri automatique, identique à avant.
+- **Vérifié dans l'appli réelle** (poste à 9 sorties Sonar, réglages
+  sauvegardés puis restaurés) :
+  - **Captures** : Contrôle (mélangeur), Réglages › Son et feuille
+    « Sortie audio », chacune en tri automatique puis avec un choix fait
+    (sorties masquées, sortie absente, noms choisis).
+  - **Vrais clics et vraies touches** (SendInput et SendKeys sur l'îlot
+    ouvert), puis lecture de `settings.json` :
+    - le premier interrupteur part du tri automatique ;
+    - Entrée valide un nom, Échap l'annule et l'îlot reste ouvert ;
+    - passer d'une ligne à l'autre enregistre la première ;
+    - un clic dans le vide de la carte valide ;
+    - Échap après les renommages referme l'îlot ;
+    - quitter 62 ms après un clic enregistre quand même le choix (envoi à
+      la fermeture).
+  - **Défaut trouvé par ces tests, et corrigé** : le texte du tri
+    automatique faisait remonter les lignes de 52 px au premier choix. Il
+    est maintenant sous les listes.
 
 ### 2026-10-25 : 0.4.19 (mélangeur multi-sorties)
 
