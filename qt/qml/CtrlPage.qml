@@ -47,6 +47,16 @@ Item {
     function refreshOut() {
         Api.invoke("audio_devices").then(l => { page.devices = l })
     }
+    // Reglages > Son : sorties masquees (la sortie par defaut reste visible)
+    readonly property var shownDevices: devices.filter(d => d.default || !Ilot.outHidden(d.id))
+    // premier lancement : beaucoup de sorties virtuelles, rien de choisi
+    readonly property bool outTip: Ilot.outHiddenMap === null && !Ilot.ui.outTip
+        && devices.filter(d => Ilot.outVirtual(d.name)).length >= 3
+    function manageOuts() {
+        Ilot.saveUi({ outTip: true })
+        sheet = ""
+        Ilot.openSettings("sound")
+    }
 
     // ------------------------------------------------------ luminosite
     property var bright: null
@@ -242,7 +252,7 @@ Item {
                         width: parent.width - x - 41
                         anchors.verticalCenter: parent.verticalCenter
                         readonly property var cur: page.devices.find(d => d.default)
-                        text: cur ? cur.name : "Sortie audio"
+                        text: cur ? Ilot.outLabel(cur.id, cur.name) : "Sortie audio"
                         weight: Font.Medium
                         elide: Text.ElideRight
                     }
@@ -306,6 +316,12 @@ Item {
             on: page.sheet === "out"
             title: "Sortie audio"
             onBack: page.sheet = ""
+            action: IconBtn {
+                small: true
+                icon: "tune"
+                tip: "Choisir les sorties affichées"
+                onClicked: page.manageOuts()
+            }
             Column {
                 width: parent.width
                 spacing: 4
@@ -315,8 +331,56 @@ Item {
                     small: true
                     text: "Aucune sortie audio."
                 }
+                // premier lancement (Voicemeeter, Sonar...) : on propose, on ne
+                // masque rien tout seul
+                Rectangle {
+                    visible: page.outTip
+                    width: parent.width
+                    height: visible ? 48 : 0
+                    radius: 16
+                    color: Theme.secondaryContainer
+                    Ms {
+                        x: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: "tune"
+                        size: 18
+                        color: Theme.inkSecondaryContainer
+                    }
+                    Txt {
+                        x: 40
+                        width: parent.width - x - tipGo.width - tipX.width - 18
+                        anchors.verticalCenter: parent.verticalCenter
+                        readonly property int nv: page.devices.filter(d => Ilot.outVirtual(d.name)).length
+                        text: page.devices.length + " sorties, dont " + nv + " virtuelles : choisis celles à afficher"
+                        px: 12
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                        color: Theme.inkSecondaryContainer
+                    }
+                    TextBtn {
+                        id: tipGo
+                        anchors.right: tipX.left
+                        anchors.rightMargin: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        primary: true
+                        text: "Choisir"
+                        onClicked: page.manageOuts()
+                    }
+                    IconBtn {
+                        id: tipX
+                        anchors.right: parent.right
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        small: true
+                        icon: "close"
+                        tip: "Ne plus proposer"
+                        fg: Theme.inkSecondaryContainer
+                        onClicked: Ilot.saveUi({ outTip: true })
+                    }
+                }
                 Repeater {
-                    model: page.devices
+                    model: page.shownDevices
                     Btn {
                         required property var modelData
                         width: parent.width
@@ -339,7 +403,7 @@ Item {
                             x: 44
                             width: parent.width - 44 - 44
                             anchors.verticalCenter: parent.verticalCenter
-                            text: parent.modelData.name
+                            text: Ilot.outLabel(parent.modelData.id, parent.modelData.name)
                             weight: Font.Medium
                             elide: Text.ElideRight
                             color: parent.fg
@@ -352,6 +416,31 @@ Item {
                             name: "check"
                             color: parent.fg
                         }
+                    }
+                }
+                // sorties masquees : discret, mene a Reglages > Son
+                Btn {
+                    readonly property int n: page.devices.length - page.shownDevices.length
+                    visible: n > 0
+                    width: parent.width
+                    height: visible ? 34 : 0
+                    radius: 12
+                    color: hovered ? Theme.surfaceHigh : "transparent"
+                    onClicked: page.manageOuts()
+                    Ms {
+                        x: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        name: "visibility_off"
+                        size: 17
+                        color: Theme.outline
+                    }
+                    Txt {
+                        x: 40
+                        anchors.verticalCenter: parent.verticalCenter
+                        readonly property string s: parent.n > 1 ? "s" : ""
+                        text: parent.n + " sortie" + s + " masquée" + s + " · Gérer"
+                        px: 12
+                        color: parent.hovered ? Theme.inkVariant : Theme.outline
                     }
                 }
             }

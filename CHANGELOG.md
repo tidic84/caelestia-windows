@@ -4,6 +4,13 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.20 — 2026-10-25
+
+- **Choisir ses sorties audio** (nouvel onglet Réglages › Son) : avec Voicemeeter, VB-Cable, Sonar et compagnie, la liste des sorties déborde. Un interrupteur par sortie, rangées en « Appareils » et « Virtuelles », décide de celles qui apparaissent dans « Sortie audio » et dans le mélangeur. Rien n'est masqué tout seul, et la sortie par défaut reste toujours visible. « +N » du mélangeur montre les sorties masquées, avec un point si une appli y joue.
+- **Renommer une sortie** (crayon) : « CABLE Input » peut devenir « OBS », « LG ULTRAGEAR 2 » devenir « Écran droit ». Le nom s'affiche dans « Sortie audio » et dans le mélangeur.
+- **Accès rapide** : l'icône en haut de la feuille « Sortie audio » et la ligne « N sorties masquées » mènent aux réglages. Avec au moins 3 sorties virtuelles, la feuille le propose, jusqu'à ce que tu choisisses ou que tu refuses.
+- **Noms plus propres** dans le mélangeur : « Speakers (Realtek(R) Audio) » s'affiche « Speakers » (au lieu de « Speakers Audio) »).
+
 ## 0.4.19 — 2026-10-25
 
 - **Nouveau mélangeur** (Contrôles) : il montre les applis de toutes les sorties audio, pas seulement de la sortie par défaut. Pratique avec SteelSeries Sonar : Game, Chat, Media et Aux ont chacun leur pastille et leur couleur. Seul l'essentiel est affiché (canaux Sonar, sortie par défaut, sorties où une appli joue) ; « +N » montre les autres.

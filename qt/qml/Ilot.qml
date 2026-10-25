@@ -48,7 +48,10 @@ Item {
         // light / normal / strong
         media_blur: "medium", media_drift: true, media_dim: "normal",
         // pilule repliee : anneau de progression, disque qui tourne
-        player_mini_ring: true, player_mini_spin: true
+        player_mini_ring: true, player_mini_spin: true,
+        // Reglages > Son : sorties masquees {id: nom Windows} (null : tri
+        // automatique du melangeur) et noms choisis {id: nom}
+        audio_hidden: null, audio_alias: {}
     })
     signal settingsChanged()
 
@@ -56,9 +59,98 @@ Item {
         cfg = Object.assign({}, cfg, patch)
         onSettings()
         Api.invoke("settings_set", { patch: patch }).then(c => {
-            cfg = Object.assign({}, cfg, c)
+            cfg = Object.assign({}, cfg, c, outPatch)
         })
     }
+
+    // Reglages > Son : sorties masquees ({id: nom}, null = tri automatique)
+    readonly property var outHiddenMap: {
+        const h = cfg.audio_hidden
+        return h && typeof h === "object" && !Array.isArray(h) ? h : null
+    }
+    readonly property var outAliasMap: {
+        const a = cfg.audio_alias
+        return a && typeof a === "object" && !Array.isArray(a) ? a : ({})
+    }
+    function outHidden(id) {
+        return outHiddenMap !== null && Object.prototype.hasOwnProperty.call(outHiddenMap, id)
+    }
+    // nom choisi pour une sortie, sinon `fallback`
+    function outLabel(id, fallback) {
+        const a = outAliasMap[id]
+        return typeof a === "string" && a.trim() !== "" ? a : fallback
+    }
+    // sorties logicielles (Voicemeeter, VB-Cable, Sonar...) : Windows ne le
+    // dit pas, seul le nom l'indique (un oubli se masque a la main)
+    function outVirtual(name) {
+        return /voicemeeter|vb-audio|\bcable\b|broadcast|sonar|wave ?link|steam streaming|voicemod|virtual|virtuel/i.test(name)
+    }
+    // nom court, libelle et icone d'une sortie (melangeur et Reglages > Son) :
+    // canaux Sonar, HDMI / DisplayPort, sinon le nom sans son adaptateur
+    // (« Speakers (Realtek(R) Audio) » -> « Speakers »)
+    function outInfo(name) {
+        const m = /sonar\s*-\s*(gaming|game|chat|media|aux|microphone)/i.exec(name)
+        if (m) {
+            const s = {
+                gaming: ["Game", "sports_esports", "#cfbdfe"], game: ["Game", "sports_esports", "#cfbdfe"],
+                chat: ["Chat", "forum", "#a8c8ff"], media: ["Media", "music_note", "#9ad8a8"], aux: ["Aux", "tune", "#efb8c8"],
+                microphone: ["Micro", "mic", "#a0dcd8"]
+            }[m[1].toLowerCase()]
+            return { short: s[0], label: "Sonar · " + s[0], icon: s[1], col: s[2], sonar: true }
+        }
+        const hdmi = /hdmi|displayport/i.exec(name)
+        // derniere parenthese, meme avec une parenthese dedans
+        // (« Digital Audio (S/PDIF) (High Definition Audio Device) » -> « Digital Audio (S/PDIF) »)
+        const label = name.replace(/\s*\((?:[^()]|\([^()]*\))*\)\s*$/, "") || name
+        return {
+            short: hdmi ? (hdmi[0].toLowerCase() === "hdmi" ? "HDMI" : "DisplayPort") : label,
+            label: label,
+            icon: /casque|headphone|headset|écouteur|airpods|buds/i.test(name) ? "headphones" : hdmi ? "monitor" : "speaker",
+            col: "",
+            sonar: false
+        }
+    }
+    // les interrupteurs s'enchainent vite : un seul envoi par rafale, sinon
+    // deux settings_set paralleles peuvent finir dans le desordre
+    function setOutCfg(patch) {
+        cfg = Object.assign({}, cfg, patch)
+        outPatch = Object.assign({}, outPatch, patch)
+        outSave.restart()
+    }
+    property var outPatch: ({})
+    property Timer outSave: Timer {
+        interval: 400
+        onTriggered: {
+            const p = root.outPatch
+            root.outPatch = ({})
+            root.setCfg(p)
+        }
+    }
+    // l'appli quitte pendant l'attente : envoi synchrone (un appel du pool
+    // pourrait trouver la fenetre deja desinscrite)
+    Connections {
+        target: Qt.application
+        function onAboutToQuit() {
+            if (root.uiSave.running) {
+                root.uiSave.stop()
+                try {
+                    Api.call("store_set", { key: "ui", value: root.ui })
+                } catch (e) {
+                    console.warn("store_set a la fermeture :", e)
+                }
+            }
+            if (!root.outSave.running)
+                return
+            root.outSave.stop()
+            try {
+                Api.call("settings_set", { patch: root.outPatch })
+            } catch (e) {
+                console.warn("settings_set a la fermeture :", e)
+            }
+        }
+    }
+    // change seulement quand le choix change (pas a chaque reglage enregistre)
+    readonly property string outSig: JSON.stringify([outHiddenMap, outAliasMap])
 
     // l'etat de l'interface garde d'une fois sur l'autre (palette, minuteur...)
     property var ui: ({})
@@ -144,7 +236,7 @@ Item {
     // un addon desactive alors que son onglet est ouvert : retour a l'accueil
     onTabsChanged: if (!hasTab(currentTab)) currentTab = "home"
 
-    // section ouverte dans Reglages (general, bar, look, pill, pet, game, access,
+    // section ouverte dans Reglages (general, bar, look, pill, sound, pet, game, access,
     // weather, keys, addons, updates)
     property string settingsSection: "general"
     function openSettings(section) {
@@ -1218,7 +1310,7 @@ Item {
         Api.listen("settings", c => {
             const icalsChanged = JSON.stringify(c.icals) !== JSON.stringify(root.cfg.icals)
             const cityChanged = JSON.stringify(c.city) !== JSON.stringify(root.cfg.city)
-            root.cfg = Object.assign({}, root.cfg, c)
+            root.cfg = Object.assign({}, root.cfg, c, root.outPatch)
             root.onSettings()
             if (icalsChanged)
                 root.refreshEvents(true)

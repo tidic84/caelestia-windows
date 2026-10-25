@@ -18,10 +18,21 @@ Item {
     property string openKey: ""
     property string flashKey: ""
     readonly property bool multi: chanModel.count > 1
-    // sorties masquees (hors essentiel) et bouton « +N » pour les montrer
+    // sorties masquees (hors essentiel, ou masquees dans Reglages > Son) et
+    // bouton « +N » pour les montrer ; hiddenBusy : une appli y joue
     property int hiddenCount: 0
+    property bool hiddenBusy: false
     property bool showAll: false
     onShowAllChanged: rebuild()
+    // Reglages > Son : sorties masquees ou renommees (pas pendant un glisser
+    // ni avant l'envoi du dernier volume : le niveau affiche reviendrait)
+    Connections {
+        target: Ilot
+        function onOutSigChanged() {
+            if (!mx.busy && !outTimer.running)
+                mx.rebuild()
+        }
+    }
     readonly property bool filtering: filter.length > 0
 
     // glisser d'une appli : { key, name, icon, pids, from }
@@ -74,27 +85,13 @@ Item {
 
     // ------------------------------------------------------------ donnees
     readonly property var neutral: ["#cac4d0", "#ffb59c", "#b5d0f0", "#c8e6a0", "#f0d8a0"]
+    // noms et icone : Ilot.outInfo (communs avec Reglages > Son) ; couleur
+    // neutre par rang hors Sonar
     function chanInfo(d, n) {
-        const m = /sonar\s*-\s*(gaming|game|chat|media|aux|microphone)/i.exec(d.name)
-        if (m) {
-            const k = m[1].toLowerCase()
-            const s = {
-                gaming: ["Game", "sports_esports", "#cfbdfe"], game: ["Game", "sports_esports", "#cfbdfe"],
-                chat: ["Chat", "forum", "#a8c8ff"], media: ["Media", "music_note", "#9ad8a8"], aux: ["Aux", "tune", "#efb8c8"],
-                microphone: ["Micro", "mic", "#a0dcd8"]
-            }[k]
-            return { short: s[0], label: "Sonar · " + s[0], icon: s[1], col: s[2], sonar: true }
-        }
-        const hdmi = /hdmi|displayport/i.exec(d.name)
-        const s = hdmi ? (hdmi[0].toLowerCase() === "hdmi" ? "HDMI" : "DisplayPort") : d.name.replace(/\s*\([^)]*\)/g, "").trim() || d.name
-        return {
-            short: s,
-            // « Speakers (High Definition Audio Device) » → « Speakers »
-            label: d.name.replace(/\s*\([^()]*\)\s*$/, "") || d.name,
-            icon: /casque|headphone|headset|écouteur|airpods|buds/i.test(d.name) ? "headphones" : hdmi ? "monitor" : "speaker",
-            col: neutral[n % neutral.length],
-            sonar: false
-        }
+        const c = Ilot.outInfo(d.name)
+        if (!c.sonar)
+            c.col = neutral[n % neutral.length]
+        return c
     }
     // met a jour un ListModel sur place (les delegues survivent au sondage)
     function sync(model, arr) {
@@ -135,8 +132,14 @@ Item {
         // l'essentiel : avec Sonar, ses canaux Game / Chat / Media / Aux (les
         // sorties physiques sont alimentees par Sonar) ; sinon la sortie par
         // defaut. Plus toute sortie ou joue une vraie appli. « +N » montre tout.
+        // Des que l'utilisateur a choisi (Reglages > Son), son choix remplace
+        // l'essentiel ; la sortie par defaut reste toujours visible.
+        // Ordre, numerotation et essentiel : a garder identiques a
+        // SettingsPage.outRows (le premier choix part de cet etat).
         const sonar = ordered.some(d => { const ci = chanInfo(d, 0); return ci.sonar && ci.short !== "Micro" })
+        const chosen = Ilot.outHiddenMap !== null
         let hidden = 0
+        let busy = false
         for (const d of ordered) {
             const c = chanInfo(d, n)
             if (!c.sonar)
@@ -147,26 +150,39 @@ Item {
             // chaque sortie a ses « Sons système » : seuls ceux de la sortie
             // par defaut comptent
             c.apps = (d.apps || []).filter(a => c.def || !(a.icon === "" && a.name === "Sons système"))
-            // noms courts en double (deux sorties HDMI...) : « HDMI », « HDMI 2 »
-            const same = chans.filter(x => map[x.key].baseShort === c.short).length
+            // noms courts en double (deux sorties HDMI...) : « HDMI », « HDMI 2 »,
+            // comptes sur toutes les sorties (le numero ne bouge pas avec « +N »)
+            const same = Object.keys(map).filter(k => map[k].baseShort === c.short).length
             c.baseShort = c.short
             if (same) {
                 c.short += " " + (same + 1)
                 c.label += " " + (same + 1)
             }
+            // nom choisi dans Reglages > Son
+            const alias = Ilot.outLabel(d.id, "")
+            if (alias !== "") {
+                c.short = alias
+                c.label = alias
+            }
             map[d.id] = c
             const real = c.apps.some(a => !(a.icon === "" && a.name === "Sons système"))
-            c.shown = showAll || real || c.def || (sonar && c.sonar && c.baseShort !== "Micro")
+            const base = c.def || (chosen ? !Ilot.outHidden(d.id) : real || (sonar && c.sonar && c.baseShort !== "Micro"))
+            c.shown = showAll || base
+            // le moteur de Voicemeeter / Sonar joue toujours sur le materiel :
+            // il ne compte pas
+            if (!base && c.apps.some(a => !(a.icon === "" && a.name === "Sons système") && !Ilot.outVirtual(a.name)))
+                busy = true
             if (!c.shown) {
                 hidden++
                 continue
             }
             chans.push({
                 key: d.id, name: d.name, label: c.label, shortName: c.short, icon: c.icon, col: c.col,
-                def: c.def, level: d.level, muted: !!d.muted, count: c.apps.length
+                def: c.def, level: d.level, muted: !!d.muted, count: c.apps.length, extra: chosen && !base
             })
         }
         hiddenCount = hidden
+        hiddenBusy = busy
         const f = filter.filter(id => !!map[id] && map[id].shown)
         if (f.length !== filter.length || (f.length && f.length === chans.length)) {
             filter = f.length === chans.length ? [] : f
@@ -373,6 +389,8 @@ Item {
                 required property real level
                 required property bool muted
                 required property int count
+                // masquee dans Reglages > Son, montree par « +N »
+                required property bool extra
                 readonly property color cc: col
                 readonly property bool sel: mx.filter.includes(key)
                 readonly property bool target: mx.drag !== null && mx.drag.from !== key
@@ -392,7 +410,7 @@ Item {
                 height: 46
                 radius: 14
                 color: hot ? Theme.mix(cc, Theme.surfaceHigh, 0.16) : Theme.surfaceHigh
-                opacity: mx.filtering && !sel && !target ? 0.45 : 1
+                opacity: mx.filtering && !sel && !target ? 0.45 : extra && !sel && !target ? 0.6 : 1
                 Behavior on opacity { NumberAnimation { duration: 250 } }
                 scale: hot ? 1.08 : target ? 1.04 : 1
                 Behavior on scale { NumberAnimation { duration: 250; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
@@ -571,6 +589,7 @@ Item {
             }
         }
         // « +N » : sorties hors essentiel (sorties physiques sous Sonar, HDMI...)
+        // ou masquees dans Reglages > Son
         Btn {
             id: more
             visible: mx.hiddenCount > 0 || mx.showAll
@@ -595,8 +614,22 @@ Item {
                 size: 17
                 color: Theme.inkVariant
             }
+            // une appli joue sur une sortie masquee
+            Rectangle {
+                visible: mx.hiddenBusy && !mx.showAll
+                x: parent.width - 13
+                y: 7
+                width: 6
+                height: 6
+                radius: 3
+                color: Theme.primary
+            }
             Tip {
-                text: mx.showAll ? "Ne garder que l'essentiel" : mx.hiddenCount + " autre" + (mx.hiddenCount > 1 ? "s" : "") + " sortie" + (mx.hiddenCount > 1 ? "s" : "") + " (physiques, HDMI…)"
+                readonly property string s: mx.hiddenCount > 1 ? "s" : ""
+                text: mx.showAll ? (Ilot.outHiddenMap ? "Cacher les sorties masquées" : "Ne garder que l'essentiel")
+                    : Ilot.outHiddenMap ? mx.hiddenCount + " sortie" + s + " masquée" + s + " dans Réglages › Son"
+                        + (mx.hiddenBusy ? "\nUne appli y joue" : "")
+                    : mx.hiddenCount + " autre" + s + " sortie" + s + " (physiques, HDMI…)"
                 shown: more.hovered
             }
         }

@@ -3,7 +3,7 @@ import IlotCore
 
 // Reglages, en onglets (a gauche) : general (demarrage, touche Windows,
 // ecran, notifications, sauvegarde), barre, apparence (et rotation des
-// fonds), pilule, compagnon, jeu et absence, accessibilite, meteo et agenda, raccourcis
+// fonds), pilule, son (sorties affichees), compagnon, jeu et absence, accessibilite, meteo et agenda, raccourcis
 // clavier, addons (onglets facultatifs), mises a jour et notes de version
 Item {
     id: page
@@ -16,6 +16,7 @@ Item {
         { id: "bar", icon: "dashboard", label: "Barre" },
         { id: "look", icon: "palette", label: "Apparence" },
         { id: "pill", icon: "pill", label: "Pilule" },
+        { id: "sound", icon: "volume_up", label: "Son" },
         { id: "pet", icon: "emoji_emotions", label: "Compagnon" },
         { id: "game", icon: "sports_esports", label: "Jeu et absence" },
         { id: "access", icon: "accessibility_new", label: "Accessibilité" },
@@ -45,6 +46,9 @@ Item {
     Component.onCompleted: {
         if (shown)
             load()
+        // page creee deja sur Son (« Gerer » depuis la feuille Sortie audio)
+        if (soundShown)
+            loadOuts()
         keyrecFn = r => page.recorded(r)
         Api.listen("keyrec", keyrecFn)
     }
@@ -54,7 +58,7 @@ Item {
             page.autostart = s.autostart
             page.monitors = s.monitors
             page.chosenMonitor = s.monitor === undefined ? null : s.monitor
-            Ilot.cfg = Object.assign({}, Ilot.cfg, s)
+            Ilot.cfg = Object.assign({}, Ilot.cfg, s, Ilot.outPatch)
         })
         refreshWinKey()
         if (!changelog.length)
@@ -62,6 +66,168 @@ Item {
         Api.invoke("update_get").then(u => { Watch.upd = u })
         Api.invoke("cc_hooks_status").then(v => { page.ccHooks = v; page.ccHooksErr = "" }, e => { page.ccHooksErr = String(e) })
     }
+    // ------------------------------------------- Son : sorties affichees
+    // sorties actives avec leurs applis (mixer_all), relues pendant l'onglet
+    property var outs: []
+    // liste lue au moins une fois : avant, rien n'est « absent »
+    property bool outsLoaded: false
+    readonly property bool soundShown: shown && section === "sound"
+    onSoundShownChanged: {
+        outEdit = ""
+        outsEmpty = false
+        if (soundShown)
+            loadOuts()
+    }
+    Timer {
+        interval: 3000
+        repeat: true
+        running: page.soundShown
+        onTriggered: page.loadOuts()
+    }
+    // les lignes ne sont refaites que si ce qui s'y affiche change (pas a
+    // chaque volume, ni aux applis une fois le choix fait : elles ne servent
+    // qu'au tri automatique), et pas pendant qu'on renomme
+    property string outsSig: ""
+    property bool outsEmpty: false
+    function outsSigOf(l, auto) {
+        return JSON.stringify(l.map(d => [d.id, d.name, !!d.default,
+            auto ? (d.apps || []).map(a => a.icon === "" ? "" : a.name).sort() : []]))
+    }
+    function loadOuts() {
+        Api.invoke("mixer_all").then(l => {
+            if (!Array.isArray(l))
+                return
+            if (page.outEdit !== "") {
+                // ignoree pendant un renommage, mais une lecture pleine
+                // casse quand meme la suite de lectures vides
+                if (l.length)
+                    page.outsEmpty = false
+                return
+            }
+            // liste vide alors qu'on en avait une, ou des la premiere
+            // lecture : sans doute une lecture ratee (COM, mixer_all rend []
+            // sur erreur) ; on ne la croit qu'a la deuxieme de suite
+            if (!l.length && (page.outs.length || !page.outsLoaded) && !page.outsEmpty) {
+                page.outsEmpty = true
+                return
+            }
+            page.outsEmpty = false
+            const sig = page.outsSigOf(l, Ilot.outHiddenMap === null)
+            page.outsLoaded = true
+            if (sig === page.outsSig)
+                return
+            page.outsSig = sig
+            page.outs = l
+        })
+    }
+    // sortie dont on modifie le nom ; outCancel : Echap, on ne garde pas
+    property string outEdit: ""
+    property bool outCancel: false
+    Connections {
+        target: Ilot
+        function onEscapeOverlay(what) {
+            if (what === "outname") {
+                page.outCancel = true
+                page.outEdit = ""
+                page.outCancel = false
+            }
+        }
+    }
+    // une ligne par sortie presente, dans l'ordre et avec les noms du
+    // melangeur (Sonar d'abord, doublons « HDMI 2 »).
+    // auto : ce que montre le tri automatique du melangeur (Mixer.rebuild)
+    readonly property var outRows: {
+        const rank = d => {
+            const c = Ilot.outInfo(d.name)
+            const i = c.sonar ? ["Game", "Chat", "Media", "Aux", "Micro"].indexOf(c.short) : -1
+            return i < 0 ? 9 : i
+        }
+        const ordered = outs.map((d, i) => [rank(d), i, d]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2])
+        const sonar = ordered.some(d => { const c = Ilot.outInfo(d.name); return c.sonar && c.short !== "Micro" })
+        const rows = []
+        const seen = {}
+        for (const d of ordered) {
+            const c = Ilot.outInfo(d.name)
+            seen[c.short] = (seen[c.short] || 0) + 1
+            const real = (d.apps || []).some(a => !(a.icon === "" && a.name === "Sons système"))
+            rows.push({
+                id: d.id, name: d.name, def: !!d.default, gone: false, icon: c.icon,
+                title: c.label + (seen[c.short] > 1 ? " " + seen[c.short] : ""),
+                virt: Ilot.outVirtual(d.name),
+                auto: !!d.default || real || (sonar && c.sonar && c.short !== "Micro")
+            })
+        }
+        return rows
+    }
+    // sorties masquees absentes (debranchees, ou id change par un pilote),
+    // avec le nom garde dans audio_hidden
+    readonly property var outGone: {
+        const h = outsLoaded && Ilot.outHiddenMap || {}
+        const rows = []
+        for (const id in h) {
+            if (outs.some(d => d.id === id))
+                continue
+            const name = typeof h[id] === "string" && h[id] !== "" ? h[id] : id
+            const c = Ilot.outInfo(name)
+            rows.push({ id: id, name: name, def: false, gone: true, icon: c.icon, title: c.label, virt: Ilot.outVirtual(name), auto: false })
+        }
+        return rows
+    }
+    // listes separees : basculer un interrupteur ne refait pas les lignes
+    readonly property var outPhys: outRows.filter(r => !r.virt)
+    readonly property var outVirt: outRows.filter(r => r.virt)
+    readonly property var outPhysGone: outGone.filter(r => !r.virt)
+    readonly property var outVirtGone: outGone.filter(r => r.virt)
+    // affichee dans le melangeur (hors « +N »)
+    function outOn(r) {
+        return Ilot.outHiddenMap === null ? r.auto : !Ilot.outHidden(r.id)
+    }
+    // masque / affiche `ids`. Au premier choix, on part de ce que montre le
+    // tri automatique : rien d'autre ne bouge que ce qu'on vient de toucher
+    function outSetHidden(ids, hide) {
+        outEdit = ""
+        const h = Object.assign({}, Ilot.outHiddenMap || {})
+        if (Ilot.outHiddenMap === null) {
+            for (const r of outRows) {
+                if (!r.def && !r.auto)
+                    h[r.id] = r.name
+            }
+        }
+        for (const id of ids) {
+            const r = outRows.find(x => x.id === id)
+            if (hide)
+                h[id] = r ? r.name : id
+            else
+                delete h[id]
+        }
+        // premier choix : les applis ne comptent plus, la signature les
+        // retire tout de suite (sinon la relecture suivante referait les lignes)
+        if (Ilot.outHiddenMap === null)
+            outsSig = outsSigOf(outs, false)
+        Ilot.setOutCfg({ audio_hidden: h })
+    }
+    // oublie une sortie absente (masquage et nom choisi)
+    function outForget(id) {
+        outEdit = ""
+        const h = Object.assign({}, Ilot.outHiddenMap || {})
+        delete h[id]
+        const a = Object.assign({}, Ilot.outAliasMap)
+        delete a[id]
+        Ilot.setOutCfg({ audio_hidden: h, audio_alias: a })
+    }
+    // nom choisi ; vide ou identique au nom d'origine : on revient a celui-ci
+    function outRename(r, text) {
+        const t = text.trim().slice(0, 32)
+        const a = Object.assign({}, Ilot.outAliasMap)
+        // (le champ coupe a 32 : un nom long garde tel quel n'est pas un choix)
+        if (t === "" || t === r.title || t === r.title.slice(0, 32).trim())
+            delete a[r.id]
+        else
+            a[r.id] = t
+        if (JSON.stringify(a) !== JSON.stringify(Ilot.outAliasMap))
+            Ilot.setOutCfg({ audio_alias: a })
+    }
+
     // hooks Claude Code (src/claude.rs) : null tant que l'etat n'est pas lu
     property var ccHooks: null
     property string ccHooksErr: ""
@@ -112,17 +278,17 @@ Item {
         // panneau) : les boutons eux-memes restent sans fond
         Rectangle {
             readonly property int i: Math.max(0, page.sections.findIndex(x => x.id === page.section))
-            y: i * (38 + nav.spacing)
+            y: i * (36 + nav.spacing)
             width: nav.width
-            height: 38
-            radius: 19
+            height: 36
+            radius: 18
             color: Theme.secondaryContainer
             Behavior on y { NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
         }
         Column {
             id: nav
             width: parent.width
-            spacing: 3
+            spacing: 2
             Repeater {
                 model: page.sections
                 Btn {
@@ -130,8 +296,8 @@ Item {
                     required property var modelData
                     readonly property bool on: page.section === modelData.id
                     width: nav.width
-                    height: 38
-                    radius: 19
+                    height: 36
+                    radius: 18
                     readonly property color fg: on ? Theme.inkSecondaryContainer : Theme.ink
                     onClicked: Ilot.settingsSection = modelData.id
                     Ms {
@@ -934,6 +1100,129 @@ Item {
                     toggle: true
                     checked: !!page.cfg.wxfx
                     onToggled: on => Ilot.setCfg({ wxfx: on })
+                }
+            }
+
+            // ------------------------------------------------------- son
+            Block {
+                id: soundBlock
+                sec: "sound"
+                readonly property bool chosen: Ilot.outHiddenMap !== null
+                // clic dans le vide de la carte : valide le nom en cours (les
+                // boutons et le champ prennent leurs clics avant)
+                TapHandler {
+                    // toute la carte, marges comprises (sinon la colonne `inner`)
+                    parent: soundBlock
+                    enabled: page.outEdit !== ""
+                    // un clic lent compte aussi
+                    longPressThreshold: 0
+                    onTapped: page.outEdit = ""
+                }
+                SetRow {
+                    icon: "tune"
+                    title: "Sorties affichées" + (soundBlock.chosen
+                        ? " · " + page.outRows.filter(r => r.def || page.outOn(r)).length + " sur " + page.outRows.length : "")
+                    sub: "Les sorties proposées dans « Sortie audio » et dans le mélangeur. Une sortie masquée fonctionne toujours dans Windows et dans la soundboard, et « +N » la montre au besoin."
+                }
+                Empty {
+                    visible: page.outsLoaded && page.outRows.length === 0 && page.outGone.length === 0
+                    width: parent.width
+                    small: true
+                    text: "Aucune sortie audio."
+                }
+                SubTitle {
+                    visible: page.outPhys.length + page.outPhysGone.length > 0
+                    text: "Appareils"
+                }
+                Column {
+                    width: parent.width
+                    Repeater {
+                        model: page.outPhys
+                        OutRow {}
+                    }
+                    Repeater {
+                        model: page.outPhysGone
+                        OutRow {}
+                    }
+                }
+                Item {
+                    id: virtHead
+                    visible: page.outVirt.length + page.outVirtGone.length > 0
+                    width: parent.width
+                    // meme ecart que « Appareils » ; bouton centre sur le titre
+                    height: visible ? Math.max(virtTitle.height, virtBtn.y + virtBtn.height) : 0
+                    // la sortie par defaut ne compte pas : elle reste affichee
+                    readonly property bool allOff: page.outVirt.some(r => !r.def) && page.outVirt.every(r => r.def || !page.outOn(r))
+                    SubTitle {
+                        id: virtTitle
+                        text: "Virtuelles"
+                    }
+                    TextBtn {
+                        id: virtBtn
+                        // inutile si la seule virtuelle est la sortie par defaut
+                        visible: page.outVirt.some(r => !r.def)
+                        anchors.right: parent.right
+                        y: virtTitle.topPadding + (virtTitle.height - virtTitle.topPadding - height) / 2
+                        icon: virtHead.allOff ? "visibility" : "visibility_off"
+                        text: virtHead.allOff ? "Afficher les virtuelles" : "Masquer les virtuelles"
+                        onClicked: page.outSetHidden(page.outVirt.map(r => r.id), !virtHead.allOff)
+                    }
+                }
+                Column {
+                    width: parent.width
+                    Repeater {
+                        model: page.outVirt
+                        OutRow {}
+                    }
+                    Repeater {
+                        model: page.outVirtGone
+                        OutRow {}
+                    }
+                }
+                // sous les listes, a hauteur fixe (la plus grande des deux) :
+                // l'explication cede la place aux boutons au premier choix sans
+                // que la carte raccourcisse (page defilee en bas, les lignes
+                // descendraient sous la souris)
+                Item {
+                    visible: soundBlock.chosen || page.outRows.length > 0
+                    width: parent.width
+                    height: Math.max(autoNote.height, outBtns.height)
+                    Txt {
+                        id: autoNote
+                        visible: !soundBlock.chosen
+                        width: parent.width
+                        topPadding: 14
+                        text: "Pour l'instant, le mélangeur trie seul (sortie par défaut, sorties où une appli joue, canaux Sonar) et « Sortie audio » les montre toutes. Touche un interrupteur pour choisir toi-même : les interrupteurs ci-dessus deviendront ton choix, pour les deux."
+                        px: 12
+                        color: Theme.inkVariant
+                        wrapMode: Text.Wrap
+                    }
+                    Row {
+                        id: outBtns
+                        visible: soundBlock.chosen
+                        topPadding: 14
+                        spacing: 8
+                        TextBtn {
+                            icon: "visibility"
+                            text: "Tout afficher"
+                            disabled: Object.keys(Ilot.outHiddenMap || {}).length === 0
+                            onClicked: {
+                                page.outEdit = ""
+                                Ilot.setOutCfg({ audio_hidden: {} })
+                            }
+                        }
+                        TextBtn {
+                            icon: "auto_awesome"
+                            text: "Revenir au tri automatique"
+                            onClicked: {
+                                page.outEdit = ""
+                                Ilot.setOutCfg({ audio_hidden: null })
+                                // les applis comptent de nouveau : relire tout de suite
+                                page.outsSig = ""
+                                page.loadOuts()
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2219,6 +2508,152 @@ Item {
         Item {
             id: extraBox
             anchors.fill: parent
+        }
+    }
+
+    // Reglages > Son : une sortie (icone, nom, nom Windows, renommer, afficher)
+    component OutRow: Item {
+        id: orow
+        required property var modelData
+        readonly property bool on: !modelData.gone && page.outOn(modelData)
+        readonly property bool editing: page.outEdit === modelData.id
+        readonly property string shownName: Ilot.outLabel(modelData.id, modelData.title)
+        // le champ a eu le focus : le perdre valide
+        property bool focusSeen: false
+        width: parent ? parent.width : 0
+        height: 54
+        opacity: modelData.gone ? 0.6 : 1
+        function startEdit() {
+            focusSeen = false
+            field.text = shownName
+            // l'ilot ne se replie pas pendant la saisie
+            Ilot.pinned = true
+            Ilot.grabFocus()
+            Ilot.overlay = "outname"
+            Qt.callLater(() => {
+                field.input.forceActiveFocus()
+                field.input.selectAll()
+                // focus deja la : « focused » ne sera pas emis
+                orow.focusSeen = field.input.activeFocus
+            })
+        }
+        onEditingChanged: {
+            if (editing)
+                return startEdit()
+            if (!page.outCancel)
+                page.outRename(modelData, field.text)
+            // un champ cache garderait le focus (et les touches tapees) ; la
+            // page le reprend, Echap remonte encore jusqu'a Main. `focus` et
+            // non `activeFocus` : fenetre inactive, il le reprendrait au retour
+            if (field.input.focus)
+                page.forceActiveFocus()
+            // passage a une autre ligne : elle garde l'overlay (Echap annule)
+            if (Ilot.overlay === "outname" && page.outEdit === "")
+                Ilot.overlay = ""
+        }
+        Component.onCompleted: if (editing) startEdit()
+        Rectangle {
+            width: 40
+            height: 40
+            radius: 14
+            anchors.verticalCenter: parent.verticalCenter
+            color: orow.on ? Theme.secondaryContainer : Theme.surfaceHigh
+            Behavior on color { ColorAnimation { duration: 200 } }
+            Ms {
+                anchors.centerIn: parent
+                name: orow.modelData.icon
+                color: orow.on ? Theme.inkSecondaryContainer : Theme.outline
+            }
+        }
+        Column {
+            visible: !orow.editing
+            x: 54
+            width: parent.width - x - ctl.width - 12
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+            Row {
+                width: parent.width
+                spacing: 8
+                Txt {
+                    id: nm
+                    width: Math.min(implicitWidth, parent.width - (chip.visible ? chip.width + 8 : 0))
+                    text: orow.shownName
+                    px: 14
+                    weight: Font.Medium
+                    elide: Text.ElideRight
+                    color: orow.on ? Theme.ink : Theme.inkVariant
+                }
+                Chip {
+                    id: chip
+                    anchors.verticalCenter: nm.verticalCenter
+                    text: orow.modelData.gone ? "Absente" : !orow.modelData.def ? ""
+                        : Ilot.outHidden(orow.modelData.id) ? "Par défaut · reste affichée" : "Par défaut"
+                }
+            }
+            Txt {
+                width: parent.width
+                text: orow.modelData.gone ? "Débranchée, ou son pilote a changé · " + orow.modelData.name : orow.modelData.name
+                px: 12
+                color: Theme.inkVariant
+                elide: Text.ElideRight
+            }
+        }
+        Field {
+            id: field
+            visible: orow.editing
+            x: 54
+            width: parent.width - x - ctl.width - 12
+            anchors.verticalCenter: parent.verticalCenter
+            focusRing: true
+            placeholder: orow.modelData.title
+            Component.onCompleted: input.maximumLength = 32
+            onFocused: {
+                orow.focusSeen = true
+                Ilot.pinned = true
+                Ilot.grabFocus()
+            }
+            onAccepted: page.outEdit = ""
+            // marges arrondies du champ : un clic y reste dans le champ (sinon
+            // le TapHandler de la carte validerait)
+            MouseArea {
+                z: -1
+                anchors.fill: parent
+                onPressed: field.input.forceActiveFocus()
+            }
+        }
+        Connections {
+            target: field.input
+            function onActiveFocusChanged() {
+                if (!field.input.activeFocus && orow.editing && orow.focusSeen)
+                    page.outEdit = ""
+            }
+        }
+        Row {
+            id: ctl
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
+            IconBtn {
+                visible: !orow.modelData.gone
+                anchors.verticalCenter: parent.verticalCenter
+                small: true
+                icon: orow.editing ? "check" : "edit"
+                tip: orow.editing ? "Valider" : "Renommer"
+                onClicked: page.outEdit = orow.editing ? "" : orow.modelData.id
+            }
+            M3Switch {
+                visible: !orow.modelData.gone
+                anchors.verticalCenter: parent.verticalCenter
+                checked: orow.on
+                onToggled: on => page.outSetHidden([orow.modelData.id], !on)
+            }
+            TextBtn {
+                visible: orow.modelData.gone
+                anchors.verticalCenter: parent.verticalCenter
+                icon: "delete"
+                text: "Oublier"
+                onClicked: page.outForget(orow.modelData.id)
+            }
         }
     }
 
