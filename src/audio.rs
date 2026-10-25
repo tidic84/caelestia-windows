@@ -322,6 +322,10 @@ fn group_apps(list: Vec<(u32, bool, ISimpleAudioVolume)>, sys: &sysinfo::System)
             ("Sons système".to_string(), String::new())
         } else {
             let Some(p) = sys.process(sysinfo::Pid::from_u32(pid)) else { continue };
+            // moteur audio de Windows (ou de Sonar) : pas une appli a regler
+            if p.name().eq_ignore_ascii_case("audiodg.exe") {
+                continue;
+            }
             let exe = p.exe().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default();
             let fallback = p.name().to_string_lossy().trim_end_matches(".exe").to_string();
             let (name, icon) = if exe.is_empty() {

@@ -18,6 +18,10 @@ Item {
     property string openKey: ""
     property string flashKey: ""
     readonly property bool multi: chanModel.count > 1
+    // sorties masquees (hors essentiel) et bouton « +N » pour les montrer
+    property int hiddenCount: 0
+    property bool showAll: false
+    onShowAllChanged: rebuild()
     readonly property bool filtering: filter.length > 0
 
     // glisser d'une appli : { key, name, icon, pids, from }
@@ -128,6 +132,11 @@ Item {
             return i < 0 ? 9 : i
         }
         const ordered = devs.map((d, i) => [rank(d), i, d]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2])
+        // l'essentiel : avec Sonar, ses canaux Game / Chat / Media / Aux (les
+        // sorties physiques sont alimentees par Sonar) ; sinon la sortie par
+        // defaut. Plus toute sortie ou joue une vraie appli. « +N » montre tout.
+        const sonar = ordered.some(d => { const ci = chanInfo(d, 0); return ci.sonar && ci.short !== "Micro" })
+        let hidden = 0
         for (const d of ordered) {
             const c = chanInfo(d, n)
             if (!c.sonar)
@@ -146,12 +155,19 @@ Item {
                 c.label += " " + (same + 1)
             }
             map[d.id] = c
+            const real = c.apps.some(a => !(a.icon === "" && a.name === "Sons système"))
+            c.shown = showAll || real || c.def || (sonar && c.sonar && c.baseShort !== "Micro")
+            if (!c.shown) {
+                hidden++
+                continue
+            }
             chans.push({
                 key: d.id, name: d.name, label: c.label, shortName: c.short, icon: c.icon, col: c.col,
                 def: c.def, level: d.level, muted: !!d.muted, count: c.apps.length
             })
         }
-        const f = filter.filter(id => !!map[id])
+        hiddenCount = hidden
+        const f = filter.filter(id => !!map[id] && map[id].shown)
         if (f.length !== filter.length || (f.length && f.length === chans.length)) {
             filter = f.length === chans.length ? [] : f
             return
@@ -161,7 +177,7 @@ Item {
         const rows = []
         for (const d of ordered) {
             const c = map[d.id]
-            if (filter.length ? !filter.includes(d.id) : !c.apps.length)
+            if (!c.shown || (filter.length ? !filter.includes(d.id) : !c.apps.length))
                 continue
             if (!c.apps.length)
                 rows.push({ key: d.id + "|", chan: d.id, kind: "empty", name: "", icon: "", pids: "", level: 0, muted: false })
@@ -338,7 +354,7 @@ Item {
     // ----------------------------------------------------------- pastilles
     Row {
         id: pills
-        visible: mx.multi
+        visible: mx.multi || mx.hiddenCount > 0 || mx.showAll
         width: parent.width
         height: visible ? 46 : 0
         spacing: 6
@@ -372,7 +388,7 @@ Item {
                     if (pma.pressed)
                         mx.sliding = false
                 }
-                width: (pills.width - pills.spacing * (chanModel.count - 1)) / Math.max(1, chanModel.count)
+                width: (pills.width - (more.visible ? more.width + pills.spacing : 0) - pills.spacing * (chanModel.count - 1)) / Math.max(1, chanModel.count)
                 height: 46
                 radius: 14
                 color: hot ? Theme.mix(cc, Theme.surfaceHigh, 0.16) : Theme.surfaceHigh
@@ -405,8 +421,10 @@ Item {
                     anchors.topMargin: 3
                     anchors.right: parent.right
                     anchors.rightMargin: 6
-                    text: pill.count || ""
+                    // niveau dans le coin, le nom en entier dessous
+                    text: pill.muted ? "–" : pill.pct
                     px: 9.5
+                    tnum: true
                     color: Theme.outline
                 }
                 Column {
@@ -424,8 +442,8 @@ Item {
                         width: parent.width - 12
                         anchors.horizontalCenter: parent.horizontalCenter
                         horizontalAlignment: Text.AlignHCenter
-                        // pastilles etroites (beaucoup de sorties) : icone et niveau
-                        text: (pill.width < 64 ? "" : pill.shortName + " · ") + (pill.muted ? "–" : pill.pct)
+                        // pastilles etroites (toutes les sorties) : icone seule
+                        text: pill.width < 52 ? "" : pill.shortName
                         px: 10.5
                         tnum: true
                         elide: Text.ElideRight
@@ -550,6 +568,36 @@ Item {
                     text: pill.name + (pill.def ? " (par défaut)" : "") + "\nGlisser " + (pills.wide ? "↔" : "↕") + " ou molette : volume · clic : filtrer (plusieurs possibles)"
                     shown: pma.containsMouse && !pma.pressed && mx.drag === null
                 }
+            }
+        }
+        // « +N » : sorties hors essentiel (sorties physiques sous Sonar, HDMI...)
+        Btn {
+            id: more
+            visible: mx.hiddenCount > 0 || mx.showAll
+            width: visible ? 40 : 0
+            height: 46
+            radius: 14
+            color: hovered ? Theme.surfaceHighest : Theme.surfaceHigh
+            onClicked: mx.showAll = !mx.showAll
+            Txt {
+                anchors.centerIn: parent
+                visible: !mx.showAll
+                text: "+" + mx.hiddenCount
+                px: 12
+                weight: Font.Medium
+                tnum: true
+                color: Theme.inkVariant
+            }
+            Ms {
+                anchors.centerIn: parent
+                visible: mx.showAll
+                name: "close"
+                size: 17
+                color: Theme.inkVariant
+            }
+            Tip {
+                text: mx.showAll ? "Ne garder que l'essentiel" : mx.hiddenCount + " autre" + (mx.hiddenCount > 1 ? "s" : "") + " sortie" + (mx.hiddenCount > 1 ? "s" : "") + " (physiques, HDMI…)"
+                shown: more.hovered
             }
         }
     }
