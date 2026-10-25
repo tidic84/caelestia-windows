@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mélangeur pratique</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,1,0">
+<style>
+:root{
+  --primary:#cfbdfe; --inkPrimary:#36265d; --primaryC:#4d3d75; --inkPrimaryC:#e9ddff;
+  --secC:#4a4458; --inkSecC:#e8def8;
+  --surface:#141218; --surfaceLow:#1d1b20; --surfaceC:#211f26; --surfaceHigh:#2b2930; --surfaceHighest:#36343b;
+  --ink:#e6e0e9; --inkVar:#cac4d0; --outline:#938f99; --outlineVar:#49454f; --error:#ffb4ab;
+  --emph:cubic-bezier(.05,.7,.1,1);
+}
+*{box-sizing:border-box}
+body{margin:0;background:#0b0a0d;color:var(--ink);font:13px Rubik,sans-serif;padding:20px 8px 48px}
+h1{font-weight:500;font-size:20px;margin:0 0 8px}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:4px 28px;max-width:1460px;margin:0 0 22px;padding:12px 18px;background:var(--surfaceC);border-radius:16px;color:var(--inkVar);line-height:1.5;font-size:12.5px}
+.choices div b{color:var(--ink);font-weight:500}
+.grid{display:flex;flex-wrap:wrap;gap:24px 10px;align-items:flex-start}
+.opt{width:478px}
+.opt h2{font-size:14px;font-weight:500;margin:0 0 3px;display:flex;gap:8px;align-items:center}
+.tag{font-size:11px;background:var(--primaryC);color:var(--inkPrimaryC);padding:2px 8px;border-radius:99px;font-weight:400}
+.opt p{color:var(--inkVar);margin:0 0 8px;line-height:1.4;font-size:12px;min-height:34px}
+.island{background:var(--surface);border-radius:26px;padding:4px}
+.card{background:var(--surfaceC);border-radius:22px;width:470px;height:420px;position:relative;overflow:hidden;display:flex;flex-direction:column;padding:8px}
+.ms{font-family:"Material Symbols Rounded";font-size:19px;line-height:1;user-select:none;font-weight:normal;font-style:normal}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+
+/* bouton Sortie audio (identique a CtrlPage) */
+.out{height:38px;border-radius:14px;background:var(--surfaceHigh);display:flex;align-items:center;gap:10px;padding:0 12px;flex:none;cursor:pointer}
+.out:hover{background:var(--surfaceHighest)}
+.out .ms{color:var(--inkVar)}
+.out b{font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* pastilles */
+.chanbar{display:flex;gap:6px;margin:6px 0 4px;flex:none}
+.cpill{flex:1;min-width:0;height:46px;border-radius:14px;background:var(--surfaceHigh);position:relative;overflow:hidden;cursor:ns-resize;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;transition:transform .25s var(--emph),opacity .25s,box-shadow .2s;touch-action:none}
+.cpill .f{position:absolute;left:0;bottom:0;right:0;opacity:.24;transition:height .06s}
+.cpill .ms{font-size:17px;position:relative}
+.cpill .l{font-size:10.5px;font-variant-numeric:tabular-nums;position:relative;color:var(--inkVar);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 6px}
+.cpill .n{position:absolute;top:4px;right:6px;font-size:9.5px;color:var(--outline)}
+.cpill.wide{flex-direction:row;gap:8px;justify-content:flex-start;padding:0 12px;cursor:ew-resize}
+.cpill.wide .l{font-size:11.5px;padding:0}
+.cpill.wide .l b{font-weight:500;color:var(--ink)}
+.cpill.wide .v{position:relative;margin-left:auto;font-size:12px;font-variant-numeric:tabular-nums;color:var(--inkVar);padding-right:10px}
+.cpill.wide .n{top:50%;transform:translateY(-50%);right:auto;left:34px;display:none}
+.cpill.dim{opacity:.45}
+.cpill.sel{box-shadow:inset 0 0 0 2px var(--c)}
+.cpill.target{transform:scale(1.04);opacity:1}
+.cpill.drop{transform:scale(1.08)}
+
+/* liste */
+.scroll{flex:1;min-height:0;overflow:auto;padding-right:4px;margin-right:-2px}
+.scroll::-webkit-scrollbar{width:4px}.scroll::-webkit-scrollbar-thumb{background:var(--outlineVar);border-radius:4px}
+.gwrap{margin-bottom:2px}
+.glab{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 6px;border-radius:9px;font-size:11px;color:var(--c);background:var(--surfaceC);cursor:pointer;transition:background .2s}
+.glab:hover{background:color-mix(in srgb,var(--c) 10%,var(--surfaceC))}
+.glab .ms{font-size:15px}
+.glab .chev{color:var(--outline);transition:transform .3s var(--emph);font-size:17px}
+.gwrap.closed .chev{transform:rotate(-90deg)}
+.glab .k{color:var(--outline)}
+.glab .rule{flex:1;height:1px;background:color-mix(in srgb,var(--c) 30%,transparent);margin:0 2px}
+.glab .mini{display:flex;gap:3px}
+.glab .mini .b{width:16px;height:16px;font-size:9px;border-radius:5px}
+.glab .x{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;color:var(--outline)}
+.glab .x:hover{background:var(--surfaceHighest);color:var(--ink)}
+.glab .x .ms{font-size:16px}
+.gwrap.hl .glab{background:color-mix(in srgb,var(--c) 16%,var(--surfaceC))}
+.body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .3s var(--emph)}
+.gwrap.closed .body{grid-template-rows:0fr}
+.body>div{overflow:hidden}
+.empty{color:var(--outline);font-size:11.5px;padding:6px 12px 8px 44px}
+
+.xrow{border-radius:12px;transition:background .25s}
+.xrow.open{background:var(--surfaceHigh)}
+.xrow.flash{animation:flash 1.1s var(--emph)}
+@keyframes flash{0%{background:var(--primaryC)}100%{background:transparent}}
+.app{display:flex;align-items:center;gap:6px;height:34px;padding:0 2px 0 4px;border-radius:12px}
+.ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;position:relative;cursor:pointer;flex:none}
+.ico:hover{background:var(--surfaceHigh)}
+.b{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:600;color:#fff;flex:none}
+.ico.mute::after{content:"volume_off";font-family:"Material Symbols Rounded";position:absolute;inset:0;display:grid;place-items:center;background:#211f26b3;color:var(--error);border-radius:9px;font-size:18px}
+.name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;padding-left:2px}
+.mutedrow .name{color:var(--outline)}
+/* le point : cible 24x24, point 8 px, devient chevron au survol/focus */
+.dot{width:24px;height:24px;border-radius:8px;flex:none;position:relative;cursor:pointer;transition:background .15s}
+.dot i{position:absolute;left:8px;top:8px;width:8px;height:8px;border-radius:4px;background:var(--c);transition:opacity .15s,transform .2s var(--emph)}
+.dot .ms{position:absolute;inset:0;display:grid;place-items:center;font-size:17px;color:var(--c);opacity:0;transition:opacity .15s,transform .3s var(--emph)}
+.app:hover .dot i,.dot:focus-visible i,.open .dot i{opacity:0;transform:scale(.4)}
+.app:hover .dot .ms,.dot:focus-visible .ms,.open .dot .ms{opacity:1}
+.open .dot .ms{transform:rotate(180deg)}
+.dot:hover{background:color-mix(in srgb,var(--c) 18%,transparent)}
+.sl{position:relative;width:140px;height:24px;cursor:pointer;flex:none;border-radius:6px}
+.sl .tr{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:8px;border-radius:99px;background:var(--surfaceHighest);overflow:hidden}
+.sl .fi{height:100%;border-radius:99px 0 0 99px;background:var(--primary)}
+.sl .th{position:absolute;top:50%;transform:translate(-50%,-50%);width:10px;height:24px;border-radius:5px;background:var(--surfaceC);display:flex;justify-content:center;align-items:center}
+.xrow.open .sl .th{background:var(--surfaceHigh)}
+.sl .th i{display:block;width:4px;height:18px;border-radius:2px;background:var(--primary)}
+.mutedrow .sl .fi,.mutedrow .sl .th i{background:var(--outline)}
+.val{width:24px;text-align:right;color:var(--inkVar);font-variant-numeric:tabular-nums;font-size:12px;flex:none}
+.grip{width:22px;height:26px;border-radius:8px;display:grid;place-items:center;color:var(--outline);flex:none;cursor:grab;opacity:0;transition:opacity .15s,background .15s}
+.grip .ms{font-size:17px}
+.app:hover .grip,.force .grip{opacity:1}
+.grip:hover{background:var(--surfaceHighest);color:var(--ink)}
+.force .dot i{opacity:0;transform:scale(.4)}.force .dot .ms{opacity:1}
+.force{background:#ffffff08}
+
+.seg{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s var(--emph)}
+.xrow.open .seg{grid-template-rows:1fr}
+.seg>div{overflow:hidden}
+.segi{display:flex;gap:2px;margin:0 6px 6px 40px;background:var(--surfaceC);border-radius:12px;padding:3px}
+.segi div{flex:1;min-width:0;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:11px;color:var(--inkVar);transition:background .2s,color .2s;white-space:nowrap}
+.segi div:hover{background:var(--surfaceHighest)}
+.segi .ms{font-size:16px}
+.segi .t{overflow:hidden;text-overflow:ellipsis}
+
+.dragging{opacity:.35}
+.ghost{position:fixed;z-index:20;pointer-events:none;display:flex;align-items:center;gap:8px;background:var(--surfaceHighest);padding:6px 12px 6px 6px;border-radius:12px;box-shadow:0 10px 30px #000b;font-size:12px}
+.glab.target{box-shadow:inset 0 0 0 1.5px var(--outlineVar)}
+.drop{box-shadow:inset 0 0 0 2px var(--c)!important;background:color-mix(in srgb,var(--c) 16%,var(--surfaceHigh))!important}
+
+/* profils (identiques a CtrlPage) */
+.profiles{display:flex;gap:6px;margin-top:6px;flex:none;align-items:center}
+.pf{height:30px;border-radius:15px;background:var(--surfaceHigh);display:flex;align-items:center;padding:0 2px 0 4px}
+.pf.on{background:var(--secC)}
+.pf .ap{height:26px;border-radius:13px;display:flex;align-items:center;gap:4px;padding:0 8px;cursor:pointer;font-size:12px}
+.pf .ap:hover{background:#e6e0e914}
+.pf .ap .ms{font-size:16px;color:var(--inkVar)}
+.pf.on .ap .ms,.pf.on .ap{color:var(--inkSecC)}
+.pf .sv{width:26px;height:26px;border-radius:13px;display:grid;place-items:center;color:var(--inkVar);cursor:pointer}
+.pf .sv:hover{background:#e6e0e914}
+.pf .sv .ms{font-size:16px}
+.profiles .hint{margin-left:auto;color:var(--outline);font-size:11px;padding-right:6px}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--inkPrimaryC);color:var(--inkPrimary);padding:10px 16px;border-radius:14px;font-weight:500;display:flex;gap:8px;align-items:center;transition:.25s;pointer-events:none;z-index:30}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.note{margin-top:28px;max-width:1460px;color:var(--inkVar);line-height:1.6;background:var(--surfaceC);border-radius:16px;padding:14px 18px;font-size:12.5px}
+.note b{color:var(--ink);font-weight:500}
+kbd{font:11px Rubik;background:var(--surfaceHighest);border-radius:5px;padding:1px 5px;color:var(--ink)}
+</style>
+</head>
+<body>
+<h1>Mélangeur A · version « pratique et dense »</h1>
+<div class="choices">
+  <div><b>Puce → point.</b> Dans un groupe déjà étiqueté, la puce « Game ▾ » répétait l'étiquette et mangeait 70 px. Elle devient un point coloré de 8 px dans une cible de 24×24 qui se change en chevron au survol ou au focus. Le clic ouvre toujours le sélecteur. Elle reste visible, donc utilisable sans souris, et les noms gagnent environ 50 px.</div>
+  <div><b>Étiquettes collantes et repliables.</b> L'étiquette du groupe reste en haut pendant le défilement. En QML, c'est la <code>section</code> d'une ListView avec <code>CurrentLabelAtStart</code>. Un clic replie le groupe, qui montre alors les mini-icônes de ses applis. On peut toujours y lâcher une appli.</div>
+  <div><b>Pastille = filtre multiple.</b> Chaque clic ajoute ou retire le canal du filtre, les pastilles non choisies sont estompées. Re-cliquer une pastille, le <span class="ms" style="font-size:14px;vertical-align:-3px">close</span> d'une étiquette retirent ce canal ; <kbd>Échap</kbd> réaffiche tout. Le glisser (vertical, ou horizontal sur les pastilles larges) et la molette règlent toujours le volume.</div>
+  <div><b>Noms longs.</b> Les colonnes fixes (curseur de 140 px, valeur, poignée) laissent environ 170 px au nom, qui est coupé à droite avec une bulle donnant le nom complet. Les lignes passent de 38 à 34 px : 7 lignes visibles au lieu de 5.</div>
+  <div><b>Cibles ≥ 24 px.</b> Icône 30, point 24, curseur 24 de haut, poignée 22×26, étiquette 28, segments 30, profils 26. La poignée n'apparaît qu'au survol, mais sa place est réservée : rien ne bouge.</div>
+  <div><b>Clavier.</b> <kbd>Tab</kbd> parcourt pastilles, étiquettes, points et curseurs. Sur un curseur : <kbd>←</kbd><kbd>→</kbd> ±5, <kbd>Maj</kbd> ±1, <kbd>Pg↑</kbd><kbd>Pg↓</kbd> ±10, <kbd>Début</kbd>/<kbd>Fin</kbd>, <kbd>M</kbd> muet. Sur une pastille : <kbd>↑</kbd><kbd>↓</kbd> volume, <kbd>Entrée</kbd> filtre. Sélecteur : <kbd>←</kbd><kbd>→</kbd> puis <kbd>Entrée</kbd>.</div>
+</div>
+
+<div class="grid">
+  <div class="opt"><h2>1 · Cas nominal Sonar <span class="tag">5 sorties</span></h2>
+    <p>Le bouton « Sortie audio » et les profils restent où ils sont dans CtrlPage. Les canaux vides (Aux, Casque) ne prennent pas de place dans la liste.</p>
+    <div class="island"><div class="card" id="c1"></div></div></div>
+  <div class="opt"><h2>2 · 12 applis, noms longs <span class="tag">défilé</span></h2>
+    <p>La liste est déjà défilée : l'étiquette « Chat » est collée en haut. Aux est replié et montre sa mini-icône.</p>
+    <div class="island"><div class="card" id="c2"></div></div></div>
+  <div class="opt"><h2>3 · Sans Sonar <span class="tag">2 sorties</span></h2>
+    <p>Jusqu'à 3 sorties, les pastilles passent en ligne, avec un remplissage et un glisser horizontaux. Avec une seule sortie, rangée et points disparaissent.</p>
+    <div class="island"><div class="card" id="c3"></div></div></div>
+  <div class="opt"><h2>4 · États : filtre, sélecteur, survol <span class="tag">démo</span></h2>
+    <p>Cas 1, avec un clic sur Game puis sur Media : les deux canaux sont filtrés en même temps. Le sélecteur de Spotify est ouvert, et Firefox est montré survolé (chevron et poignée visibles).</p>
+    <div class="island"><div class="card" id="c4"></div></div></div>
+</div>
+
+<div class="note">
+<b>Pour le QML :</b> la liste est une <code>ListView</code> sur un modèle à plat trié par canal, avec <code>section.property: "channel"</code> et <code>section.labelPositioning: ViewSection.InlineLabels | ViewSection.CurrentLabelAtStart</code>. Un groupe replié met <code>height: 0</code> à ses délégués, avec un Behavior. Le point est un <code>Btn</code> de 24×24 qui contient un Rectangle de 8 px et un <code>Ms "expand_more"</code>, avec un fondu croisé sur <code>hovered || activeFocus</code>. La pastille-filtre fixe <code>page.mixFilter</code> ; un filtre posé dans la liste suffit (<code>visible</code> + <code>height</code>). Au clavier, on utilise <code>activeFocusOnTab</code> et <code>Keys.onLeftPressed</code>/<code>onRightPressed</code> sur <code>M3Slider</code>, plus un Rectangle de focus de 2 px en <code>Theme.primary</code>.<br>
+<b>Icônes :</b> <code>drag_indicator</code> et <code>alt_route</code> manquent au sous-ensemble <code>MaterialSymbolsRounded.ttf</code> ; seule la première sert ici et il faudra l'y ajouter. <code>expand_more</code>, <code>close</code>, <code>speaker</code>, <code>save</code> et <code>self_improvement</code> y sont déjà.
+</div>
+
+<script>
+const SONAR=()=>[
+ {id:"game",name:"Sonar · Game",short:"Game",icon:"sports_esports",col:"#cfbdfe",def:true,level:80,apps:[
+   {n:"Apex Legends",c:"#c8392f",l:"A",v:100},{n:"Steam",c:"#1b2838",l:"S",v:45}]},
+ {id:"chat",name:"Sonar · Chat",short:"Chat",icon:"forum",col:"#a8c8ff",level:60,apps:[{n:"Discord",c:"#5865f2",l:"D",v:85}]},
+ {id:"media",name:"Sonar · Media",short:"Media",icon:"music_note",col:"#9ad8a8",level:75,apps:[
+   {n:"Spotify",c:"#1db954",l:"S",v:65},{n:"Firefox",c:"#e66000",l:"F",v:40}]},
+ {id:"aux",name:"Sonar · Aux",short:"Aux",icon:"tune",col:"#efb8c8",level:100,apps:[]},
+ {id:"hs",name:"Arctis Nova Pro",short:"Casque",icon:"headphones",col:"#cac4d0",level:100,apps:[]},
+];
+const MANY=()=>{const D=SONAR();
+ D[0].apps=[{n:"Apex Legends",c:"#c8392f",l:"A",v:100},{n:"Call of Duty®: Modern Warfare III",c:"#3a3a3a",l:"C",v:90},
+   {n:"Steam Client WebHelper",c:"#1b2838",l:"S",v:45},{n:"Battle.net Launcher",c:"#148eff",l:"B",v:30}];
+ D[1].apps=[{n:"Discord",c:"#5865f2",l:"D",v:85},{n:"Microsoft Teams (travail ou école)",c:"#5b5fc7",l:"T",v:70,m:true},{n:"WhatsApp",c:"#25d366",l:"W",v:50}];
+ D[2].apps=[{n:"Spotify",c:"#1db954",l:"S",v:65},{n:"Firefox — YouTube : Lofi hip hop radio",c:"#e66000",l:"F",v:40},
+   {n:"VLC media player",c:"#f08a00",l:"V",v:80},{n:"Microsoft Edge WebView2",c:"#0c7bd6",l:"E",v:25}];
+ D[3].apps=[{n:"OBS Studio 30.2 (moniteur)",c:"#7a4fc0",l:"O",v:60}];
+ return D};
+const PLAIN=()=>[
+ {id:"spk",name:"Haut-parleurs (Realtek Audio)",short:"Haut-parleurs",icon:"speaker",col:"#cfbdfe",def:true,level:70,apps:[
+   {n:"Firefox",c:"#e66000",l:"F",v:55},{n:"Spotify",c:"#1db954",l:"S",v:65},{n:"Microsoft Teams",c:"#5b5fc7",l:"T",v:80}]},
+ {id:"hs",name:"Casque (Jabra Evolve2 65)",short:"Casque",icon:"headphones",col:"#a8c8ff",level:55,apps:[{n:"Discord",c:"#5865f2",l:"D",v:85}]},
+];
+
+const $=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e};
+const badge=a=>`<div class="b" style="background:${a.c}">${a.l}</div>`;
+const clamp=v=>Math.max(0,Math.min(100,Math.round(v)));
+function toast(t){let e=document.querySelector(".toast");if(!e){e=$("div","toast");document.body.append(e)}
+  e.innerHTML=`<span class="ms">swap_horiz</span>${t}`;e.classList.add("show");clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove("show"),1800)}
+
+function mixer(el,S){
+  const SEL=`#${el.id} .cpill, #${el.id} .glab`;
+  const move=(a,to)=>{if(to.apps.includes(a))return false;S.D.forEach(d=>d.apps=d.apps.filter(x=>x!==a));to.apps.push(a);S.flash=a;
+    S.closed.delete(to.id);toast(`${a.n} → ${to.name}`);return true};
+  const multi=S.D.length>1;
+  S.filter=S.filter instanceof Set?S.filter:new Set(S.filter?[S.filter]:[]);
+  const on=()=>S.filter.size>0;
+
+  function re(){
+    const old=el.querySelector(".scroll"),top=old?old.scrollTop:(S.scroll||0);
+    const fk=document.activeElement&&el.contains(document.activeElement)?document.activeElement.dataset.k:null;
+    el.innerHTML="";
+    const def=S.D.find(d=>d.def);
+    el.append($("div","out",`<span class="ms">speaker</span><b>${S.device||def.name}</b><span class="ms">unfold_more</span>`));
+    if(multi){const bar=$("div","chanbar");S.D.forEach(d=>bar.append(pill(d)));el.append(bar)}
+    el.append(list());
+    el.append(profiles());
+    const sc=el.querySelector(".scroll");sc.scrollTop=top;
+    if(fk){const f=el.querySelector(`[data-k="${fk}"]`);if(f)f.focus()}
+  }
+
+  function pill(d){
+    const wide=S.D.length<=3;const p=$("div","cpill"+(wide?" wide":"")+(on()&&!S.filter.has(d.id)?" dim":"")+(S.filter.has(d.id)?" sel":""));
+    p.dataset.id=d.id;p.dataset.k="p-"+d.id;p.tabIndex=0;p.style.setProperty("--c",d.col);
+    p.title=`${d.name}${d.def?" (par défaut)":""}\nGlisser ${wide?"↔":"↕"} ou molette : volume · clic : filtrer (plusieurs possibles)`;
+    const draw=()=>{p.innerHTML=`<div class="f" style="${wide?"top:0;right:auto;width":"height"}:${d.level}%;background:${d.col}"></div><span class="n">${d.apps.length||""}</span><span class="ms" style="color:${d.col}">${d.icon}</span>`+
+      (p.classList.contains("wide")?`<span class="l"><b>${d.short}</b>${d.def?' <span class="ms" style="font-size:12px;color:var(--primary);vertical-align:-2px">star</span>':""}<span style="color:var(--outline)"> · ${d.apps.length}</span></span><span class="v">${d.level}</span>`:`<span class="l">${d.short} · ${d.level}</span>`)};draw();
+    const pick=()=>{S.filter.has(d.id)?S.filter.delete(d.id):S.filter.add(d.id);if(S.filter.size===S.D.length)S.filter.clear();S.scroll=0;const sc=el.querySelector(".scroll");if(sc)sc.scrollTop=0;re()};
+    p.onwheel=e=>{e.preventDefault();d.level=clamp(d.level+(e.deltaY<0?5:-5));draw()};
+    p.onpointerdown=e=>{if(e.button!==0)return;p.setPointerCapture(e.pointerId);const x0=e.clientX,y0=e.clientY,l0=d.level;let moved=false;
+      p.onpointermove=m=>{const dl=wide?(m.clientX-x0)/(p.offsetWidth/100):(y0-m.clientY)/1.2;if(Math.abs(wide?m.clientX-x0:m.clientY-y0)>3)moved=true;if(moved){d.level=clamp(l0+dl);draw()}};
+      p.onpointerup=()=>{p.onpointermove=null;if(!moved)pick()}};
+    p.onkeydown=e=>{if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)){e.preventDefault();d.level=clamp(d.level+(e.key==="ArrowUp"||e.key==="ArrowRight"?5:-5));draw()}
+      else if(e.key==="Enter"||e.key===" "){e.preventDefault();pick()}else if(e.key==="Escape"&&on()){S.filter.clear();re()}};
+    return p}
+
+  function list(){
+    const sc=$("div","scroll");
+    const shown=S.D.filter(d=>on()?S.filter.has(d.id):d.apps.length);
+    if(!shown.length)sc.append($("div","empty","Aucune application ne joue de son."));
+    shown.forEach(d=>{
+      const closed=S.closed.has(d.id);
+      const g=$("div","gwrap"+(closed?" closed":""));g.dataset.gid=d.id;g.style.setProperty("--c",d.col);
+      const lab=$("div","glab");lab.dataset.id=d.id;lab.dataset.k="g-"+d.id;lab.tabIndex=0;lab.style.setProperty("--c",d.col);
+      lab.title=(closed?"Déplier":"Replier")+" · on peut y lâcher une appli";
+      lab.innerHTML=`<span class="ms chev">expand_more</span>`+`<span class="ms">${d.icon}</span>${d.name}${d.def?'<span class="ms" style="font-size:12px">star</span>':""}<span class="k">· ${d.apps.length}</span><span class="rule"></span>`;
+      if(closed){const mi=$("div","mini");d.apps.slice(0,6).forEach(a=>mi.insertAdjacentHTML("beforeend",badge(a)));lab.append(mi)}
+      if(on()){const x=$("div","x",'<span class="ms">close</span>');x.title="Retirer ce canal du filtre (Échap : tout afficher)";x.onclick=e=>{e.stopPropagation();S.filter.delete(d.id);re()};lab.append(x)}
+      const act=()=>{S.closed.has(d.id)?S.closed.delete(d.id):S.closed.add(d.id);re()};
+      lab.onclick=act;lab.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();act()}else if(e.key==="Escape"&&on()){S.filter.clear();re()}};
+      g.append(lab);
+      const body=$("div","body"),inner=$("div");
+      if(!d.apps.length)inner.append($("div","empty","Aucune application. Glisse-en une ici."));
+      d.apps.forEach(a=>inner.append(row(a,d)));
+      body.append(inner);g.append(body);sc.append(g)});
+    sc.onkeydown=e=>{if(e.key==="Escape"&&on()){S.filter.clear();re()}};
+    return sc}
+
+  function slider(a,onset){
+    const s=$("div","sl",`<div class="tr"><div class="fi"></div></div><div class="th"><i></i></div>`);s.tabIndex=0;
+    s.setAttribute("role","slider");s.setAttribute("aria-label","Volume de "+a.n);
+    const fi=s.querySelector(".fi"),t=s.querySelector(".th");let val=a.v;
+    const set=(v,fire)=>{val=clamp(v);const shown=a.m?0:val;fi.style.width=shown+"%";t.style.left=`calc(5px + (100% - 10px) * ${shown/100})`;s.setAttribute("aria-valuenow",val);if(fire)onset(val)};
+    set(val);const at=e=>{const r=s.getBoundingClientRect();set((e.clientX-r.left)/r.width*100,true)};
+    s.onpointerdown=e=>{e.stopPropagation();s.setPointerCapture(e.pointerId);at(e);s.onpointermove=at};s.onpointerup=()=>{s.onpointermove=null};
+    s.onwheel=e=>{e.preventDefault();set(val+(e.deltaY<0?5:-5),true)};
+    s.onkeydown=e=>{const st=e.shiftKey?1:5,k=e.key;let n=null;
+      if(k==="ArrowRight"||k==="ArrowUp")n=val+st;else if(k==="ArrowLeft"||k==="ArrowDown")n=val-st;
+      else if(k==="PageUp")n=val+10;else if(k==="PageDown")n=val-10;else if(k==="Home")n=0;else if(k==="End")n=100;
+      else if(k==="m"||k==="M"){e.preventDefault();a.m=!a.m;re();return}
+      if(n!=null){e.preventDefault();set(n,true)}};
+    return s}
+
+  function row(a,d){
+    const k=d.id+"-"+a.n;
+    const x=$("div","xrow"+(S.open===a?" open":"")+(S.flash===a?" flash":"")+(a.m?" mutedrow":""));if(S.flash===a)S.flash=null;
+    const r=$("div","app"+(S.hover===a?" force":""));
+    const ic=$("div","ico"+(a.m?" mute":""),badge(a));ic.title=a.m?"Rétablir le son":"Couper le son";ic.onclick=()=>{a.m=!a.m;re()};
+    const nm=$("div","name");nm.textContent=a.n;nm.title=a.n;
+    const val=$("div","val");val.textContent=a.m?"–":a.v;
+    const s=slider(a,v=>{a.v=v;if(a.m){a.m=false;x.classList.remove("mutedrow");ic.classList.remove("mute")}val.textContent=v});s.dataset.k="s-"+k;
+    const toggle=()=>{S.open=S.open===a?null:a;re()};
+    const parts=[ic,nm];
+    if(multi){const dot=$("div","dot",`<i></i><span class="ms">expand_more</span>`);dot.style.setProperty("--c",d.col);dot.tabIndex=0;dot.dataset.k="d-"+k;
+      dot.title=`${d.name} · changer de sortie`;dot.onclick=toggle;
+      dot.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle();if(S.open===a)setTimeout(()=>el.querySelector(`[data-k="o-${k}-${d.id}"]`)?.focus(),0)}else if(e.key==="Escape"&&S.open===a){S.open=null;re()}};
+      parts.push(dot)}
+    parts.push(s,val);
+    if(multi){const g=$("div","grip",'<span class="ms">drag_indicator</span>');g.title="Glisser vers une pastille ou une étiquette";drag(g,a,d,x);parts.push(g)}
+    r.append(...parts);x.append(r);
+    if(multi){
+      const seg=$("div","seg"),inner=$("div"),si=$("div","segi");
+      S.D.forEach((o,i)=>{const it=$("div","",`<span class="ms">${o.icon}</span><span class="t">${S.D.length<=3?o.name:o.short}</span>`);it.title=o.name;it.tabIndex=S.open===a?0:-1;it.dataset.k=`o-${k}-${o.id}`;
+        const paint=on=>{it.style.background=on?o.col+"33":"";it.style.color=on?o.col:""};paint(o===d);
+        const go=()=>{if(move(a,o)){si.querySelectorAll("div").forEach(z=>{z.style.background="";z.style.color=""});paint(true);setTimeout(()=>{S.open=null;re()},260)}else{S.open=null;re()}};
+        it.onclick=go;
+        it.onkeydown=e=>{const items=[...si.children];if(e.key==="ArrowRight")items[(i+1)%items.length].focus();else if(e.key==="ArrowLeft")items[(i-1+items.length)%items.length].focus();
+          else if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}else if(e.key==="Escape"){S.open=null;re();el.querySelector(`[data-k="d-${k}"]`)?.focus()}};
+        si.append(it)});
+      inner.append(si);seg.append(inner);x.append(seg)}
+    return x}
+
+  function drag(handle,a,from,row){
+    handle.onpointerdown=e=>{
+      if(e.button!==0)return;e.preventDefault();const x0=e.clientX,y0=e.clientY;let ghost=null,targets=[];
+      const mv=m=>{
+        if(!ghost){if(Math.hypot(m.clientX-x0,m.clientY-y0)<4)return;
+          S.open=null;ghost=$("div","ghost",`${badge(a)}${a.n}`);document.body.append(ghost);row.classList.add("dragging");
+          targets=[...el.querySelectorAll(SEL)].filter(t=>t.dataset.id!==from.id);targets.forEach(t=>{t.classList.add("target");t.style.setProperty("--c",S.D.find(d=>d.id===t.dataset.id).col)})}
+        ghost.style.left=m.clientX+12+"px";ghost.style.top=m.clientY-14+"px";
+        const hit=document.elementFromPoint(m.clientX,m.clientY)?.closest(SEL);
+        targets.forEach(t=>t.classList.toggle("drop",t===hit));
+        const sc=el.querySelector(".scroll"),r=sc.getBoundingClientRect();
+        if(m.clientX>r.left&&m.clientX<r.right){if(m.clientY<r.top+30&&m.clientY>r.top-10)sc.scrollTop-=8;else if(m.clientY>r.bottom-30)sc.scrollTop+=8}};
+      const up=()=>{document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);
+        if(!ghost)return;ghost.remove();const t=targets.find(t=>t.classList.contains("drop"));
+        if(t)move(a,S.D.find(d=>d.id===t.dataset.id));re()};
+      document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up)}}
+
+  function profiles(){
+    const w=$("div","profiles");
+    [["jeu","Jeu","sports_esports"],["chill","Chill","self_improvement"]].forEach(([id,lab,ic])=>{
+      const p=$("div","pf"+(S.prof===id?" on":""),`<div class="ap" title="Appliquer le profil « ${lab} »"><span class="ms">${ic}</span>${lab}</div><div class="sv" title="Enregistrer les volumes actuels comme « ${lab} »"><span class="ms">save</span></div>`);
+      p.querySelector(".ap").onclick=()=>{S.prof=id;re()};w.append(p)});
+    const n=S.D.reduce((s,d)=>s+d.apps.length,0);
+    w.append($("div","hint",`${n} appli${n>1?"s":""}`));
+    return w}
+
+  re();return re}
+
+mixer(document.getElementById("c1"),{D:SONAR(),open:null,closed:new Set(),prof:"jeu",device:"SteelSeries Sonar - Gaming"});
+const S2={D:MANY(),open:null,closed:new Set(["aux"]),device:"SteelSeries Sonar - Gaming",scroll:236};
+mixer(document.getElementById("c2"),S2);
+mixer(document.getElementById("c3"),{D:PLAIN(),open:null,closed:new Set(),prof:"chill"});
+{const D=SONAR();mixer(document.getElementById("c4"),{D,open:D[2].apps[0],hover:D[2].apps[1],filter:new Set(["game","media"]),closed:new Set(),prof:"jeu",device:"SteelSeries Sonar - Gaming"})}
+</script>
+</body>
+</html>

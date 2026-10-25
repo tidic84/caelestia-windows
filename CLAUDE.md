@@ -89,6 +89,17 @@ l'appli). Pour publier, pousser un tag `v*` : la CI publie
   n'ouvrent pas l'îlot.
 - **`app_route` (sortie d'une appli)** : la préférence est enregistrée par
   exécutable et persiste. Un test doit lire la valeur d'origine et la remettre.
+  Vers la sortie par défaut, le QML envoie `device: ""` (l'appli suit de
+  nouveau le défaut). Les vieilles applis (WinMM) ne basculent qu'après
+  relance ; Chrome bascule à chaud.
+- **Mélangeur (`qt/qml/Mixer.qml`)** : maquette de référence
+  `docs/dev/maquettes/melangeur.html`. Le poste a 9 sorties de rendu (Sonar
+  Game/Chat/Media/Aux/Microphone, Speakers, 2 HDMI de même nom, casque Shure) :
+  tester avec ce cas. Mode « essentiel » dans `rebuild()`.
+- **Ne pas tester l'îlot pendant que l'utilisateur joue** (plein écran) :
+  arrêter l'appli le dérange et la capture est blanche. Vérifier avant
+  `Get-Process RocketLeague` (ou autre jeu) et relancer l'appli installée
+  après chaque capture.
 - **Effets système de l'appli** :
   - barre des tâches en masquage automatique, rétablie quand on quitte (si
     l'appli plante, redémarrer l'Explorateur) ;

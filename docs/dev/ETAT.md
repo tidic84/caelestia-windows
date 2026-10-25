@@ -6,7 +6,9 @@ reprendre.
 
 ## Où on en est (mis à jour le 2026-10-25)
 
-- **Version** : 0.4.19 (mélangeur multi-sorties, voir le journal). Avant :
+- **Version** : 0.4.19 (mélangeur multi-sorties, voir le journal), publiée
+  le 2026-10-25. Prochaine étape : les retours de l'utilisateur sur le
+  mélangeur (`qt/qml/Mixer.qml`). Avant :
   0.4.18 (patch du lecteur), publiée le 2026-10-24 par le tag
   `v0.4.18` (GitHub Action `release.yml`). La 0.4.17 (addon Claude, hooks
   WSL, Apex) l'a été le même jour. La 0.4.8 n'a jamais été publiée seule : elle
@@ -30,9 +32,19 @@ reprendre.
 
 ### 2026-10-25 : 0.4.19 (mélangeur multi-sorties)
 
-- Maquettes validées par l'utilisateur (scratchpad, non versionnées) : choix
-  « A pratique » (pastilles de sorties + liste groupée), filtre multiple, sans
-  préréglages ni compteur d'applis.
+- Maquette validée : `docs/dev/maquettes/melangeur.html` (version « A
+  pratique » : pastilles de sorties + liste groupée), avec filtre multiple,
+  sans préréglages ni compteur d'applis. Différences dans l'appli : niveau
+  dans le coin des pastilles, mode « essentiel » ci-dessous.
+- Mode « essentiel » (demandé après la 1re capture réelle : 9 sorties, trop) :
+  avec Sonar, seulement Game / Chat / Media / Aux ; sinon la sortie par
+  défaut ; plus toujours la sortie par défaut et toute sortie où joue une
+  vraie appli (hors « Sons système »). Bouton « +N » = tout montrer.
+  `audiodg.exe` est ignoré ; « Sons système » seulement sur la sortie par
+  défaut. Logique dans `Mixer.qml`, `rebuild()`.
+- Publiée : tag `v0.4.19` poussé le 2026-10-25 (CI lancée, fin non suivie).
+- **Retours de l'utilisateur attendus** sur le mélangeur (il a des choses à
+  redire) : repartir de là.
 - Rust (`src/audio.rs`) : `mixer_all`, `mixer_set` avec `device` optionnel,
   `device_volume_set`, `app_route` / `app_route_get` (fabrique WinRT
   `Windows.Media.Internal.AudioPolicyConfig`, vtable reprise d'EarTrumpet),
