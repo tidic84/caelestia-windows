@@ -73,7 +73,8 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── bar.rs        Barre façon Waybar, AppBar, masquage de la barre des tâches
 ├── winkey.rs     Touche Windows → lanceur (Scancode Map HKLM, admin), hook clavier, combos
 ├── media.rs      Lecteur (GSMTC)        ├── lyrics.rs  Paroles LRC (LRCLIB, NetEase)
-├── audio.rs      Sortie, mélangeur, OSD volume, visualiseur (loopback + FFT)
+├── audio.rs      Sortie, mélangeur multi-sorties (mixer_all, device_volume_set, app_route
+│                 = IAudioPolicyConfigFactory non documentée), OSD volume, visualiseur
 ├── boost.rs      Volume > 100 % via Equalizer APO
 ├── system.rs     Ressources, batterie, historique presse-papiers, caféine, profil, actions de session
 ├── display.rs    Luminosité (WMI, DDC/CI) + OSD
@@ -127,7 +128,7 @@ Singletons    Api (invoke/call/listen) · Ilot (état global : réglages, thème
               Watch (jeux, absence, Valorant, extinction, caméra/micro, services) · Theme (Material You, polices, courbes)
 Fenêtres      Main (îlot) · Bar (écrans sans îlot) · Captions · TipWindow · PetWindow (promenade du compagnon)
 Îlot          Island · Pill · PillClock · Panel · BarContent · BarTask · TaskIcon · TaskPreview · QuickShare · Ear
-Pages         HomePage · MediaPage · CtrlPage · AppsPage · ClipsPage · WallsPage · MailPage · TasksPage · PcPage · ClaudeUsagePage
+Pages         HomePage · MediaPage · CtrlPage (+ Mixer : pastilles de sorties, applis groupées) · AppsPage · ClipsPage · WallsPage · MailPage · TasksPage · PcPage · ClaudeUsagePage
               SoundsPage · AssistPage · SettingsPage
 Cartes PC     PcCard · ServicesCard · HealthCard · ShutdownCard · SensCard
 Addon Claude  UsageChart (graphique de ClaudeUsagePage)

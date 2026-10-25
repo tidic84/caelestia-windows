@@ -180,13 +180,24 @@ pub struct AppVolume {
     muted: bool,
 }
 
-/// Icones des executables, gardees d'un appel a l'autre.
-static ICONS: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+/// Nom et icone des executables, gardes d'un appel a l'autre.
+static ICONS: Mutex<Option<HashMap<String, (String, String)>>> = Mutex::new(None);
 
+/// Sortie designee par son id IMMDevice.
+fn device_by_id(id: &str) -> windows::core::Result<IMMDevice> {
+    let wide: Vec<u16> = id.encode_utf16().chain([0]).collect();
+    unsafe { enumerator()?.GetDevice(PCWSTR(wide.as_ptr())) }
+}
+
+/// Sessions de la sortie par defaut.
 fn sessions() -> windows::core::Result<Vec<(u32, bool, ISimpleAudioVolume)>> {
+    sessions_of(&default_device()?)
+}
+
+fn sessions_of(dev: &IMMDevice) -> windows::core::Result<Vec<(u32, bool, ISimpleAudioVolume)>> {
     let mut out = Vec::new();
     unsafe {
-        let mgr: IAudioSessionManager2 = default_device()?.Activate(CLSCTX_ALL, None)?;
+        let mgr: IAudioSessionManager2 = dev.Activate(CLSCTX_ALL, None)?;
         let en = mgr.GetSessionEnumerator()?;
         for i in 0..en.GetCount()? {
             let c = en.GetSession(i)?;
@@ -201,53 +212,152 @@ fn sessions() -> windows::core::Result<Vec<(u32, bool, ISimpleAudioVolume)>> {
     Ok(out)
 }
 
+fn processes() -> sysinfo::System {
+    let mut sys = sysinfo::System::new();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, false);
+    sys
+}
+
 pub fn mixer_get() -> Vec<AppVolume> {
     // les icones passent par le shell : thread STA dedie
     std::thread::spawn(|| {
         crate::com_init_sta();
         let Ok(list) = sessions() else { return Vec::new() };
-        let mut sys = sysinfo::System::new();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, false);
-        let mut out: Vec<AppVolume> = Vec::new();
-        for (pid, system, vol) in list {
-            let (level, muted) = unsafe {
-                (vol.GetMasterVolume().unwrap_or(0.0), vol.GetMute().map(|m| m.as_bool()).unwrap_or(false))
-            };
-            let (name, icon) = if system {
-                ("Sons système".to_string(), String::new())
-            } else {
-                let Some(p) = sys.process(sysinfo::Pid::from_u32(pid)) else { continue };
-                let exe = p.exe().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default();
-                let fallback = p.name().to_string_lossy().trim_end_matches(".exe").to_string();
-                let name = crate::apps::file_description(&exe).unwrap_or(fallback);
-                let icon = if exe.is_empty() {
-                    String::new()
-                } else {
-                    let mut cache = ICONS.lock().unwrap();
-                    let cache = cache.get_or_insert_with(HashMap::new);
-                    cache.entry(exe.clone()).or_insert_with(|| crate::apps::file_icon(&exe)).clone()
+        group_apps(list, &processes())
+    })
+    .join()
+    .unwrap_or_default()
+}
+
+#[derive(Serialize)]
+pub struct OutputMix {
+    id: String,
+    name: String,
+    default: bool,
+    level: f32,
+    muted: bool,
+    apps: Vec<AppVolume>,
+}
+
+/// Toutes les sorties actives (ordre d'enumeration), leur volume et les
+/// applis qui y jouent. Une appli peut figurer sous plusieurs sorties.
+pub fn mixer_all() -> Vec<OutputMix> {
+    use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+    // les icones passent par le shell : thread STA dedie
+    std::thread::spawn(|| {
+        crate::com_init_sta();
+        let mut out = Vec::new();
+        let mut active = Vec::new();
+        let _ = (|| -> windows::core::Result<()> {
+            let en = enumerator()?;
+            let def = default_device().map(|d| device_id(&d)).unwrap_or_default();
+            let col = unsafe { en.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)? };
+            let sys = processes();
+            for i in 0..unsafe { col.GetCount()? } {
+                let Ok(d) = (unsafe { col.Item(i) }) else { continue };
+                let id = device_id(&d);
+                let (level, muted) = unsafe {
+                    d.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)
+                        .and_then(|ep| Ok((ep.GetMasterVolumeLevelScalar()?, ep.GetMute()?.as_bool())))
+                        .unwrap_or((0.0, false))
                 };
-                (name, icon)
-            };
-            if let Some(a) = out.iter_mut().find(|a| a.name == name) {
-                if !a.pids.contains(&pid) {
-                    a.pids.push(pid);
-                }
-                continue;
+                let apps = sessions_of(&d).map(|l| group_apps(l, &sys)).unwrap_or_default();
+                active.push(active_pids(&d));
+                out.push(OutputMix { name: device_name(&d), default: id == def, id, level, muted, apps });
             }
-            out.push(AppVolume { pids: vec![pid], name, icon, level, muted });
-        }
-        // les sons systeme a la fin
-        out.sort_by_key(|a| (a.icon.is_empty() && a.name == "Sons système", a.name.to_lowercase()));
+            Ok(())
+        })();
+        hide_stale(&mut out, &active);
         out
     })
     .join()
     .unwrap_or_default()
 }
 
-pub fn mixer_set(pids: Vec<u32>, level: Option<f32>, muted: Option<bool>) {
+/// Pids des sessions qui jouent en ce moment sur `dev`.
+fn active_pids(dev: &IMMDevice) -> Vec<u32> {
+    use windows::Win32::Media::Audio::AudioSessionStateActive;
+    let mut out = Vec::new();
+    let _ = (|| -> windows::core::Result<()> {
+        unsafe {
+            let mgr: IAudioSessionManager2 = dev.Activate(CLSCTX_ALL, None)?;
+            let en = mgr.GetSessionEnumerator()?;
+            for i in 0..en.GetCount()? {
+                let c = en.GetSession(i)?;
+                if c.GetState()? == AudioSessionStateActive {
+                    out.push(c.cast::<IAudioSessionControl2>()?.GetProcessId().unwrap_or(0));
+                }
+            }
+        }
+        Ok(())
+    })();
+    out
+}
+
+/// Apres un changement de sortie, l'appli garde une session inactive sur
+/// l'ancienne : si elle joue ailleurs, on masque ses entrees inactives.
+fn hide_stale(out: &mut [OutputMix], active: &[Vec<u32>]) {
+    let plays = |i: usize, a: &AppVolume| active.get(i).is_some_and(|p| a.pids.iter().any(|x| p.contains(x)));
+    let mut playing: Vec<String> = Vec::new();
+    for (i, o) in out.iter().enumerate() {
+        for a in &o.apps {
+            if plays(i, a) && !playing.contains(&a.name) {
+                playing.push(a.name.clone());
+            }
+        }
+    }
+    for (i, o) in out.iter_mut().enumerate() {
+        o.apps.retain(|a| a.name == "Sons système" || !playing.contains(&a.name) || plays(i, a));
+    }
+}
+
+/// Regroupe les sessions par appli (nom, icone), sons systeme a la fin.
+fn group_apps(list: Vec<(u32, bool, ISimpleAudioVolume)>, sys: &sysinfo::System) -> Vec<AppVolume> {
+    let mut out: Vec<AppVolume> = Vec::new();
+    for (pid, system, vol) in list {
+        let (level, muted) = unsafe {
+            (vol.GetMasterVolume().unwrap_or(0.0), vol.GetMute().map(|m| m.as_bool()).unwrap_or(false))
+        };
+        let (name, icon) = if system {
+            ("Sons système".to_string(), String::new())
+        } else {
+            let Some(p) = sys.process(sysinfo::Pid::from_u32(pid)) else { continue };
+            let exe = p.exe().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default();
+            let fallback = p.name().to_string_lossy().trim_end_matches(".exe").to_string();
+            let (name, icon) = if exe.is_empty() {
+                (fallback, String::new())
+            } else {
+                // nom et icone lus une fois par executable (sondage toutes les 2 s)
+                let mut cache = ICONS.lock().unwrap_or_else(|e| e.into_inner());
+                let cache = cache.get_or_insert_with(HashMap::new);
+                cache
+                    .entry(exe.clone())
+                    .or_insert_with(|| (crate::apps::file_description(&exe).unwrap_or(fallback), crate::apps::file_icon(&exe)))
+                    .clone()
+            };
+            (name, icon)
+        };
+        if let Some(a) = out.iter_mut().find(|a| a.name == name) {
+            if !a.pids.contains(&pid) {
+                a.pids.push(pid);
+            }
+            continue;
+        }
+        out.push(AppVolume { pids: vec![pid], name, icon, level, muted });
+    }
+    // les sons systeme a la fin
+    out.sort_by_key(|a| (a.icon.is_empty() && a.name == "Sons système", a.name.to_lowercase()));
+    out
+}
+
+/// Volume des sessions `pids` sur la sortie `device` (par defaut si absente).
+pub fn mixer_set(pids: Vec<u32>, level: Option<f32>, muted: Option<bool>, device: Option<String>) {
     crate::com_init_mta();
-    let Ok(list) = sessions() else { return };
+    let list = match device.as_deref() {
+        Some(id) if !id.is_empty() => device_by_id(id).and_then(|d| sessions_of(&d)),
+        _ => sessions(),
+    };
+    let Ok(list) = list else { return };
     for (p, _, vol) in list {
         if !pids.contains(&p) {
             continue;
@@ -261,6 +371,134 @@ pub fn mixer_set(pids: Vec<u32>, level: Option<f32>, muted: Option<bool>) {
             }
         }
     }
+}
+
+/// Volume ou sourdine d'une sortie.
+pub fn device_volume_set(id: String, level: Option<f32>, muted: Option<bool>) -> bool {
+    use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+    crate::com_init_mta();
+    (|| -> windows::core::Result<()> {
+        unsafe {
+            let ep: IAudioEndpointVolume = device_by_id(&id)?.Activate(CLSCTX_ALL, None)?;
+            if let Some(l) = level {
+                ep.SetMasterVolumeLevelScalar(l.clamp(0.0, 1.0), std::ptr::null())?;
+            }
+            if let Some(m) = muted {
+                ep.SetMute(m, std::ptr::null())?;
+            }
+        }
+        Ok(())
+    })()
+    .is_ok()
+}
+
+/// Sortie propre a une appli, comme la page « Volume et preferences de
+/// peripherique des applications » de Windows (et EarTrumpet). Fabrique
+/// WinRT interne, non documentee : vtable reprise d'EarTrumpet
+/// (Interop/MMDeviceAPI/IAudioPolicyConfigFactoryVariantFor21H2.cs).
+#[allow(non_snake_case)]
+mod app_policy {
+    use std::ffi::c_void;
+    use windows::core::{interface, IInspectable, IUnknown, IUnknown_Vtbl, Interface, HRESULT, HSTRING};
+    use windows::Win32::Media::Audio::{eConsole, eMultimedia, eRender, EDataFlow, ERole};
+
+    /// IID de Windows >= 21H2 (build 21390).
+    #[interface("ab3d4648-e242-459f-b02f-541c70306324")]
+    // derive d'IInspectable : ses trois methodes sont declarees ici, la
+    // macro ne sait heriter que d'IUnknown
+    unsafe trait IAudioPolicyConfigFactory: IUnknown {
+        fn GetIids(&self) -> HRESULT;
+        fn GetRuntimeClassName(&self) -> HRESULT;
+        fn GetTrustLevel(&self) -> HRESULT;
+        fn add_CtxVolumeChange(&self) -> HRESULT;
+        fn remove_CtxVolumeChanged(&self) -> HRESULT;
+        fn add_RingerVibrateStateChanged(&self) -> HRESULT;
+        fn remove_RingerVibrateStateChange(&self) -> HRESULT;
+        fn SetVolumeGroupGainForId(&self) -> HRESULT;
+        fn GetVolumeGroupGainForId(&self) -> HRESULT;
+        fn GetActiveVolumeGroupForEndpointId(&self) -> HRESULT;
+        fn GetVolumeGroupsForEndpoint(&self) -> HRESULT;
+        fn GetCurrentVolumeContext(&self) -> HRESULT;
+        fn SetVolumeGroupMuteForId(&self) -> HRESULT;
+        fn GetVolumeGroupMuteForId(&self) -> HRESULT;
+        fn SetRingerVibrateState(&self) -> HRESULT;
+        fn GetRingerVibrateState(&self) -> HRESULT;
+        fn SetPreferredChatApplication(&self) -> HRESULT;
+        fn ResetPreferredChatApplication(&self) -> HRESULT;
+        fn GetPreferredChatApplication(&self) -> HRESULT;
+        fn GetCurrentChatApplications(&self) -> HRESULT;
+        fn add_ChatContextChanged(&self) -> HRESULT;
+        fn remove_ChatContextChanged(&self) -> HRESULT;
+        fn SetPersistedDefaultAudioEndpoint(&self, pid: u32, flow: EDataFlow, role: ERole, id: *mut c_void) -> HRESULT;
+        fn GetPersistedDefaultAudioEndpoint(&self, pid: u32, flow: EDataFlow, role: ERole, id: *mut *mut c_void) -> HRESULT;
+        fn ClearAllPersistedApplicationDefaultEndpoints(&self) -> HRESULT;
+    }
+
+    /// IID d'avant 21H2, meme vtable.
+    const IID_DOWNLEVEL: windows::core::GUID = windows::core::GUID::from_u128(0x2a59116d_6c4f_45e0_a74f_707e3fef9258);
+
+    const TOKEN: &str = r"\\?\SWD#MMDEVAPI#";
+    /// interface « audio render »
+    const RENDER: &str = "#{e6327cad-dcec-4949-ae8a-991e976a79d2}";
+
+    fn factory() -> Option<IAudioPolicyConfigFactory> {
+        use windows::Win32::System::WinRT::RoGetActivationFactory;
+        let class = HSTRING::from("Windows.Media.Internal.AudioPolicyConfig");
+        if let Ok(f) = unsafe { RoGetActivationFactory::<IAudioPolicyConfigFactory>(&class) } {
+            return Some(f);
+        }
+        // Windows plus ancien : meme vtable sous un autre IID
+        let f: IInspectable = unsafe { RoGetActivationFactory(&class) }.ok()?;
+        let mut p = std::ptr::null_mut();
+        unsafe { f.query(&IID_DOWNLEVEL, &mut p) }.ok().ok()?;
+        if p.is_null() {
+            return None;
+        }
+        // SAFETY : reference comptee vers une interface de meme vtable
+        Some(unsafe { IAudioPolicyConfigFactory::from_raw(p) })
+    }
+
+    /// Envoie les processus `pids` vers la sortie `id` (id IMMDevice) ;
+    /// `id` vide : ils suivent de nouveau la sortie par defaut.
+    pub fn set(pids: &[u32], id: &str) -> bool {
+        let Some(f) = factory() else { return false };
+        let full = if id.is_empty() { HSTRING::new() } else { HSTRING::from(format!("{TOKEN}{id}{RENDER}")) };
+        // HSTRING est un pointeur transparent (nul si vide) ; `full` vit
+        // jusqu'a la fin de la fonction et garde sa propriete
+        let raw: *mut c_void = unsafe { std::mem::transmute_copy(&full) };
+        let mut ok = !pids.is_empty();
+        for &pid in pids {
+            for role in [eMultimedia, eConsole] {
+                ok &= unsafe { f.SetPersistedDefaultAudioEndpoint(pid, eRender, role, raw) }.is_ok();
+            }
+        }
+        ok
+    }
+
+    /// Sortie propre au processus (id IMMDevice), vide s'il suit la sortie par defaut.
+    pub fn get(pid: u32) -> Option<String> {
+        let f = factory()?;
+        let mut raw: *mut c_void = std::ptr::null_mut();
+        let hr = unsafe { f.GetPersistedDefaultAudioEndpoint(pid, eRender, ERole(eMultimedia.0 | eConsole.0), &mut raw) };
+        // SAFETY : HSTRING rendu par l'appel (nul si vide), libere par Drop,
+        // meme en cas d'echec
+        let s: HSTRING = unsafe { std::mem::transmute::<*mut c_void, HSTRING>(raw) };
+        hr.ok().ok()?;
+        let s = s.to_string_lossy();
+        Some(s.trim_start_matches(TOKEN).trim_end_matches(RENDER).to_string())
+    }
+}
+
+/// Change la sortie des processus `pids` (`device` vide : sortie par defaut).
+pub fn app_route(pids: Vec<u32>, device: String) -> bool {
+    crate::com_init_mta();
+    app_policy::set(&pids, &device)
+}
+
+/// Sortie propre a un processus (vide : il suit la sortie par defaut).
+pub fn app_route_get(pid: u32) -> Option<String> {
+    crate::com_init_mta();
+    app_policy::get(pid)
 }
 
 // ------------------------------------------------------------------- OSD
@@ -741,4 +979,227 @@ pub fn fg_volume(step: f32) -> Option<FgVolume> {
         c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
     });
     Some(FgVolume { name, level })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Processus lance par le test : a la fin (meme en cas d'echec), sa
+    /// sortie propre est remise (`restore`), puis lui seul est tue.
+    struct Child {
+        p: std::process::Child,
+        restore: Option<String>,
+    }
+    impl Drop for Child {
+        fn drop(&mut self) {
+            if let Some(o) = self.restore.take() {
+                println!("restauration de la sortie propre : {}", app_route(vec![self.p.id()], o));
+            }
+            let _ = self.p.kill();
+            let _ = self.p.wait();
+        }
+    }
+
+    fn play() -> Child {
+        let p = std::process::Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "(New-Object Media.SoundPlayer 'C:\\Windows\\Media\\Alarm01.wav').PlayLooping(); Start-Sleep 60",
+            ])
+            .spawn()
+            .expect("powershell");
+        Child { p, restore: None }
+    }
+
+    /// (id, nom) des sorties ou le processus a une session.
+    fn find(pid: u32) -> Vec<(String, String)> {
+        mixer_all()
+            .into_iter()
+            .filter(|o| o.apps.iter().any(|a| a.pids.contains(&pid)))
+            .map(|o| (o.id, o.name))
+            .collect()
+    }
+
+    fn names(v: &[(String, String)]) -> Vec<&str> {
+        v.iter().map(|(_, n)| n.as_str()).collect()
+    }
+
+    fn app_level(dev: &str, pid: u32) -> Option<f32> {
+        let o = mixer_all().into_iter().find(|o| o.id == dev)?;
+        o.apps.into_iter().find(|a| a.pids.contains(&pid)).map(|a| a.level)
+    }
+
+    fn wait_until(secs: u64, mut f: impl FnMut() -> bool) -> bool {
+        let t = Instant::now();
+        while t.elapsed() < Duration::from_secs(secs) {
+            if f() {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(300));
+        }
+        false
+    }
+
+    /// Test reel (son joue, sortie changee puis restauree) :
+    /// `cargo test --lib -- --ignored --nocapture route_reel`
+    #[test]
+    #[ignore]
+    fn route_reel() {
+        crate::com_init_mta();
+        for o in mixer_all() {
+            let apps: Vec<_> = o.apps.iter().map(|a| (&a.name, &a.pids)).collect();
+            println!("sortie {:?} defaut={} niveau={:.2} muet={} applis={:?}", o.name, o.default, o.level, o.muted, apps);
+        }
+        let aux = mixer_all().into_iter().find(|o| o.name.contains("Sonar - Aux")).expect("pas de sortie Aux");
+        let on_aux = |pid: u32| find(pid).iter().any(|(id, _)| *id == aux.id);
+
+        let mut a = play();
+        let pid = a.p.id();
+        assert!(wait_until(15, || !find(pid).is_empty()), "session du test absente");
+        let orig = app_route_get(pid).unwrap_or_default();
+        println!("processus A {pid} sous {:?} ; sortie propre d'origine {orig:?}", names(&find(pid)));
+        // reste d'un essai interrompu : la sortie propre d'origine etait vide
+        a.restore = Some(if orig == aux.id { String::new() } else { orig });
+
+        // routage a chaud
+        let t = Instant::now();
+        assert!(app_route(vec![pid], aux.id.clone()), "app_route a echoue");
+        assert_eq!(app_route_get(pid).as_deref(), Some(aux.id.as_str()));
+        let live = wait_until(8, || on_aux(pid));
+        println!("A sous Aux a chaud : {live} ({:?}) ; sorties {:?}", t.elapsed(), names(&find(pid)));
+
+        // mixer_set sur une sortie donnee
+        let dev = find(pid)[0].0.clone();
+        let before = app_level(&dev, pid);
+        mixer_set(vec![pid], Some(0.42), None, Some(dev.clone()));
+        let after = app_level(&dev, pid);
+        mixer_set(vec![pid], before, None, Some(dev.clone()));
+        println!("mixer_set(device={dev}) : {before:?} -> {after:?} -> {:?}", app_level(&dev, pid));
+        assert!(after.is_some_and(|l| (l - 0.42).abs() < 0.01));
+
+        // la preference est persistee par executable : un nouveau processus
+        let b = play();
+        let pid_b = b.p.id();
+        let ok_b = wait_until(15, || on_aux(pid_b));
+        println!("B {pid_b} (relance) sous Aux : {ok_b} ; sorties {:?}", names(&find(pid_b)));
+        std::thread::sleep(Duration::from_secs(5));
+        println!("+5 s : A {:?} ; B {:?}", names(&find(pid)), names(&find(pid_b)));
+        assert!(ok_b && on_aux(pid_b), "B n'est pas sous Aux");
+
+        // volume de la sortie
+        let lvl = |id: &str| mixer_all().into_iter().find(|o| o.id == id).map(|o| (o.level, o.muted));
+        let init = lvl(&aux.id).expect("Aux");
+        let target = if init.0 > 0.5 { init.0 - 0.1 } else { init.0 + 0.1 };
+        assert!(device_volume_set(aux.id.clone(), Some(target), Some(!init.1)));
+        let changed = lvl(&aux.id).expect("Aux");
+        assert!(device_volume_set(aux.id.clone(), Some(init.0), Some(init.1)));
+        let restored = lvl(&aux.id).expect("Aux");
+        println!("device_volume_set(Aux) : {init:?} -> {changed:?} -> {restored:?}");
+        assert!((changed.0 - target).abs() < 0.01 && changed.1 != init.1);
+        assert!((restored.0 - init.0).abs() < 0.01 && restored.1 == init.1);
+
+        assert!(!device_volume_set("inexistant".into(), Some(0.5), None));
+        assert!(!app_route(vec![], aux.id.clone()));
+        drop(b);
+        drop(a);
+        // apres restauration
+        let c = play();
+        let pid_c = c.p.id();
+        assert!(wait_until(15, || !find(pid_c).is_empty()));
+        println!("C {pid_c} apres restauration : sous {:?} ; sortie propre {:?}", names(&find(pid_c)), app_route_get(pid_c));
+        assert!(!on_aux(pid_c));
+    }
+
+    /// Pid des processus chrome.exe dont la ligne de commande contient `dir`
+    /// (avec `mine`), ou ne le contient pas (sans).
+    fn chrome_pids(dir: &str, mine: bool) -> Vec<u32> {
+        use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, UpdateKind};
+        let mut sys = sysinfo::System::new();
+        let kind = ProcessRefreshKind::nothing().with_cmd(UpdateKind::Always);
+        sys.refresh_processes_specifics(ProcessesToUpdate::All, true, kind);
+        sys.processes()
+            .iter()
+            .filter(|(_, p)| p.name().eq_ignore_ascii_case("chrome.exe"))
+            .filter(|(_, p)| p.cmd().iter().any(|a| a.to_string_lossy().contains(dir)) == mine)
+            .map(|(pid, _)| pid.as_u32())
+            .collect()
+    }
+
+    /// Bascule a chaud d'une appli WASAPI (Chrome isole, sans interface) :
+    /// `ILOT_CHROME_TEST_DIR=<dossier neuf> cargo test --lib -- --ignored --nocapture route_chrome`
+    /// (le dossier contient page/loop.html ; le profil va dans profile/).
+    #[test]
+    #[ignore]
+    fn route_chrome() {
+        crate::com_init_mta();
+        let dir = std::env::var("ILOT_CHROME_TEST_DIR").expect("ILOT_CHROME_TEST_DIR");
+        let profile = format!("{dir}\\profile");
+        let page = format!("file:///{}/page/loop.html", dir.replace('\\', "/"));
+        let aux = mixer_all().into_iter().find(|o| o.name.contains("Sonar - Aux")).expect("pas de sortie Aux");
+
+        // preference de chrome.exe (par executable) lue sur un Chrome de l'utilisateur
+        let users = chrome_pids(&profile, false);
+        let orig_user = users.first().and_then(|&p| app_route_get(p));
+        println!("Chrome de l'utilisateur : {users:?} ; preference d'origine {orig_user:?}");
+
+        let mut child = std::process::Command::new(r"C:\Program Files\Google\Chrome\Application\chrome.exe")
+            .args([
+                "--headless=new".to_string(),
+                format!("--user-data-dir={profile}"),
+                "--autoplay-policy=no-user-gesture-required".to_string(),
+                "--no-first-run".to_string(),
+                page,
+            ])
+            .spawn()
+            .expect("chrome");
+        // nettoyage : preference remise a l'identique, puis seuls nos pid tues
+        struct Cleanup<'a> {
+            profile: &'a str,
+            restore: Option<(u32, String)>,
+        }
+        impl Drop for Cleanup<'_> {
+            fn drop(&mut self) {
+                if let Some((pid, o)) = self.restore.take() {
+                    println!("restauration ({o:?}) : {} ; relue {:?}", app_route(vec![pid], o.clone()), app_route_get(pid));
+                }
+                let mut sys = sysinfo::System::new();
+                sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+                let mine = chrome_pids(self.profile, true);
+                for pid in &mine {
+                    if let Some(p) = sys.process(sysinfo::Pid::from_u32(*pid)) {
+                        let _ = p.kill();
+                    }
+                }
+                println!("tues : {mine:?}");
+            }
+        }
+        let mut clean = Cleanup { profile: &profile, restore: None };
+
+        let mut session = None;
+        let found = wait_until(20, || {
+            let mine = chrome_pids(&profile, true);
+            session = mine.iter().copied().find(|p| !find(*p).is_empty());
+            session.is_some()
+        });
+        let _ = child.try_wait();
+        assert!(found, "pas de session audio pour notre Chrome");
+        let pid = session.unwrap_or_default();
+        let orig = orig_user.unwrap_or_else(|| app_route_get(pid).unwrap_or_default());
+        clean.restore = Some((pid, orig.clone()));
+        println!("session Chrome {pid} sous {:?} ; preference d'origine {orig:?}", names(&find(pid)));
+
+        let t = Instant::now();
+        assert!(app_route(vec![pid], aux.id.clone()));
+        let live = wait_until(8, || find(pid).iter().any(|(id, _)| *id == aux.id));
+        println!("a chaud sous Aux : {live} ({:?}) ; sorties {:?}", t.elapsed(), names(&find(pid)));
+        std::thread::sleep(Duration::from_secs(3));
+        println!("+3 s : sorties {:?}", names(&find(pid)));
+        drop(clean);
+        std::thread::sleep(Duration::from_secs(1));
+        let _ = child.kill();
+        let _ = child.wait();
+        println!("restants a nous : {:?} ; Chrome utilisateur encore la : {:?}", chrome_pids(&profile, true), chrome_pids(&profile, false));
+    }
 }

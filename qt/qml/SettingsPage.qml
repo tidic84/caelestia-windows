@@ -1271,15 +1271,6 @@ Item {
                 }
                 SetRow {
                     subRow: true
-                    title: "Profil de volume « Jeu »"
-                    sub: "Appliqué au lancement (Contrôles › profils), volumes d'avant rétablis ensuite"
-                    toggle: true
-                    disabled: !page.cfg.game_mode
-                    checked: !!page.cfg.mix_auto
-                    onToggled: on => Ilot.setCfg({ mix_auto: on })
-                }
-                SetRow {
-                    subRow: true
                     title: "Alerte « partie trouvée »"
                     sub: "Son et îlot qui clignote quand tu attends hors du jeu"
                     toggle: true

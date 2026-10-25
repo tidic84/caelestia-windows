@@ -4,6 +4,14 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.19 — 2026-10-25
+
+- **Nouveau mélangeur** (Contrôles) : il montre les applis de toutes les sorties audio, pas seulement de la sortie par défaut. Pratique avec SteelSeries Sonar : Game, Chat, Media et Aux ont chacun leur pastille et leur couleur.
+- **Volume par sortie** : chaque pastille se règle à la molette ou en glissant, et se remplit selon le volume.
+- **Changer la sortie d'une appli** : clic sur son point coloré puis choix de la sortie, ou glisser sa poignée sur une pastille. Windows retient ce choix ; certaines applis doivent être relancées pour basculer.
+- **Filtre** : un clic sur une ou plusieurs pastilles ne montre que ces sorties ; Échap réaffiche tout. Les groupes se replient, leur titre reste en haut pendant le défilement.
+- **Retirés** : les préréglages de volume « Jeu » et « Chill », et leur application au lancement d'un jeu.
+
 ## 0.4.18 — 2026-10-24
 
 - **Onglet Média** : les coins du fond « pochette floutée » ne dépassent plus de l'arrondi.

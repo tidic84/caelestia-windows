@@ -13,6 +13,16 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🟢 **Mélangeur, appli en pause** : après un changement de sortie, une appli
+  qui ne joue pas peut rester listée sous l'ancienne et la nouvelle sortie
+  (`hide_stale` ne masque que si une session est active ailleurs).
+- 🟢 **Code mort des profils de volume** : `Watch.qml` (`mixProfiles`,
+  `saveProfile`, `applyProfile`, `gameMix`) et `cfg.mix_auto` ne servent
+  plus depuis la 0.4.19.
+- 🟢 **Mélangeur, `Ilot.later`** : les rafraîchissements différés après un
+  changement de sortie peuvent arriver après le déchargement de la page
+  (TypeError dans le journal, sans effet).
+
 - 🟢 **Lecteur, une seule session** : seule `GetCurrentSession()` est suivie,
   donc on ne choisit pas entre deux applis qui jouent. Il n'y a pas non plus
   d'aléatoire ni de répétition, qui demanderaient du Rust en plus. Voir

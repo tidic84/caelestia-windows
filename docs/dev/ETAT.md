@@ -4,9 +4,10 @@
 chaque session : ce qui a été fait, ce qui a été vérifié ou non, et où
 reprendre.
 
-## Où on en est (mis à jour le 2026-10-24)
+## Où on en est (mis à jour le 2026-10-25)
 
-- **Version** : 0.4.18 (patch du lecteur), publiée le 2026-10-24 par le tag
+- **Version** : 0.4.19 (mélangeur multi-sorties, voir le journal). Avant :
+  0.4.18 (patch du lecteur), publiée le 2026-10-24 par le tag
   `v0.4.18` (GitHub Action `release.yml`). La 0.4.17 (addon Claude, hooks
   WSL, Apex) l'a été le même jour. La 0.4.8 n'a jamais été publiée seule : elle
   est incluse dans la 0.4.9.
@@ -26,6 +27,32 @@ reprendre.
   le clic droit de la ligne `explorer`.
 
 ## Journal
+
+### 2026-10-25 : 0.4.19 (mélangeur multi-sorties)
+
+- Maquettes validées par l'utilisateur (scratchpad, non versionnées) : choix
+  « A pratique » (pastilles de sorties + liste groupée), filtre multiple, sans
+  préréglages ni compteur d'applis.
+- Rust (`src/audio.rs`) : `mixer_all`, `mixer_set` avec `device` optionnel,
+  `device_volume_set`, `app_route` / `app_route_get` (fabrique WinRT
+  `Windows.Media.Internal.AudioPolicyConfig`, vtable reprise d'EarTrumpet),
+  `hide_stale` (masque la session inactive restée sur l'ancienne sortie),
+  cache nom + icône par exe. Feature `Win32_System_WinRT`. Tests `#[ignore]`
+  `route_reel` et `route_chrome` (lancent leur propre processus et restaurent
+  la préférence).
+- QML : nouveau `Mixer.qml` dans la carte audio de `CtrlPage`. Profils de
+  volume retirés de l'interface, de `Watch` (plus appliqués au lancement d'un
+  jeu) et de `SettingsPage`. Police : `drag_indicator` et `star` ajoutées
+  (310 ligatures, axes FILL 0 / GRAD 0 / opsz 24 / wght 400).
+- `shell.cpp` : `ILOT_QT_SHOT_TAB=<onglet>` ouvre l'îlot avant la capture
+  `ILOT_QT_SHOT` (tests).
+
+Vérifié : `cargo clippy`, `cargo test` (28 + 3 ignorés), tests réels de
+routage (Sonar respecte le routage ; Chrome bascule à chaud, le lecteur WinMM
+de PowerShell seulement après relance), `qt\build.cmd`, capture réelle de
+l'onglet Contrôles avec les 9 sorties du poste, relectures `relecteur`.
+Non vérifié : glisser, filtre et sélecteur à la vraie souris dans l'appli
+(validés seulement hors appli par `qml.exe` et dans les maquettes).
 
 ### 2026-10-24 : 0.4.18 (patch lecteur)
 

@@ -81,6 +81,14 @@ l'appli). Pour publier, pousser un tag `v*` : la CI publie
   lancés par le test.
 - **Ne pas passer `panic = "abort"`** : `ilot_invoke` rattrape les paniques
   avec `catch_unwind`.
+- **Voir l'îlot ouvert sans souris** : arrêter l'appli installée, lancer
+  `qt\build\ilot.exe` avec `ILOT_QT_SHOT=<png>`, `ILOT_QT_SHOT_TAB=ctrl`,
+  `ILOT_QT_SHOT_DELAY=6000`, `ILOT_QT_SHOT_QUIT=1`, puis relancer l'appli
+  installée. La capture est blanche si un jeu plein écran tourne (l'îlot se
+  masque) ou si le panneau s'est refermé. Les clics simulés (`mouse_event`)
+  n'ouvrent pas l'îlot.
+- **`app_route` (sortie d'une appli)** : la préférence est enregistrée par
+  exécutable et persiste. Un test doit lire la valeur d'origine et la remettre.
 - **Effets système de l'appli** :
   - barre des tâches en masquage automatique, rétablie quand on quitte (si
     l'appli plante, redémarrer l'Explorateur) ;

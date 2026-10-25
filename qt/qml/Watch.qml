@@ -254,7 +254,8 @@ Item {
                         return Api.invoke("power_set", { mode: "perf" }).then(ok => { if (ok && w.gameOn) w.gameOn.power = before })
                 })
             }
-            gameMix(true)
+            // profils de volume retires de l'interface : plus appliques au
+            // lancement d'un jeu (gameMix(false) ne restaure que s'il y a lieu)
         } else if (gameOn) {
             if (gameOn.power)
                 Api.invoke("power_set", { mode: gameOn.power })

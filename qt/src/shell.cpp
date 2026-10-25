@@ -354,12 +354,20 @@ void Shell::restart()
 }
 
 // ILOT_QT_SHOT=<fichier.png> : capture de la fenetre de l'ilot apres
-// ILOT_QT_SHOT_DELAY ms (4000 par defaut), puis on quitte si ILOT_QT_SHOT_QUIT
+// ILOT_QT_SHOT_DELAY ms (4000 par defaut), puis on quitte si ILOT_QT_SHOT_QUIT.
+// ILOT_QT_SHOT_TAB=<onglet> : ouvre d'abord l'ilot sur cet onglet (tests)
 void Shell::shot()
 {
     QString file = qEnvironmentVariable("ILOT_QT_SHOT");
     if (file.isEmpty())
         return;
+    QString tab = qEnvironmentVariable("ILOT_QT_SHOT_TAB");
+    if (!tab.isEmpty()) {
+        QTimer::singleShot(1500, this, [this, tab] {
+            if (QObject *ilot = m_engine.singletonInstance<QObject *>("Ilot", "Ilot"))
+                QMetaObject::invokeMethod(ilot, "open", Q_ARG(QVariant, tab));
+        });
+    }
     int delay = qEnvironmentVariableIntValue("ILOT_QT_SHOT_DELAY");
     QTimer::singleShot(delay > 0 ? delay : 4000, this, [this, file] {
         if (m_island)

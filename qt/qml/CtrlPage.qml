@@ -38,29 +38,14 @@ Item {
                 brightSlider.value = Math.round(b.level * 100)
         })
         refreshOut()
-        refreshMixer()
-    }
-    Timer {
-        interval: 2000
-        repeat: true
-        running: page.shown
-        onTriggered: page.refreshMixer()
+        mixerView.refresh()
     }
 
     // ------------------------------------------------- sortie, melangeur
+    // (le melangeur se sonde lui-meme : Mixer.qml)
     property var devices: []
-    property var mixer: []
-    property bool mixDragging: false
     function refreshOut() {
         Api.invoke("audio_devices").then(l => { page.devices = l })
-    }
-    function refreshMixer() {
-        if (mixDragging)
-            return
-        Api.invoke("mixer_get").then(l => {
-            if (!page.mixDragging)
-                page.mixer = l
-        })
     }
 
     // ------------------------------------------------------ luminosite
@@ -270,184 +255,13 @@ Item {
                         color: Theme.inkVariant
                     }
                 }
-                Flickable {
-                    id: mixFlick
+                Mixer {
+                    id: mixerView
                     x: 8
                     y: outBtn.y + outBtn.height + 6
-                    width: parent.width - 18
-                    height: parent.height - y - 8 - profiles.height - 6
-                    contentHeight: mixCol.height
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    Column {
-                        id: mixCol
-                        width: parent.width
-                        spacing: 2
-                        Empty {
-                            visible: page.mixer.length === 0
-                            width: parent.width
-                            small: true
-                            text: "Aucune application ne joue de son."
-                        }
-                        Repeater {
-                            model: page.mixer
-                            Item {
-                                id: mix
-                                required property var modelData
-                                width: mixCol.width
-                                height: 38
-                                property bool muted: modelData.muted
-                                property real level: modelData.level
-                                onModelDataChanged: {
-                                    if (!slider.dragging) {
-                                        muted = modelData.muted
-                                        level = modelData.level
-                                    }
-                                }
-                                Btn {
-                                    id: mixIcon
-                                    x: 4
-                                    width: 30
-                                    height: 30
-                                    radius: 9
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    tip: "Couper / rétablir"
-                                    onClicked: {
-                                        mix.muted = !mix.muted
-                                        Api.invoke("mixer_set", { pids: mix.modelData.pids, muted: mix.muted })
-                                    }
-                                    Image {
-                                        anchors.centerIn: parent
-                                        visible: !!mix.modelData.icon
-                                        width: 24
-                                        height: 24
-                                        source: mix.modelData.icon || ""
-                                        sourceSize.width: 48
-                                        asynchronous: true
-                                        mipmap: true
-                                    }
-                                    Ms {
-                                        anchors.centerIn: parent
-                                        visible: !mix.modelData.icon
-                                        name: "notifications"
-                                        size: 19
-                                        color: Theme.inkVariant
-                                    }
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        visible: mix.muted
-                                        radius: 9
-                                        color: Theme.alpha(Theme.surfaceC, 0.7)
-                                        Ms {
-                                            anchors.centerIn: parent
-                                            name: "volume_off"
-                                            size: 18
-                                            color: Theme.error
-                                        }
-                                    }
-                                }
-                                Txt {
-                                    x: 4 + 30 + 10
-                                    width: 100
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: mix.modelData.name
-                                    px: 12
-                                    elide: Text.ElideRight
-                                }
-                                M3Slider {
-                                    id: slider
-                                    x: 4 + 30 + 10 + 100 + 10
-                                    width: parent.width - x - 10 - 28 - 8
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    trackH: 8
-                                    thumbH: 18
-                                    value: Math.round(mix.level * 100)
-                                    fill: mix.muted ? 0 : value / 100
-                                    onDraggingChanged: page.mixDragging = dragging
-                                    onMoved: v => {
-                                        mix.level = v / 100
-                                        mix.muted = false
-                                        Api.invoke("mixer_set", { pids: mix.modelData.pids, level: v / 100, muted: false })
-                                    }
-                                }
-                                Txt {
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: 8
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 28
-                                    horizontalAlignment: Text.AlignRight
-                                    text: mix.muted ? "–" : Math.round(mix.level * 100)
-                                    px: 12
-                                    tnum: true
-                                    color: Theme.inkVariant
-                                }
-                            }
-                        }
-                    }
-                }
-                Scroller { flick: mixFlick }
-                // profils de volume : clic = appliquer, disquette = enregistrer les volumes actuels
-                Row {
-                    id: profiles
-                    x: 8
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 8
-                    spacing: 6
-                    Repeater {
-                        model: Watch.profileList
-                        Rectangle {
-                            id: pf
-                            required property var modelData
-                            readonly property bool has: !!Watch.mixProfiles[modelData[0]] && Object.keys(Watch.mixProfiles[modelData[0]]).length > 0
-                            readonly property bool on: Watch.mixOn === modelData[0]
-                            width: pfRow.implicitWidth + 8
-                            height: 30
-                            radius: 15
-                            color: on ? Theme.secondaryContainer : Theme.surfaceHigh
-                            Row {
-                                id: pfRow
-                                x: 4
-                                anchors.verticalCenter: parent.verticalCenter
-                                Btn {
-                                    width: pfLabel.implicitWidth + 16
-                                    height: 26
-                                    radius: 13
-                                    opacity: pf.has ? 1 : 0.55
-                                    color: hovered ? Theme.alpha(Theme.ink, 0.08) : "transparent"
-                                    tip: pf.has ? "Appliquer le profil « " + pf.modelData[1] + " »" : "Pas encore enregistré : clique sur la disquette"
-                                    onClicked: {
-                                        if (!pf.has)
-                                            return
-                                        Watch.mixOn = pf.modelData[0]
-                                        Watch.applyProfile(Watch.mixProfiles[pf.modelData[0]]).then(() => Ilot.later(300, page.refreshMixer))
-                                    }
-                                    Row {
-                                        id: pfLabel
-                                        anchors.centerIn: parent
-                                        spacing: 4
-                                        Ms {
-                                            name: pf.modelData[2]
-                                            size: 16
-                                            color: pf.on ? Theme.inkSecondaryContainer : Theme.inkVariant
-                                        }
-                                        Txt {
-                                            text: pf.modelData[1]
-                                            px: 12
-                                            color: pf.on ? Theme.inkSecondaryContainer : Theme.ink
-                                            anchors.verticalCenter: parent.verticalCenter
-                                        }
-                                    }
-                                }
-                                IconBtn {
-                                    small: true
-                                    icon: "save"
-                                    iconSize: 16
-                                    tip: "Enregistrer les volumes actuels comme « " + pf.modelData[1] + " »"
-                                    onClicked: Watch.saveProfile(pf.modelData[0], pf.modelData[1])
-                                }
-                            }
-                        }
-                    }
+                    width: parent.width - 16
+                    height: parent.height - y - 8
+                    shown: page.shown
                 }
             }
         }
@@ -513,7 +327,7 @@ Item {
                         onClicked: Api.invoke("audio_set_default", { id: modelData.id }).then(() => {
                             page.refreshOut()
                             Ilot.refreshVolume()
-                            page.refreshMixer()
+                            mixerView.refresh()
                         })
                         Ms {
                             x: 12
