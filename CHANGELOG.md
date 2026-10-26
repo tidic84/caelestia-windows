@@ -4,8 +4,9 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
-## À venir
+## 0.4.21 — 2026-10-26
 
+- **Bluetooth** (Contrôles, chevron de la tuile Bluetooth) : la liste des appareils appairés, avec leur état. Un clic connecte ou déconnecte un casque ou une enceinte ; la corbeille (deux clics) oublie un appareil. En dessous, les appareils à proximité : un clic les appaire, avec le code à confirmer ou à saisir directement dans l'îlot.
 - **Paroles des vidéos YouTube** : l'onglet Média trouve maintenant les paroles d'un clip lu dans le navigateur. L'îlot remet en ordre les titres de vidéo (« Artiste - Titre (Clip officiel) », chaînes « …VEVO » ou « … - Topic », titres japonais « 【Ado】Raven Sky » ou « Leina 「誓い」 Music Video ») et accepte un clip plus long que le morceau (intro, fin). Ailleurs, rien ne change.
 
 ## 0.4.20 — 2026-10-25

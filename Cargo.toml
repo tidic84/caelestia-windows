@@ -1,6 +1,6 @@
 ﻿[package]
 name = "ilot"
-version = "0.4.20"
+version = "0.4.21"
 edition = "2021"
 rust-version = "1.89"
 description = "Ilot facon Caelestia pour Windows"
@@ -21,6 +21,7 @@ sysinfo = "0.33"
 arboard = { version = "3", default-features = false, features = ["image-data"] }
 windows-core = "0.61"
 windows-future = "0.2"
+windows-collections = "0.2"
 ureq = { version = "2", features = ["native-tls", "json"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 imap = "2.4"
@@ -55,6 +56,7 @@ windows = { version = "0.61", features = [
   "Win32_Graphics_Gdi",
   "Win32_Media_Audio",
   "Win32_Media_Audio_Endpoints",
+  "Win32_Media_KernelStreaming",
   "Win32_NetworkManagement_IpHelper",
   "Win32_NetworkManagement_Ndis",
   "Win32_NetworkManagement_WiFi",

@@ -13,6 +13,17 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🟢 **Sélecteur Bluetooth (2026-10-26), limites connues** :
+  - Seuls les casques et enceintes (classe audio) se connectent depuis
+    l'îlot. Souris, claviers, manettes se connectent d'eux-mêmes ; la ligne
+    n'a pas d'action.
+  - Les pilotes audio d'un appareil sont retrouvés par l'adresse (A2DP) ou
+    par « (Nom » dans le nom de la sortie (mains libres) : un appareil
+    nommé « Nom 2 » serait visé aussi.
+  - Pour un code affiché (DisplayPin), pas de bouton Annuler : l'attente va
+    jusqu'à 90 s.
+  - Un appareil classique + BLE de même nom n'apparaît qu'une fois.
+
 - 🟢 **Mélangeur, appli en pause** : après un changement de sortie, une appli
   qui ne joue pas peut rester listée sous l'ancienne et la nouvelle sortie
   (`hide_stale` ne masque que si une session est active ailleurs).

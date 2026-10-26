@@ -79,6 +79,8 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── system.rs     Ressources, batterie, historique presse-papiers, caféine, profil, actions de session
 ├── display.rs    Luminosité (WMI, DDC/CI) + OSD
 ├── net.rs        Wi-Fi, Bluetooth, réseau
+├── bt.rs         Sélecteur Bluetooth : appairés, recherche (DeviceWatcher), appairage,
+│                 connexion des casques (IKsControl KSPROPSETID_BtAudio), oubli
 ├── notif.rs      Notifications Windows (wpndatabase.db en lecture seule)
 ├── theme.rs      Clair/sombre, accent, source  ├── wall.rs  Fonds d'écran      ├── we.rs  Wallpaper Engine
 ├── apps.rs       Lanceur (shell:AppsFolder)    ├── games.rs Jeux Steam/Epic/Ubisoft/GOG, sélecteurs de fichiers

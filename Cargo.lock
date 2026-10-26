@@ -927,7 +927,7 @@ dependencies = [
 
 [[package]]
 name = "ilot"
-version = "0.4.20"
+version = "0.4.21"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -954,6 +954,7 @@ dependencies = [
  "sysinfo",
  "ureq",
  "windows 0.61.3",
+ "windows-collections",
  "windows-core 0.61.2",
  "windows-future",
 ]

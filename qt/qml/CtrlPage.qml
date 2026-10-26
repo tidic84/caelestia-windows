@@ -3,19 +3,27 @@ import QtQuick.Shapes
 
 // Controles : tuiles (Wi-Fi, Bluetooth, cafeine, ne pas deranger, mode
 // sombre, minuteur), luminosite, sortie audio et melangeur ; feuilles
-// (reseaux, sorties, minuteur) ; notifications a droite
+// (reseaux, Bluetooth, sorties, minuteur) ; notifications a droite
 Item {
     id: page
     readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "ctrl"
     property string sheet: ""
     onSheetChanged: {
+        if (sheet !== "bt" && btScan)
+            stopBt()
         if (sheet !== "")
             Ilot.overlay = "sheet"
         else if (Ilot.overlay === "sheet")
             Ilot.overlay = ""
     }
     // page dechargee (Panel) : Echap ne doit plus viser la feuille
-    Component.onDestruction: if (Ilot.overlay === "sheet") Ilot.overlay = ""
+    Component.onDestruction: {
+        if (Ilot.overlay === "sheet")
+            Ilot.overlay = ""
+        if (btScan)
+            stopBt()
+        Api.unlisten("bt_pin", onBtPin)
+    }
     Connections {
         target: Ilot
         function onCloseSheets() { page.sheet = "" }
@@ -24,12 +32,23 @@ Item {
         sheet = name
         if (name === "wifi")
             loadWifi(true)
+        if (name === "bt")
+            loadBt(true)
         if (name === "out")
             refreshOut()
     }
 
-    onShownChanged: if (shown) enter()
-    Component.onCompleted: if (shown) enter()
+    onShownChanged: {
+        if (shown)
+            enter()
+        else if (btScan)
+            stopBt()
+    }
+    Component.onCompleted: {
+        Api.listen("bt_pin", onBtPin)
+        if (shown)
+            enter()
+    }
     function enter() {
         Api.invoke("net_get").then(n => { Ilot.net = n })
         Api.invoke("brightness_get").then(b => {
@@ -107,6 +126,92 @@ Item {
         wifiMsg = l.length ? "" : "Aucun réseau trouvé."
     }
 
+    // ------------------------------------------------------- Bluetooth
+    // appaires (connexion des casques et enceintes, oubli) puis appareils a
+    // proximite (recherche tant que la feuille est ouverte, appairage)
+    property var bt: []
+    property bool btScan: false
+    property string btMsg: ""
+    // demande de code de l'appairage en cours : { id, kind, pin }
+    property var btPin: null
+    // action en cours ou derniere erreur, par appareil : { busy, msg }. Gardee
+    // ici : les lignes sont recreees quand la liste change
+    property var btOps: ({})
+    readonly property var btPaired: bt.filter(d => d.paired)
+    readonly property var btNear: bt.filter(d => !d.paired)
+    function loadBt(scan) {
+        if (Ilot.net.radios.bluetooth === false) {
+            bt = []
+            btMsg = "Le Bluetooth est désactivé."
+            if (btScan)
+                stopBt()
+            return
+        }
+        btMsg = ""
+        // reaffirmee a chaque sondage : Windows l'interrompt si la radio se coupe
+        if (scan) {
+            btScan = true
+            Api.invoke("bt_scan", { on: true })
+        }
+        Api.invoke("bt_list").then(l => {
+            // pas pendant la saisie d'un code : la ligne serait recreee
+            if (!page.btPin && JSON.stringify(l) !== JSON.stringify(page.bt))
+                page.bt = l
+        })
+    }
+    function btOp(id, busy, msg) {
+        const o = Object.assign({}, btOps)
+        o[id] = { busy: busy, msg: msg || "" }
+        btOps = o
+    }
+    function btDone(id, msg) {
+        btOp(id, false, msg)
+        loadBt(btScan)
+        Api.invoke("net_get").then(n => { Ilot.net = n })
+    }
+    function btPair(d) {
+        btOp(d.id, true, "Appairage…")
+        const end = msg => {
+            if (page.btPin && page.btPin.id === d.id)
+                page.btPin = null
+            page.btDone(d.id, msg)
+        }
+        Api.invoke("bt_pair", { id: d.id }).then(() => end(), e => end(String(e)))
+    }
+    function btConnect(d) {
+        btOp(d.id, true, d.connected ? "Déconnexion…" : "Connexion…")
+        // le casque met quelques secondes a (se) connecter
+        Api.invoke("bt_connect", { id: d.id, on: !d.connected }).then(() => Ilot.later(3000, () => page.btDone(d.id)), e => page.btDone(d.id, String(e)))
+    }
+    function btUnpair(d) {
+        btOp(d.id, true, "Suppression…")
+        Api.invoke("bt_unpair", { id: d.id }).then(() => page.btDone(d.id), e => page.btDone(d.id, String(e)))
+    }
+    // reponse a la demande de code (refus : l'appairage echoue)
+    function btAnswer(accept, code) {
+        btPin = null
+        Api.invoke("bt_pair_answer", { accept: accept, pin: code === undefined ? null : code })
+    }
+    function stopBt() {
+        btScan = false
+        Api.invoke("bt_scan", { on: false })
+    }
+    function onBtPin(p) { page.btPin = p }
+    Timer {
+        interval: 2000
+        repeat: true
+        running: page.shown && page.sheet === "bt"
+        onTriggered: page.loadBt(page.btScan)
+    }
+    // radio activee feuille ouverte : la recherche demarre
+    Connections {
+        target: Ilot
+        function onNetChanged() {
+            if (page.sheet === "bt")
+                page.loadBt(true)
+        }
+    }
+
     Item {
         id: main
         width: parent.width - 250 - 10
@@ -152,7 +257,9 @@ Item {
                     icon: "bluetooth"
                     title: "Bluetooth"
                     sub: tiles.r.bluetooth ? (Ilot.net.bt_devices.length ? Ilot.net.bt_devices.join(", ") : "Activé") : "Désactivé"
+                    more: true
                     onMain: Ilot.toggleRadio("bluetooth")
+                    onMoreClicked: page.openSheet("bt")
                 }
                 Tile {
                     on: Ilot.caffeine
@@ -307,6 +414,74 @@ Item {
                 Repeater {
                     model: page.wifi
                     WifiRow {
+                        width: parent.width
+                    }
+                }
+            }
+        }
+        Sheet {
+            on: page.sheet === "bt"
+            title: "Bluetooth"
+            onBack: page.sheet = ""
+            action: IconBtn {
+                small: true
+                icon: "refresh"
+                tip: page.btScan ? "Recherche en cours" : "Rechercher"
+                RotationAnimator on rotation {
+                    running: page.btScan
+                    from: 0
+                    to: 360
+                    duration: 1000
+                    loops: Animation.Infinite
+                }
+                onClicked: page.loadBt(true)
+            }
+            Column {
+                width: parent.width
+                spacing: 4
+                Empty {
+                    visible: page.btMsg !== ""
+                    width: parent.width
+                    small: true
+                    text: page.btMsg
+                }
+                BtHead {
+                    visible: page.btMsg === ""
+                    text: "Appareils appairés"
+                }
+                Txt {
+                    visible: page.btMsg === "" && page.btPaired.length === 0
+                    x: 12
+                    height: 30
+                    verticalAlignment: Text.AlignVCenter
+                    text: "Aucun appareil appairé"
+                    px: 12
+                    color: Theme.outline
+                }
+                Repeater {
+                    model: page.btPaired
+                    BtRow {
+                        width: parent.width
+                    }
+                }
+                BtHead {
+                    visible: page.btMsg === ""
+                    text: "À proximité"
+                }
+                Txt {
+                    visible: page.btMsg === "" && page.btNear.length === 0
+                    x: 12
+                    width: parent.width - 24
+                    height: 30
+                    verticalAlignment: Text.AlignVCenter
+                    text: page.btScan ? "Recherche… Mets l’appareil en mode appairage." : "Aucun appareil trouvé"
+                    px: 12
+                    elide: Text.ElideRight
+                    color: Theme.outline
+                }
+                Repeater {
+                    model: page.btNear
+                    BtRow {
                         width: parent.width
                     }
                 }
@@ -685,6 +860,166 @@ Item {
             }
         }
         Scroller { flick: flick }
+    }
+
+    component BtHead: Txt {
+        x: 12
+        height: 26
+        verticalAlignment: Text.AlignBottom
+        px: 11.5
+        weight: Font.Medium
+        color: Theme.inkVariant
+    }
+
+    component BtRow: Rectangle {
+        id: dev
+        required property var modelData
+        readonly property bool connected: modelData.connected
+        readonly property var op: page.btOps[modelData.id] || null
+        readonly property bool busy: !!op && op.busy
+        // action en cours ou erreur ; vide : etat de l'appareil
+        readonly property string state2: op ? op.msg : ""
+        readonly property var pin: page.btPin && page.btPin.id === modelData.id ? page.btPin : null
+        height: 40 + (pin ? 44 : 0)
+        radius: 16
+        color: connected ? Theme.secondaryContainer : devBtn.hovered ? Theme.surfaceHigh : "transparent"
+        opacity: busy && !pin ? 0.7 : 1
+        readonly property color fg: connected ? Theme.inkSecondaryContainer : Theme.ink
+        // survol de la ligne, meme sans action (souris, clavier : bouton Oublier)
+        HoverHandler { id: rowHov }
+        Btn {
+            id: devBtn
+            width: parent.width
+            height: 40
+            radius: 16
+            active: !dev.busy && (dev.modelData.audio || !dev.modelData.paired)
+            onClicked: {
+                if (dev.modelData.paired)
+                    page.btConnect(dev.modelData)
+                else
+                    page.btPair(dev.modelData)
+            }
+            Ms {
+                x: 12
+                anchors.verticalCenter: parent.verticalCenter
+                name: dev.modelData.icon
+                color: dev.fg
+            }
+            Column {
+                x: 44
+                width: parent.width - 44 - (forget.visible ? 40 : 12)
+                spacing: 1
+                anchors.verticalCenter: parent.verticalCenter
+                Txt {
+                    width: parent.width
+                    text: dev.modelData.name
+                    weight: Font.Medium
+                    elide: Text.ElideRight
+                    color: dev.fg
+                }
+                Txt {
+                    width: parent.width
+                    readonly property var d: dev.modelData
+                    text: forget.armed ? "Cliquer encore pour oublier"
+                        : dev.state2 || (!d.paired ? "Appairer" : d.connected ? "Connecté" : d.audio ? "Non connecté · Connecter" : "Non connecté")
+                    px: 11.5
+                    opacity: 0.75
+                    elide: Text.ElideRight
+                    color: forget.armed ? Theme.error : dev.fg
+                }
+            }
+            // oublier : second clic pour confirmer
+            IconBtn {
+                id: forget
+                visible: dev.modelData.paired && !dev.busy && (rowHov.hovered || armed)
+                anchors.right: parent.right
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                small: true
+                icon: "delete"
+                tip: armed ? "Cliquer encore pour oublier" : "Oublier l’appareil"
+                fg: armed ? Theme.inkError : dev.fg
+                onClicked: {
+                    if (!armed) {
+                        armed = true
+                        disarm.restart()
+                        return
+                    }
+                    armed = false
+                    page.btUnpair(dev.modelData)
+                }
+                Timer {
+                    id: disarm
+                    interval: 2500
+                    onTriggered: forget.armed = false
+                }
+            }
+        }
+        // code de l'appairage : a comparer, a taper sur l'appareil, ou a saisir
+        Row {
+            visible: !!dev.pin
+            x: 44
+            y: 40
+            height: 36
+            spacing: 8
+            Txt {
+                visible: !!dev.pin && dev.pin.kind !== "provide"
+                width: dev.width - 44 - 12 - (dev.pin && dev.pin.kind === "confirm" ? yes.width + no.width + 16 : 0)
+                anchors.verticalCenter: parent.verticalCenter
+                text: !dev.pin ? "" : (dev.pin.kind === "confirm" ? "Même code sur l’appareil ? " : "Tape ce code sur l’appareil : ") + dev.pin.pin
+                px: 12
+                wrapMode: Text.Wrap
+                maximumLineCount: 2
+                elide: Text.ElideRight
+                color: dev.fg
+            }
+            TextBtn {
+                id: yes
+                visible: !!dev.pin && dev.pin.kind === "confirm"
+                anchors.verticalCenter: parent.verticalCenter
+                primary: true
+                text: "Oui"
+                onClicked: page.btAnswer(true)
+            }
+            TextBtn {
+                id: no
+                visible: !!dev.pin && dev.pin.kind === "confirm"
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Non"
+                onClicked: page.btAnswer(false)
+            }
+            Field {
+                id: pinField
+                visible: !!dev.pin && dev.pin.kind === "provide"
+                width: dev.width - 44 - 12 - 2 * (26 + 8)
+                anchors.verticalCenter: parent.verticalCenter
+                placeholder: "Code PIN de l’appareil"
+                onAccepted: page.btAnswer(true, text)
+            }
+            IconBtn {
+                visible: pinField.visible
+                small: true
+                filled: true
+                icon: "arrow_forward"
+                anchors.verticalCenter: parent.verticalCenter
+                tip: "Valider"
+                onClicked: page.btAnswer(true, pinField.text)
+            }
+            IconBtn {
+                visible: pinField.visible
+                small: true
+                icon: "close"
+                anchors.verticalCenter: parent.verticalCenter
+                tip: "Annuler"
+                onClicked: page.btAnswer(false)
+            }
+        }
+        onPinChanged: {
+            if (pin && pin.kind === "provide") {
+                Ilot.grabFocus()
+                pinField.input.forceActiveFocus()
+            }
+        }
     }
 
     component WifiRow: Rectangle {

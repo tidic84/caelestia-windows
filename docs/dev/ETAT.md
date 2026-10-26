@@ -6,10 +6,10 @@ reprendre.
 
 ## Où on en est (mis à jour le 2026-10-25)
 
-- **Version** : 0.4.20 (sorties affichées, Réglages › Son), installée sur le
-  poste, ni commitée ni publiée au moment de l'écrire. Prochaine étape :
-  tester à la main (voir le journal), puis publier si l'utilisateur le veut.
-  Avant : 0.4.19 (mélangeur multi-sorties), publiée le 2026-10-25. Avant :
+- **Version** : 0.4.21 (sélecteur Bluetooth, paroles des vidéos YouTube),
+  publiée le 2026-10-26 par le tag `v0.4.21`. Appairage et connexion
+  Bluetooth réels encore à tester (journal du 2026-10-26). Avant : 0.4.20
+  (sorties affichées, Réglages › Son), publiée le 2026-10-25. Avant : 0.4.19 (mélangeur multi-sorties), publiée le 2026-10-25. Avant :
   0.4.18 (patch du lecteur), publiée le 2026-10-24 par le tag
   `v0.4.18` (GitHub Action `release.yml`). La 0.4.17 (addon Claude, hooks
   WSL, Apex) l'a été le même jour. La 0.4.8 n'a jamais été publiée seule : elle
@@ -30,6 +30,41 @@ reprendre.
   le clic droit de la ligne `explorer`.
 
 ## Journal
+
+### 2026-10-26 : sélecteur Bluetooth (Contrôles)
+
+- **Demande** : sélecteur Bluetooth avec appairage, et appareils déjà
+  appairés dans l'onglet Contrôles.
+- **Rust, nouveau `src/bt.rs`** : `bt_list` (appairés, classique + BLE, avec
+  état connecté et icône d'après la classe / l'apparence, puis appareils
+  trouvés), `bt_scan(on)` (DeviceWatcher sur les non-appairés ; arrêt seul
+  après 20 s sans `bt_list` ; relancé si Windows l'a interrompu),
+  `bt_pair` (appairage personnalisé : ConfirmOnly accepté, code envoyé à
+  l'interface par l'événement `bt_pin`, réponse par `bt_pair_answer` ; un
+  seul à la fois), `bt_unpair`, `bt_connect` (casques et enceintes :
+  `IKsControl` `KSPROPSETID_BtAudio` ONESHOT_RECONNECT / DISCONNECT sur les
+  pilotes retrouvés depuis les sorties audio, comme ToothTray).
+  `Cargo.toml` : `windows-collections`, feature
+  `Win32_Media_KernelStreaming`. `--check-all` affiche `bt:` (6 s de
+  recherche).
+- **QML, `CtrlPage.qml`** : chevron sur la tuile Bluetooth → feuille
+  « Bluetooth » (Appareils appairés / À proximité), composants `BtHead` et
+  `BtRow`. L'état des actions est gardé dans la page par identifiant
+  (`btOps`) : le sondage (2 s) recrée les lignes quand la liste change, et
+  ne la remplace pas pendant la saisie d'un code.
+- **Vérifié** : clippy propre ; `--check-all` liste les 3 appareils
+  appairés du poste (manette Xbox, Stadia, casque « Zen Air Plus » reconnu
+  audio) ; essai temporaire (retiré) : 2 pilotes KS trouvés pour le casque ;
+  capture de la feuille (`ILOT_QT_SHOT`) correcte. Installé.
+- **Relecture** : un agent général (pas de `relecteur` sur le poste). Il a
+  trouvé la recréation des lignes toutes les 2 s (état perdu, saisie du code
+  impossible), la recherche non relancée après coupure de la radio, deux
+  appairages simultanés, et le nom vide qui visait toutes les sorties :
+  tout est corrigé.
+- **Non vérifié** : appairage réel d'un nouvel appareil (avec code),
+  connexion / déconnexion réelle du casque, oubli. À tester par
+  l'utilisateur. Limites dans `BACKLOG.md`.
+- **Publié** en 0.4.21 (tag `v0.4.21`), à la demande de l'utilisateur.
 
 ### 2026-10-26 : paroles des vidéos YouTube
 

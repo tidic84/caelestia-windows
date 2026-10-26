@@ -9,6 +9,7 @@ mod apps;
 mod audio;
 mod bar;
 mod boost;
+mod bt;
 mod captions;
 mod claude;
 mod decode;
@@ -313,6 +314,12 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "wifi_list" => json(net::wifi_list(a!("scan"))),
         "wifi_connect" => net::wifi_connect(a!("ssidName"), a!("password")).and_then(json),
         "wifi_disconnect" => json(net::wifi_disconnect()),
+        "bt_list" => json(bt::bt_list()),
+        "bt_scan" => json(bt::bt_scan(a!("on"))),
+        "bt_pair" => bt::bt_pair(app, a!("id")).and_then(json),
+        "bt_pair_answer" => json(bt::bt_pair_answer(a!("accept"), a!("pin"))),
+        "bt_unpair" => bt::bt_unpair(a!("id")).and_then(json),
+        "bt_connect" => bt::bt_connect(a!("id"), a!("on")).and_then(json),
         // notifications
         "notifs_get" => json(notif::notifs_get(app.state())),
         "notifs_dismiss" => json(notif::notifs_dismiss(app, a!("id"))),
@@ -610,6 +617,14 @@ pub extern "C" fn ilot_cli() -> i32 {
             format!("net: {}", j(serde_json::to_string(&net::net_get()))),
             format!("media: {} ; pochette {} o", j(serde_json::to_string(&media::media_get())), media::media_art().len()),
             format!("wifi: {}", j(serde_json::to_string(&net::wifi_list(false)))),
+            {
+                // appaires, puis 6 s de recherche
+                bt::bt_scan(true);
+                std::thread::sleep(std::time::Duration::from_secs(6));
+                let l = bt::bt_list();
+                bt::bt_scan(false);
+                format!("bt: {}", j(serde_json::to_string(&l)))
+            },
             format!("user: {}", j(serde_json::to_string(&system::user_info()).map(|s| s.chars().take(120).collect()))),
             format!("win_light: {}", theme::windows_light()),
             format!("peaks: {}", audio::peaks_report()),
