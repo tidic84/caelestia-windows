@@ -31,6 +31,49 @@ reprendre.
 
 ## Journal
 
+### 2026-10-26 : paroles des vidéos YouTube
+
+- **Constat.** Une vidéo YouTube lue dans le navigateur donne pour titre
+  « Artiste - Titre (Clip officiel) » et pour artiste la chaîne
+  (« ArtisteVEVO », « Artiste - Topic », un label), sans album.
+  `clean_title` coupait au « - » : la recherche portait sur « Artiste ».
+- **`src/lyrics.rs`.** Nouvelle fonction `youtube()` : sans album, si le
+  titre est « gauche - droite » et que la gauche ressemble à la chaîne, ou
+  que la chaîne a un suffixe YouTube (`VEVO`, ` - Topic`, `Official`), ou
+  que le titre a une mention vidéo entre parenthèses (official, clip,
+  lyrics, audio, video…), on cherche (gauche, droite nettoyée de
+  `ft.`/`feat.`/`|`/guillemets). Sans « - » : (chaîne sans suffixe, titre
+  nettoyé). Sinon rien ne change. Recherche LRCLIB + NetEase sortie dans
+  `lookup()`. Le cache reste indexé par l'artiste et le titre d'origine.
+  Test `youtube_titles` (sans réseau).
+- **Vérifié.** `cargo test --lib lyrics` OK, clippy sans avertissement dans
+  `lyrics.rs`, le Rust compile dans `qt\build.cmd`.
+- **Build.** Premier essai : lien de `ilot.exe` en échec (LNK1104, l'appli
+  tournait).
+- **Retour utilisateur : ne marchait pas.** Titre réel reçu de Chrome :
+  `【Ado】Raven Sky` (artiste « Ado », sans album, 252 s). Ajout de
+  `strip_jp()` : retire les `【…】` et prend le contenu de `「…」` comme
+  titre ; `video_tag` lit aussi `【…】`. Essai réseau (test temporaire,
+  retiré) : `lookup("Ado", "Raven Sky")` renvoie les paroles synchronisées.
+  **Piège** : les deux builds précédents étaient en échec silencieux (lien
+  de `ilot.exe` raté, code de sortie perdu par `powershell -Command`), donc
+  `qt\build\ilot_core.dll` restait l'ancienne (la copie de la DLL est une
+  étape après le lien). Lire `%errorlevel%` dans le `cmd /c` et la date de
+  `qt\build\ilot_core.dll`. Rebuild vérifié puis `install.ps1` : version
+  installée et lancée depuis `%LOCALAPPDATA%\Programs\Ilot`. Pour lire les métadonnées envoyées par le
+  navigateur : script PowerShell WinRT (`GlobalSystemMediaTransportControlsSessionManager`).
+- **Second morceau** : `Leina 「誓い」 Music Video` (clip de 191,8 s, morceau
+  NetEase de 176,7 s). NetEase rejetait au-delà de 8 s d'écart. Pour une
+  vidéo, si rien d'horodaté n'est trouvé, nouvel essai NetEase sans la
+  durée. Essai réseau OK, installé (DLL du 26/10 12:54 dans
+  `Programs\Ilot`). Limite : l'intro d'un clip peut décaler les paroles
+  horodatées.
+- **Validé par l'utilisateur** : paroles de 「誓い」 trouvées (cache du
+  26/10 14:22). Section « À venir » dans `CHANGELOG.md`, poussé sans
+  release ni changement de version (demande de l'utilisateur).
+- **Non vérifié.** Pas de relecture par l'agent `relecteur`
+  (absent du poste).
+
 ### 2026-10-25 : 0.4.20 (sorties affichées, Réglages › Son)
 
 - **Demande** : pour les amis qui ont Voicemeeter, VB-Cable, Sonar…, choisir

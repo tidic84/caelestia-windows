@@ -174,6 +174,96 @@ fn urlencode(s: &str) -> String {
         .collect()
 }
 
+// ------------------------------------------- videos YouTube (navigateur)
+
+/// Coupe s a la premiere occurrence d'un des motifs (sans tenir compte de la casse).
+fn cut_at(s: &str, pats: &[&str]) -> String {
+    let low = s.to_ascii_lowercase();
+    let i = pats.iter().filter_map(|p| low.find(p)).filter(|&i| i > 0).min().unwrap_or(s.len());
+    s[..i].trim().to_string()
+}
+
+/// « Titre ft. X | Album » -> « Titre »
+fn strip_feat(s: &str) -> String {
+    cut_at(s, &[" ft. ", " ft ", " feat. ", " feat ", " featuring ", " | "])
+}
+
+/// Mention propre aux videos entre parentheses ou crochets : « (Clip officiel) », « [Lyrics] ».
+fn video_tag(title: &str) -> bool {
+    const TAGS: &[&str] = &["official", "officiel", "clip", "lyric", "parole", "audio", "video", "vidéo", "visuali", "m/v"];
+    let low = title.to_lowercase();
+    low.split(['(', '[', '【']).skip(1).any(|part| {
+        let inner = part.split([')', ']', '】']).next().unwrap_or("");
+        TAGS.iter().any(|t| inner.contains(t))
+    })
+}
+
+/// Titres japonais : « 【Ado】Raven Sky【MV】 » -> « Raven Sky », « Ado「唱」 » -> « 唱 ».
+/// Renvoie le titre et vrai si quelque chose a ete retire.
+fn strip_jp(title: &str) -> (String, bool) {
+    let mut out = String::new();
+    let mut rest = title;
+    while let Some(i) = rest.find('【') {
+        out.push_str(&rest[..i]);
+        match rest[i..].find('】') {
+            Some(j) => rest = &rest[i + j + '】'.len_utf8()..],
+            None => {
+                rest = &rest[i..];
+                break;
+            }
+        }
+    }
+    out.push_str(rest);
+    if let (Some(a), Some(b)) = (out.find('「'), out.find('」')) {
+        let inner = if a < b { out[a + '「'.len_utf8()..b].trim() } else { "" };
+        if !inner.is_empty() {
+            return (inner.to_string(), true);
+        }
+    }
+    let out = out.trim().to_string();
+    let changed = out != title.trim() && !out.is_empty();
+    (if out.is_empty() { title.trim().to_string() } else { out }, changed)
+}
+
+/// Une video YouTube (lue dans un navigateur) donne pour titre « Artiste - Titre
+/// (Clip officiel) » et pour artiste le nom de la chaine (« ArtisteVEVO »,
+/// « Artiste - Topic »). Renvoie (artiste, titre) remis en ordre, ou None si
+/// rien n'indique une video (YouTube Music et les lecteurs donnent un album).
+fn youtube(artist: &str, title: &str, album: &str) -> Option<(String, String)> {
+    if !album.trim().is_empty() {
+        return None;
+    }
+    let artist = artist.trim();
+    let mut channel = artist;
+    for suf in [" - Topic", "VEVO", "Vevo", " Official", "Official"] {
+        channel = channel.strip_suffix(suf).unwrap_or(channel).trim();
+    }
+    let is_channel = channel != artist || artist.is_empty();
+    let (jp, jp_cut) = strip_jp(title);
+    let tagged = video_tag(title) || jp_cut;
+    let title = jp.as_str();
+    let quotes: &[char] = &['"', '“', '”', '«', '»'];
+    let split = [" - ", " – ", " — "].iter().filter_map(|sep| title.find(sep).map(|i| (i, sep.len()))).min();
+    if let Some((i, n)) = split {
+        let (left, right) = (title[..i].trim(), title[i + n..].trim());
+        let (l, c) = (norm(left), norm(channel));
+        let same = !l.is_empty() && !c.is_empty() && (l.contains(&c) || c.contains(&l));
+        if same || is_channel || tagged {
+            let t = clean_title(&strip_feat(right));
+            let t = t.trim_matches(quotes).trim();
+            if !left.is_empty() && !t.is_empty() {
+                return Some((strip_feat(left), t.to_string()));
+            }
+        }
+    }
+    if (is_channel && !channel.is_empty()) || tagged {
+        let t = clean_title(&strip_feat(title));
+        let t = t.trim_matches(quotes).trim();
+        return (!t.is_empty()).then(|| (channel.to_string(), t.to_string()));
+    }
+    None
+}
+
 pub fn lyrics_get(artist: String, title: String, album: String, duration: f64) -> Result<Lyrics, String> {
     if title.trim().is_empty() {
         return Ok(Lyrics::default());
@@ -182,14 +272,16 @@ pub fn lyrics_get(artist: String, title: String, album: String, duration: f64) -
     if let Some(l) = std::fs::read_to_string(&cache).ok().and_then(|s| serde_json::from_str::<Lyrics>(&s).ok()) {
         return Ok(l);
     }
-    let r = lrclib(&artist, &title, &album, duration);
-    // LRCLIB en panne ou sans paroles horodatees : NetEase
-    let r = match r {
-        Ok(l) if !l.synced.is_empty() || l.instrumental => Ok(l),
-        other => match netease(&artist, &clean_title(&title), duration) {
-            Some(l) => Ok(l),
-            None => other,
+    let r = match youtube(&artist, &title, &album) {
+        // un clip dure souvent plus que le morceau (intro, fin) : sans la duree
+        Some((a, t)) => match lookup(&a, &t, "", duration) {
+            Ok(l) if !l.synced.is_empty() || l.instrumental => Ok(l),
+            other => match netease(&a, &t, 0.0) {
+                Some(l) => Ok(l),
+                None => other,
+            },
         },
+        None => lookup(&artist, &title, &album, duration),
     };
     if let Ok(l) = &r {
         if found(l) {
@@ -197,6 +289,17 @@ pub fn lyrics_get(artist: String, title: String, album: String, duration: f64) -
         }
     }
     r
+}
+
+fn lookup(artist: &str, title: &str, album: &str, duration: f64) -> Result<Lyrics, String> {
+    // LRCLIB en panne ou sans paroles horodatees : NetEase
+    match lrclib(artist, title, album, duration) {
+        Ok(l) if !l.synced.is_empty() || l.instrumental => Ok(l),
+        other => match netease(artist, &clean_title(title), duration) {
+            Some(l) => Ok(l),
+            None => other,
+        },
+    }
 }
 
 fn lrclib(artist: &str, title: &str, album: &str, duration: f64) -> Result<Lyrics, String> {
@@ -231,4 +334,33 @@ fn lrclib(artist: &str, title: &str, album: &str, duration: f64) -> Result<Lyric
             (x["syncedLyrics"].is_null() as i64, off)
         });
     Ok(best.map(from_json).or(fallback).unwrap_or_default())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::youtube;
+
+    fn yt(a: &str, t: &str) -> Option<(String, String)> {
+        youtube(a, t, "")
+    }
+
+    #[test]
+    fn youtube_titles() {
+        let p = |a: &str, t: &str| Some((a.to_string(), t.to_string()));
+        assert_eq!(yt("RickAstleyVEVO", "Rick Astley - Never Gonna Give You Up (Official Music Video)"), p("Rick Astley", "Never Gonna Give You Up"));
+        assert_eq!(yt("Stromae", "Stromae - papaoutai (Official Video)"), p("Stromae", "papaoutai"));
+        assert_eq!(yt("Daft Punk - Topic", "Get Lucky"), p("Daft Punk", "Get Lucky"));
+        assert_eq!(yt("Spinnin' Records", "Martin Garrix - Animals [Official Video]"), p("Martin Garrix", "Animals"));
+        assert_eq!(yt("Angèle", "Angèle - Balance ton quoi ft. X [Clip Officiel]"), p("Angèle", "Balance ton quoi"));
+        assert_eq!(yt("Stromae", "Papaoutai (Clip officiel)"), p("Stromae", "Papaoutai"));
+        assert_eq!(yt("Ado", "【Ado】Raven Sky"), p("Ado", "Raven Sky"));
+        assert_eq!(yt("Ado", "【Ado】唱"), p("Ado", "唱"));
+        assert_eq!(yt("Ado", "Ado「唱」MV"), p("Ado", "唱"));
+        assert_eq!(yt("YOASOBI", "YOASOBI「アイドル」 Official Music Video"), p("YOASOBI", "アイドル"));
+        assert_eq!(yt("Ado", "うっせぇわ【MV】"), p("Ado", "うっせぇわ"));
+        // pas une video : rien ne change
+        assert_eq!(yt("Queen", "Bohemian Rhapsody"), None);
+        assert_eq!(youtube("The Beatles", "Let It Be - Remastered 2009", "Let It Be"), None);
+        assert_eq!(yt("Artiste", "Morceau - Live"), None);
+    }
 }

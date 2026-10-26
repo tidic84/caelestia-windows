@@ -4,6 +4,10 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## À venir
+
+- **Paroles des vidéos YouTube** : l'onglet Média trouve maintenant les paroles d'un clip lu dans le navigateur. L'îlot remet en ordre les titres de vidéo (« Artiste - Titre (Clip officiel) », chaînes « …VEVO » ou « … - Topic », titres japonais « 【Ado】Raven Sky » ou « Leina 「誓い」 Music Video ») et accepte un clip plus long que le morceau (intro, fin). Ailleurs, rien ne change.
+
 ## 0.4.20 — 2026-10-25
 
 - **Choisir ses sorties audio** (nouvel onglet Réglages › Son) : avec Voicemeeter, VB-Cable, Sonar et compagnie, la liste des sorties déborde. Un interrupteur par sortie, rangées en « Appareils » et « Virtuelles », décide de celles qui apparaissent dans « Sortie audio » et dans le mélangeur. Rien n'est masqué tout seul, et la sortie par défaut reste toujours visible. « +N » du mélangeur montre les sorties masquées, avec un point si une appli y joue.
