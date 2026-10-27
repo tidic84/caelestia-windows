@@ -167,7 +167,8 @@ static void forceForeground(HWND h)
 
 void WinCtl::grabFocus()
 {
-    if (!m_win)
+    // devant une appli en plein ecran, le clavier lui reste (voir noActivate)
+    if (!m_win || m_covered)
         return;
     forceForeground(HWND(m_win->winId()));
     m_win->requestActivate();
@@ -207,6 +208,18 @@ static QString exeOf(DWORD pid)
         name = QString::fromWCharArray(buf, int(n)).section(QLatin1Char('\\'), -1).toLower();
     CloseHandle(p);
     return name;
+}
+
+// Devant une appli en plein ecran (ou en fenetre sans bordure qui couvre
+// l'ecran), un clic sur la fenetre ne la met pas au premier plan : le jeu
+// garde le clavier et n'est pas reduit. Remis a chaque releve, au cas ou Qt
+// reecrirait le style etendu.
+static void noActivate(HWND h, bool on)
+{
+    const LONG_PTR ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
+    const LONG_PTR want = on ? ex | WS_EX_NOACTIVATE : ex & ~LONG_PTR(WS_EX_NOACTIVATE);
+    if (want != ex)
+        SetWindowLongPtrW(h, GWL_EXSTYLE, want);
 }
 
 // Meme regle que l'ilot Tauri : fenetre au premier plan couvrant tout
@@ -264,6 +277,7 @@ void WinCtl::checkFullscreen()
         m_covered = fs || hide;
         Q_EMIT coveredChanged();
     }
+    noActivate(own, m_covered);
     m_hideWanted = hide;
     if (hide && m_fsMode == QLatin1String("auto")) {
         if (!m_peekTimer.isActive())

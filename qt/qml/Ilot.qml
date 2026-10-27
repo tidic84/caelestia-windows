@@ -426,7 +426,9 @@ Item {
         } else if (mode === "peek") {
             leaveTimer.interval = 120
             leaveTimer.start()
-        } else if (mode === "open" && !pinned && !locked) {
+        } else if (mode === "open" && (!pinned || covered) && !locked) {
+            // devant une appli en plein ecran, l'ilot n'a pas le clavier
+            // (Echap) : il se replie quand la souris s'en va, meme epingle
             leaveTimer.interval = 450
             leaveTimer.start()
         }
