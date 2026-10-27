@@ -47,14 +47,6 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 - 🟢 **Code mort des profils de volume** : `Watch.qml` (`mixProfiles`,
   `saveProfile`, `applyProfile`, `gameMix`) et `cfg.mix_auto` ne servent
   plus depuis la 0.4.19.
-- 🟠 **Échap ne marche plus après avoir changé d'onglet** (déjà avant la
-  0.4.20). Un champ a pris le focus (recherche du lanceur, ville, raccourci,
-  renommage d'une sortie), puis on change d'onglet. Le Loader de la page est
-  désactivé (`enabled: shown`, `Panel.qml`), le focus tombe sur l'item racine
-  de la fenêtre, et `Keys.onPressed` de `Main.qml` ne reçoit plus Échap.
-  Correctif proposé : dans `Main.qml`, si `activeFocusItem === contentItem`,
-  rendre le focus à `root`. Relevé par un relecteur, confirmé par un test
-  `qmltestrunner`.
 - 🟢 **Sorties affichées (0.4.20), restes connus** :
   - Le nom choisi d'une sortie débranchée, mais pas masquée, reste dans
     `audio_alias` sans moyen de l'oublier. « Tout afficher » oublie aussi les

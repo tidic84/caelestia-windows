@@ -35,6 +35,42 @@ reprendre.
 
 ## Journal
 
+### 2026-10-27 : audit, mises à jour signées, réglages, Échap (0.4.22)
+
+Vérification d'un audit externe (8 points). Retenus et corrigés : 2, 3, 5,
+et 8 en partie. Écartés : 4 (`lock().unwrap()` ne panique qu'après un
+mutex empoisonné), 6 (déjà connu : l'état de la barre est rétabli au
+lancement suivant), 7 (`SetWindowRgn` à chaque image déjà retiré ; seul
+l'acrylique refait sa forme). Point 1 : le plein écran compile sous
+Windows, mais il n'est toujours pas testé en vrai.
+
+- **Mises à jour signées** (`src/update.rs`) : une archive n'est installée
+  que si `ilot-<ver>-win64.zip.sig` est valide (ECDSA P-256, `p256` déjà
+  présent, sur sha256(zip + `\nilot <ver>`)). Clé publique `SIGN_KEY`. La clé
+  privée a été créée dans `%USERPROFILE%\.ilot\release.key` (sans mot de
+  passe) : **à sauvegarder**. Le SHA passé au script d'installation est
+  maintenant celui des octets vérifiés. `Pending.signed` : un
+  `pending.json` d'avant est ignoré.
+- **`examples/sign.rs`** : `keygen`, `pub`, `sign`. **`release.ps1`** :
+  les 5 étapes de publication, plus la signature et des vérifications
+  (changelog daté, arbre propre, commit poussé, clé = `SIGN_KEY`). Notes
+  sans BOM. `release.yml` : déclenchement au tag retiré (la CI ne signe pas).
+- **`setCfg`** (`Ilot.qml`) : un seul `settings_set` à la fois. Les
+  changements faits pendant l'envoi partent ensuite ensemble. À la
+  fermeture, l'envoi en cours et l'attente sont renvoyés de façon
+  synchrone.
+- **Échap après un changement d'onglet** (`Main.qml`) : le focus qui tombe
+  sur `contentItem` revient à `root`.
+- Vérifié : `qt\build.cmd`, `cargo test --lib update` (aller-retour de
+  signature, clé valide), relance de `qt\build\ilot.exe` avec un journal Qt
+  vide. Relu par un agent : pas de bug bloquant ; deux remarques appliquées
+  (patch en cours renvoyé à la fermeture, BOM des notes).
+- **Non vérifié** : une vraie mise à jour signée de bout en bout (il faut
+  une release 0.4.23 publiée par `release.ps1`, installée par une 0.4.22).
+  Échap et les réglages rapides n'ont pas été testés à la main. Les îlots
+  en 0.4.21 ne vérifient pas encore la signature : la 0.4.22 doit être
+  publiée avec `release.ps1` pour que la suite soit protégée.
+
 ### 2026-10-27 : comparaison avec Nusa, paroles dans la pilule
 
 - **Nusa** (rama2555.github.io/nusa, notch Windows en Rust) : nos courbes

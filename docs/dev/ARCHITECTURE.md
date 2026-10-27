@@ -54,7 +54,9 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── uninstall.ps1   Arrête ilot.exe, supprime le raccourci et le dossier installé (garde %LOCALAPPDATA%\Ilot et la clé Run)
 ├── CHANGELOG.md    Notes de version, embarquées dans l'appli (update.rs) et publiées sur GitHub Releases
 ├── README.md       Présentation pour l'utilisateur
-├── .github/workflows/release.yml  Sur un tag v* : compile et publie ilot-<ver>-win64.zip
+├── release.ps1     Publication locale : compile, zip, signe (examples/sign.rs), gh release create
+├── examples/sign.rs  Clé et signature des archives (keygen, pub, sign), vérifiées par update.rs
+├── .github/workflows/release.yml  À la main seulement (ne signe pas) : compile et publie ilot-<ver>-win64.zip
 ├── icons/          icon.ico, icon.png
 └── docs/           Captures, perf-ilot.md (mesures), perf-pistes.md (optimisations), dev/ (ce dossier)
                     design/claude-code/ : maquette et spécification de l'animation Claude Code
@@ -100,7 +102,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── claude.rs     Hooks Claude Code dans ~/.claude/settings.json, Windows et WSL (installer, retirer, état) ; limites de l'abonnement (addon Claude)
 ├── translate.rs  Traduction Google « gtx »
 ├── mail.rs       IMAP (mots de passe DPAPI)    ├── google.rs  OAuth 2 Gmail (PKCE)
-├── update.rs     Mises à jour GitHub Releases (toutes les 6 h)
+├── update.rs     Mises à jour GitHub Releases (toutes les 6 h), signature exigée (SIGN_KEY)
 └── quickshare/   Quick Share (d'après NearDrop)
     ├── mod.rs  État, mDNS, commandes qs_*   ├── conn.rs  UKEY2, AES-CBC + HMAC, trames
     ├── inbound.rs  Réception                ├── outbound.rs  Envoi

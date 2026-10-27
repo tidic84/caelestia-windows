@@ -55,11 +55,36 @@ Item {
     })
     signal settingsChanged()
 
+    // un seul settings_set a la fois : deux envois paralleles peuvent finir
+    // dans le desordre, et la reponse la plus ancienne ecraserait le reglage
+    // suivant. Les changements faits pendant l'envoi partent ensemble apres.
     function setCfg(patch) {
         cfg = Object.assign({}, cfg, patch)
         onSettings()
-        Api.invoke("settings_set", { patch: patch }).then(c => {
-            cfg = Object.assign({}, cfg, c, outPatch)
+        cfgWait = Object.assign({}, cfgWait, patch)
+        if (!cfgBusy)
+            sendCfg()
+    }
+    property var cfgWait: null
+    property bool cfgBusy: false
+    // patch en cours d'envoi (renvoye a la fermeture, l'appel peut ne pas aboutir)
+    property var cfgSending: null
+    function sendCfg() {
+        const p = cfgWait
+        cfgWait = null
+        cfgSending = p
+        cfgBusy = true
+        const next = c => {
+            if (c)
+                cfg = Object.assign({}, cfg, c, cfgWait, outPatch)
+            cfgSending = null
+            cfgBusy = false
+            if (cfgWait)
+                sendCfg()
+        }
+        Api.invoke("settings_set", { patch: p }).then(next, e => {
+            console.warn("settings_set :", e)
+            next(null)
         })
     }
 
@@ -139,11 +164,14 @@ Item {
                     console.warn("store_set a la fermeture :", e)
                 }
             }
-            if (!root.outSave.running)
-                return
+            // reglages en cours d'envoi ou pas encore envoyes
+            const pend = [root.cfgSending, root.cfgWait, root.outSave.running ? root.outPatch : null]
             root.outSave.stop()
+            if (pend.every(p => !p))
+                return
+            const wait = Object.assign({}, ...pend)
             try {
-                Api.call("settings_set", { patch: root.outPatch })
+                Api.call("settings_set", { patch: wait })
             } catch (e) {
                 console.warn("settings_set a la fermeture :", e)
             }

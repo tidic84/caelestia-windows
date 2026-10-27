@@ -12,6 +12,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use crate::host::AppHandle;
 
 const REPO: &str = "tidic84/caelestia-windows";
@@ -44,6 +45,9 @@ pub struct Update {
     asset: String,
     #[serde(skip)]
     sha256: String,
+    /// signature de l'archive (`<archive>.sig`), vide si la version n'en a pas
+    #[serde(skip)]
+    sig: String,
 }
 
 static STATE: Mutex<Option<Update>> = Mutex::new(None);
@@ -173,6 +177,13 @@ fn check(app: &AppHandle) -> Update {
                 .and_then(|d| d.strip_prefix("sha256:"))
                 .unwrap_or_default()
                 .to_string();
+            u.sig = asset
+                .and_then(|a| {
+                    let name = format!("{}.sig", a.name);
+                    r.assets.iter().find(|s| s.name.eq_ignore_ascii_case(&name))
+                })
+                .map(|s| s.browser_download_url.clone())
+                .unwrap_or_default();
             u.checked = now();
             u.status = if ready { "ready" } else { "idle" };
         }),
@@ -193,18 +204,72 @@ struct Pending {
     version: String,
     zip: PathBuf,
     sha256: String,
+    /// signature verifiee (une archive telechargee par une version qui ne
+    /// verifiait pas n'est pas installee)
+    #[serde(default)]
+    signed: bool,
 }
 
 fn pending() -> Option<Pending> {
     let p: Pending = serde_json::from_str(&std::fs::read_to_string(dir().join("pending.json")).ok()?).ok()?;
-    (p.zip.exists() && newer(&p.version, VERSION)).then_some(p)
+    (p.signed && p.zip.exists() && newer(&p.version, VERSION)).then_some(p)
+}
+
+// ---------------------------------------------------------------- signature
+
+/// Cle publique des versions (ECDSA P-256, SEC1 en base64). La cle privee
+/// reste sur le poste qui publie (`release.ps1`, `examples/sign.rs`) : un
+/// compte GitHub pirate ne suffit pas a faire installer une fausse archive.
+const SIGN_KEY: &str = "AvUM28q7Ibz+YxT55VoBno1wrvC8P8TOX6StiTxYVZjY";
+
+/// Message signe : l'archive, puis `\nilot <version>` (une archive signee
+/// ne peut pas etre republiee sous un autre numero). Meme calcul que
+/// `examples/sign.rs`.
+fn signed_message(zip: &Sha256, version: &str) -> Sha256 {
+    let mut h = zip.clone();
+    h.update(format!("\nilot {version}").as_bytes());
+    h
+}
+
+fn verify(msg: Sha256, sig_b64: &str) -> Result<(), String> {
+    verify_with(SIGN_KEY, msg, sig_b64)
+}
+
+fn verify_with(key_b64: &str, msg: Sha256, sig_b64: &str) -> Result<(), String> {
+    use base64::Engine;
+    use p256::ecdsa::signature::DigestVerifier;
+    use p256::ecdsa::{Signature, VerifyingKey};
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let key = b64.decode(key_b64).ok().and_then(|k| VerifyingKey::from_sec1_bytes(&k).ok()).ok_or("Clé de signature invalide")?;
+    let sig = b64
+        .decode(sig_b64.trim())
+        .ok()
+        .and_then(|s| Signature::from_slice(&s).ok())
+        .ok_or("Signature illisible")?;
+    key.verify_digest(msg, &sig).map_err(|_| "Signature invalide : archive refusée".to_string())
+}
+
+fn hex(b: &[u8]) -> String {
+    b.iter().map(|x| format!("{x:02X}")).collect()
 }
 
 fn download(app: &AppHandle) -> Result<(), String> {
-    let (url, version, size, sha256) = with(|u| (u.asset.clone(), u.latest.clone(), u.size, u.sha256.clone()));
+    let (url, version, size, digest, sig_url) =
+        with(|u| (u.asset.clone(), u.latest.clone(), u.size, u.sha256.clone(), u.sig.clone()));
     if url.is_empty() || !newer(&version, VERSION) {
         return Err("Pas de mise à jour à télécharger".into());
     }
+    if sig_url.is_empty() {
+        return Err("Version non signée : mise à jour refusée".into());
+    }
+    let sig = crate::http()
+        .get(&sig_url)
+        .set("User-Agent", "ilot")
+        .timeout(Duration::from_secs(30))
+        .call()
+        .map_err(|e| format!("Signature introuvable ({e})"))?
+        .into_string()
+        .map_err(|e| format!("Signature illisible ({e})"))?;
     let resp = crate::http()
         .get(&url)
         .set("User-Agent", "ilot")
@@ -219,6 +284,7 @@ fn download(app: &AppHandle) -> Result<(), String> {
     let mut rd = resp.into_reader();
     let mut buf = vec![0u8; 64 * 1024];
     let mut got = 0u64;
+    let mut hash = Sha256::new();
     let mut last = Instant::now();
     loop {
         let n = rd.read(&mut buf).map_err(|e| format!("Téléchargement interrompu ({e})"))?;
@@ -226,6 +292,7 @@ fn download(app: &AppHandle) -> Result<(), String> {
             break;
         }
         out.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+        hash.update(&buf[..n]);
         got += n as u64;
         if last.elapsed() > Duration::from_millis(250) {
             last = Instant::now();
@@ -238,8 +305,19 @@ fn download(app: &AppHandle) -> Result<(), String> {
         let _ = std::fs::remove_file(&part);
         return Err("Archive incomplète".into());
     }
+    // somme de l'archive recue : le script d'installation la reverifie
+    let sha256 = hex(&hash.clone().finalize());
+    let checked = if !digest.is_empty() && !digest.eq_ignore_ascii_case(&sha256) {
+        Err("Archive corrompue (somme SHA-256)".to_string())
+    } else {
+        verify(signed_message(&hash, &version), &sig)
+    };
+    if let Err(e) = checked {
+        let _ = std::fs::remove_file(&part);
+        return Err(e);
+    }
     std::fs::rename(&part, &zip).map_err(|e| e.to_string())?;
-    let p = Pending { version, zip, sha256 };
+    let p = Pending { version, zip, sha256, signed: true };
     std::fs::write(dir().join("pending.json"), serde_json::to_string(&p).unwrap_or_default()).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -452,5 +530,40 @@ fn running() -> bool {
             true
         }
         Err(_) => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine;
+    use p256::ecdsa::signature::DigestSigner;
+    use p256::ecdsa::{Signature, SigningKey};
+
+    #[test]
+    fn sign_key_valid() {
+        let k = base64::engine::general_purpose::STANDARD.decode(SIGN_KEY).unwrap();
+        assert!(p256::ecdsa::VerifyingKey::from_sec1_bytes(&k).is_ok());
+    }
+
+    // meme calcul que examples/sign.rs
+    #[test]
+    fn signature_roundtrip() {
+        let b64 = base64::engine::general_purpose::STANDARD;
+        let k = SigningKey::random(&mut rand::rngs::OsRng);
+        let key = b64.encode(k.verifying_key().to_encoded_point(true).as_bytes());
+        let mut zip = Sha256::new();
+        zip.update(b"archive");
+        let mut h = zip.clone();
+        h.update(b"\nilot 1.2.3");
+        let sig: Signature = k.sign_digest(h);
+        let sig = b64.encode(sig.to_bytes());
+        assert!(verify_with(&key, signed_message(&zip, "1.2.3"), &sig).is_ok());
+        // autre version, autre archive, autre cle
+        assert!(verify_with(&key, signed_message(&zip, "1.2.4"), &sig).is_err());
+        let mut other = Sha256::new();
+        other.update(b"archivf");
+        assert!(verify_with(&key, signed_message(&other, "1.2.3"), &sig).is_err());
+        assert!(verify(signed_message(&zip, "1.2.3"), &sig).is_err());
     }
 }

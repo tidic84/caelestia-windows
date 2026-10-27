@@ -7,4 +7,5 @@ qt/build/
 # release locale (CI indisponible)
 /dist/
 /ilot-*-win64.zip
+/ilot-*-win64.zip.sig
 /notes.md

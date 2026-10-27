@@ -16,6 +16,13 @@ Window {
     // nom de l'ecran (donne par Shell)
     property string screenName: ""
 
+    // un champ qui avait le clavier est desactive (changement d'onglet) : le
+    // focus tombe sur contentItem, et Echap n'arrivait plus a root
+    onActiveFocusItemChanged: {
+        if (activeFocusItem === contentItem)
+            root.forceActiveFocus()
+    }
+
     // appele par Shell quand le coeur Rust tourne
     function start() {
         Ilot.start()

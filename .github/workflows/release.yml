@@ -3,11 +3,14 @@
 # `ilot-<version>-win64.zip` et cree la version GitHub avec les notes de
 # CHANGELOG.md. Les ilots installes la trouvent par l'API Releases
 # (src/update.rs) et l'installent.
+#
+# Desactive au tag : les mises a jour exigent une archive signee
+# (`<archive>.sig`), et la cle privee reste sur le poste. Publier avec
+# `release.ps1`. Lancee a la main, cette CI ecraserait l'archive signee par
+# une archive dont la signature ne correspond plus : les ilots la refuseraient.
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:

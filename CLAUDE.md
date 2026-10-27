@@ -37,28 +37,28 @@ C:\Qt\6.9.3\msvc2022_64\bin\qmllint.exe -I qt\build qt\qml\X.qml
 $env:ILOT_QT_LOG="$env:TEMP\ilot.log"; qt\build\ilot.exe   # journal Qt/QML dans un fichier
 ```
 
-Version : `Cargo.toml`, plus une section dans `CHANGELOG.md` (embarqué dans
-l'appli). Pour publier, pousser un tag `v*` : la CI publie
-`ilot-<ver>-win64.zip`.
+Version : `Cargo.toml`, plus une section `## <ver> — <date>` dans
+`CHANGELOG.md` (embarqué dans l'appli). Commit, push, puis :
 
-**⚠️ Depuis le 2026-10-27, le quota des GitHub Actions est épuisé** : la CI
-(`release.yml`) ne tourne plus pour l'instant. Pour publier, il faut
-compiler en local et créer la release à la main, en refaisant les étapes de
-`release.yml` :
-1. version dans `Cargo.toml` + section `## <ver> — <date>` dans
-   `CHANGELOG.md`, commit ;
-2. `qt\build.cmd` (commande PowerShell des « Pièges connus ») ;
-3. copier `qt\build` dans `dist\Ilot` avec le même `robocopy` que
-   `release.yml` (sans `CMakeFiles`, `.rcc`, `*.obj`, `*.pdb`…), puis
-   `Compress-Archive -Path dist\Ilot -DestinationPath ilot-<ver>-win64.zip`.
-   Le nom doit finir par `.zip` et contenir `ilot.exe` (cherché partout
-   dans l'archive par `src/update.rs`) ; garder le dossier `Ilot\` comme
-   la CI ;
-4. notes = la section `## <ver>` du changelog, dans `notes.md` ;
-5. `gh release create v<ver> ilot-<ver>-win64.zip --title "Îlot <ver>" --notes-file notes.md`
-   (crée aussi le tag ; ne pas pousser le tag avant, sinon la CI se lance
-   et échoue).
-Ne pas commiter `dist\`, le zip ni `notes.md`.
+```powershell
+powershell -ExecutionPolicy Bypass -File release.ps1 -NoPublish   # compile, zip, signe, notes.md (sans publier)
+powershell -ExecutionPolicy Bypass -File release.ps1              # pareil, puis gh release create v<ver>
+```
+
+**Mises à jour signées (depuis la 0.4.22)** : `src/update.rs` refuse une
+archive sans `ilot-<ver>-win64.zip.sig` valide (ECDSA P-256 sur l'archive et
+la version, clé publique `SIGN_KEY`). La clé privée est
+`%USERPROFILE%\.ilot\release.key`, **hors du dépôt : ne jamais la commiter,
+la garder sauvegardée**. Perdue, plus aucun îlot installé ne se met à jour
+seul (il faudrait une nouvelle clé dans le code et une installation à la
+main). Outil : `examples/sign.rs` (`keygen`, `pub`, `sign`).
+
+`release.ps1` vérifie la section datée du changelog, l'arbre propre, le
+commit poussé, et que la clé correspond à `SIGN_KEY`. Il crée le tag par
+`gh release create`. La CI (`release.yml`) ne se lance plus sur un tag : elle
+ne sait pas signer, et son archive remplacerait celle qui est signée. Le
+quota des GitHub Actions est d'ailleurs épuisé depuis le 2026-10-27.
+Ne pas commiter `dist\`, le zip, le `.sig` ni `notes.md`.
 
 ## Pièges connus
 
