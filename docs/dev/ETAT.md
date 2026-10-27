@@ -35,6 +35,29 @@ reprendre.
 
 ## Journal
 
+### 2026-10-27 : pas de focus devant une appli en plein écran (0.4.22)
+
+- **Demande** : que l'îlot ne puisse pas prendre le focus quand une appli
+  est en plein écran, ou en plein écran fenêtré.
+- **`winctl.cpp`** :
+  - tant que `covered` est vrai, le style `WS_EX_NOACTIVATE` est posé sur
+    la fenêtre (`noActivate`, remis à chaque relevé de 500 ms) : un clic ne
+    l'active pas ;
+  - `grabFocus` ne fait rien si la fenêtre qui couvrait l'écran
+    (`m_coverFg`) est encore au premier plan. Tous les chemins de focus
+    passent par lui : le signal QML `grabFocus` et `@focus` côté Rust.
+  - Le plein écran fenêtré est déjà compté quand la fenêtre sans bordure
+    couvre l'écran sans être « agrandie ». Une fenêtre agrandie ne compte
+    que si elle est choisie en « Personnalisé ».
+- **`Ilot.qml`** : devant une appli en plein écran, l'îlot ouvert se replie
+  quand la souris le quitte, même épinglé. S'il a été ouvert par un
+  raccourci sans la souris dessus, il se replie au bout de 3 s.
+- **Relecture** (agent général) : rien de bloquant. Les deux remarques ont
+  été appliquées : le repli après 3 s, et `m_coverFg` (un relevé qui date
+  de 500 ms après un Alt+Tab ne bloque plus le focus).
+- **Vérifié** : la même chose que ci-dessous (syntaxe clang et qmllint).
+  **Non compilé avec `qt\build.cmd`, non testé en vrai.**
+
 ### 2026-10-27 : réglage « Îlot en plein écran » (0.4.22, à venir)
 
 - **Demande** : un réglage pour l'îlot en jeu, avec quatre modes : normal

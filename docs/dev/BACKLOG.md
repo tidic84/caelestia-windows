@@ -15,9 +15,11 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 - 🟠 **Îlot en plein écran (2026-10-27)** : pas compilé ni testé sur le
   poste (session cloud). Limites connues :
-  - Un clic sur l'îlot affiché par-dessus un jeu (« Toujours affiché »,
-    « Masquer auto ») lui donne le focus : la barre peut apparaître
-    jusqu'au retour dans le jeu, et un jeu en plein écran exclusif se réduit.
+  - Devant une appli en plein écran, l'îlot n'a jamais le clavier : pas de
+    saisie (recherche, champs) ni d'Échap. C'est voulu, pour que le jeu
+    garde le focus.
+  - Le style `WS_EX_NOACTIVATE` n'est posé qu'au relevé suivant (500 ms au
+    plus) : un clic juste à l'entrée en plein écran active encore l'îlot.
   - Les applis UWP sont vues comme `applicationframehost.exe` : on ne peut
     pas en choisir une en particulier.
   - La touche Windows reste rendue à Windows en plein écran, même en

@@ -100,6 +100,9 @@ private:
     // processus de la fenetre au premier plan et son executable (lu une fois
     // par processus)
     unsigned long m_fgPid = 0;
+    // fenetre qui couvre l'ecran (covered), comparee au premier plan actuel
+    // par grabFocus : le releve a pu dater de 500 ms
+    void *m_coverFg = nullptr;
     QString m_fgExe;
     // mode "auto" : la fenetre serait masquee, mais la souris l'a rappelee
     bool m_hideWanted = false;

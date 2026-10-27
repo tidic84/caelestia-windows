@@ -381,6 +381,12 @@ Item {
             endActivity(false)
         if (s === "open")
             opened()
+        // ouvert par un raccourci devant une appli en plein ecran : sans
+        // clavier ni souris dessus, rien ne le refermerait
+        if (s === "open" && covered && !hovered && !locked) {
+            leaveTimer.interval = 3000
+            leaveTimer.start()
+        }
         updateViz()
     }
     signal opened()

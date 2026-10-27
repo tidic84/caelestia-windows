@@ -168,7 +168,7 @@ static void forceForeground(HWND h)
 void WinCtl::grabFocus()
 {
     // devant une appli en plein ecran, le clavier lui reste (voir noActivate)
-    if (!m_win || m_covered)
+    if (!m_win || (m_covered && GetForegroundWindow() == HWND(m_coverFg)))
         return;
     forceForeground(HWND(m_win->winId()));
     m_win->requestActivate();
@@ -277,6 +277,7 @@ void WinCtl::checkFullscreen()
         m_covered = fs || hide;
         Q_EMIT coveredChanged();
     }
+    m_coverFg = m_covered ? fg : nullptr;
     noActivate(own, m_covered);
     m_hideWanted = hide;
     if (hide && m_fsMode == QLatin1String("auto")) {
