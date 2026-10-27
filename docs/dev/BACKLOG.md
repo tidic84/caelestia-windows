@@ -13,6 +13,11 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🟢 **Puce Jeux (2026-10-27)** : une appli de `folders.games` qui est aussi
+  détectée (Steam…) apparaît deux fois. CurseForge et Overwolf sont rangés
+  dans « Launcher ». Les jeux ajoutés à la main ne déclenchent pas le mode
+  jeu (détection Rust seule).
+
 - 🟢 **Sélecteur Bluetooth (2026-10-26), limites connues** :
   - Seuls les casques et enceintes (classe audio) se connectent depuis
     l'îlot. Souris, claviers, manettes se connectent d'eux-mêmes ; la ligne

@@ -14,6 +14,10 @@ reprendre.
   `v0.4.18` (GitHub Action `release.yml`). La 0.4.17 (addon Claude, hooks
   WSL, Apex) l'a été le même jour. La 0.4.8 n'a jamais été publiée seule : elle
   est incluse dans la 0.4.9.
+- **⚠️ CI indisponible (2026-10-27)** : quota des GitHub Actions épuisé.
+  Les releases se font en local : build, zip, `gh release create`. Étapes
+  dans `CLAUDE.md` (section Commandes). La 0.4.22 est en attente
+  (changelog « à venir »).
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
   un raccourci dans le dossier Démarrage. Elle a été construite depuis les
   sources par `install.ps1`.
@@ -30,6 +34,30 @@ reprendre.
   le clic droit de la ligne `explorer`.
 
 ## Journal
+
+### 2026-10-27 : Apps, Launcher et Jeux inversés, dossiers, commandes
+
+- **Demande** : les launchers étaient dans « Jeux » et les jeux dans
+  « Launcher ». Pouvoir supprimer les dossiers. Plus de commandes « > ».
+- **Inversion** (`Ilot.qml` `seedGames`, `AppsPage.qml`) : la puce des jeux
+  détectés s'appelle « Jeux ». Le dossier « Jeux » devient « Launcher ».
+  Migration `folders.layout` 1 → 2 : dans l'ancien dossier, seuls les
+  launchers restent (`launcherHints`). Le reste passe dans `folders.games`.
+  Un jeu passe avant un launcher (`gameHints` : Minecraft, Valorant, Lunar
+  Client, Genshin…). Nouvelle installation : dossier « Launcher » + jeux dans
+  `folders.games`.
+- **Dossiers** : `folderMenu` agissait sur le `modelData` du Repeater, qui
+  est une copie. Supprimer et renommer étaient donc perdus. Le dossier est
+  désormais retrouvé par id.
+- **Commandes** : volume N %, muet, lecture/pause, pistes, « Ouvrir » +
+  onglets activés, Corbeille, Téléchargements, dossier des fonds,
+  gestionnaire des tâches de Windows, actualiser les applis et les jeux,
+  mise à jour.
+- Vérifié : compilé, la migration a tourné sur le `folders.json` du poste
+  (sauvegarde prise avant). Relu par un agent : pas de bug, deux remarques
+  appliquées (libellé du mode jeu, ancien `seeded:false` avec « Jeux »).
+- Non vérifié : la suppression et le renommage d'un dossier au clic, et les
+  nouvelles commandes, à tester par l'utilisateur. Rien n'est commité.
 
 ### 2026-10-26 : sélecteur Bluetooth (Contrôles)
 

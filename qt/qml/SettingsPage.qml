@@ -1535,7 +1535,7 @@ Item {
                 SetRow {
                     icon: "sports_esports"
                     title: "Mode jeu"
-                    sub: "Quand un jeu du Launcher tourne"
+                    sub: "Quand un jeu détecté (Steam, Epic, Ubisoft, GOG) tourne"
                     toggle: true
                     checked: !!page.cfg.game_mode
                     onToggled: on => Ilot.setCfg({ game_mode: on })

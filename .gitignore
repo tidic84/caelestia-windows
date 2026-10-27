@@ -3,3 +3,8 @@ gen/
 .shots/
 Ilot.exe
 qt/build/
+
+# release locale (CI indisponible)
+/dist/
+/ilot-*-win64.zip
+/notes.md

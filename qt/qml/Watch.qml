@@ -238,7 +238,7 @@ Item {
     }
 
     // ================================================== mode jeu
-    // jeu du Launcher lance : Windows en mode Performances (retabli a la
+    // jeu detecte lance : Windows en mode Performances (retabli a la
     // sortie), notifications en silence, profil de volume « Jeu »
     property var gameOn: null
     function gameMode(g) {
