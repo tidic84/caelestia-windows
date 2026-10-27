@@ -1,0 +1,471 @@
+<title>Animations de l'îlot</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,1,0">
+<style>
+/* Mise en page : une colonne de comparaisons ; chacune montre deux écrans
+   (avant / après) joués en même temps, avec les vraies tailles de l'îlot
+   (Ilot.qml sizeFor) réduites à la largeur disponible. Palette de Theme.qml. */
+:root{
+  color-scheme:dark;
+  --primary:#cfbdfe; --inkPrimary:#36265d; --primaryC:#4d3d75; --inkPrimaryC:#e9ddff;
+  --tertiary:#efb8c8; --tertiaryC:#633b48;
+  --surface:#141218; --surfaceLow:#1d1b20; --surfaceC:#211f26; --surfaceHigh:#2b2930; --surfaceHighest:#36343b;
+  --ink:#e6e0e9; --inkVar:#cac4d0; --outline:#938f99; --outlineVar:#49454f;
+  --page:#0e0d11; --island:#000;
+  --good:#9ad7a4; --bad:#ffb4ab;
+  --ui:Rubik,"Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 var(--ui);
+  padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+.ms{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;white-space:nowrap;user-select:none;-webkit-font-feature-settings:"liga";font-feature-settings:"liga"}
+
+header{display:flex;flex-direction:column;gap:12px}
+h1{font-size:26px;font-weight:500;margin:0;text-wrap:balance}
+.lead{color:var(--inkVar);margin:0;max-width:70ch}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;
+  background:color-mix(in srgb,var(--page) 88%,transparent);backdrop-filter:blur(10px);padding:10px 0}
+.tgl{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px 0 10px;border-radius:18px;background:var(--surfaceHigh);
+  color:var(--ink);border:0;font:inherit;cursor:pointer}
+.tgl .sw{width:30px;height:18px;border-radius:9px;background:var(--surfaceHighest);border:1.5px solid var(--outline);position:relative;transition:background .2s,border-color .2s}
+.tgl .sw::after{content:"";position:absolute;left:2px;top:2px;width:11px;height:11px;border-radius:50%;background:var(--outline);transition:transform .25s cubic-bezier(.34,1.36,.5,1),background .2s}
+.tgl[aria-pressed="true"] .sw{background:var(--primary);border-color:var(--primary)}
+.tgl[aria-pressed="true"] .sw::after{transform:translateX(12px);background:var(--inkPrimary)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 16px 0 12px;border-radius:18px;border:0;font:inherit;cursor:pointer;
+  background:var(--primaryC);color:var(--inkPrimaryC)}
+.btn:hover,.tgl:hover{filter:brightness(1.12)}
+.btn .ms{font-size:20px}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+.demo{display:flex;flex-direction:column;gap:14px}
+.demo-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-end;justify-content:space-between}
+.demo-head > div{min-width:0;flex:1 1 420px}
+h2{font-size:18px;font-weight:500;margin:0 0 4px;text-wrap:balance}
+.demo p{margin:0;color:var(--inkVar);max-width:78ch}
+.refs{font-size:12px;color:var(--outline);margin-top:6px}
+.refs code{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--inkVar);background:var(--surfaceC);padding:1px 6px;border-radius:6px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:820px){.pair{grid-template-columns:1fr}}
+figure{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+figcaption{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--inkVar)}
+.tag{font-size:11.5px;font-weight:500;padding:2px 10px;border-radius:99px;letter-spacing:.02em}
+.tag.before{background:var(--surfaceHighest);color:var(--inkVar)}
+.tag.after{background:var(--primary);color:var(--inkPrimary)}
+.screen{position:relative;width:100%;aspect-ratio:900/560;border-radius:14px;overflow:hidden;background:#20304a;box-shadow:0 0 0 1px var(--outlineVar)}
+.note{font-size:12.5px;color:var(--outline);display:flex;gap:6px;align-items:flex-start}
+.note .ms{font-size:16px;margin-top:2px}
+
+/* ---- scène : 900 × 560 unités, mise à l'échelle par JS ---- */
+.stage{position:absolute;left:0;top:0;width:900px;height:560px;transform-origin:0 0;font-family:var(--ui);color:#fff}
+.wall{position:absolute;inset:0;background:
+  radial-gradient(120% 70% at 78% 105%,#f2b8a2 0,#e88f86 24%,transparent 55%),
+  radial-gradient(90% 60% at 10% 100%,#7d6bd1 0,transparent 60%),
+  linear-gradient(180deg,#9fb8e8 0%,#c9c3ea 46%,#eab9b4 100%)}
+.wall::after{content:"";position:absolute;left:-5%;right:-5%;bottom:0;height:38%;
+  background:radial-gradient(60% 100% at 30% 100%,#5b4f9c 0,#5b4f9c 55%,transparent 56%),radial-gradient(70% 90% at 85% 100%,#463c80 0,#463c80 55%,transparent 56%)}
+.isl{position:absolute;left:450px;top:0;transform:translateX(-50%)}
+.isl .body{position:relative;background:var(--island);overflow:hidden;border-radius:0 0 15px 15px}
+.isl .ear{position:absolute;top:0;width:var(--e);height:var(--e)}
+.isl .ear.l{right:100%;background:radial-gradient(circle at 0 100%,transparent calc(var(--e) - .5px),var(--island) var(--e))}
+.isl .ear.r{left:100%;background:radial-gradient(circle at 100% 100%,transparent calc(var(--e) - .5px),var(--island) var(--e))}
+.L{position:absolute;top:0;left:50%;will-change:opacity,transform}
+
+/* pilule repliée */
+.L-pill{height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 14px 0 8px;gap:8px}
+.disc{width:22px;height:22px;border-radius:50%;background:conic-gradient(var(--primary) 0 62%,rgba(255,255,255,.18) 0);display:grid;place-items:center}
+.disc i{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,#ff8a65,#7e57c2)}
+.clock{font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.pet{position:relative;width:20px;height:17px;border-radius:50% 50% 44% 44%;background:#a8e0a0;flex:none}
+.pet .eye{position:absolute;top:6px;width:3px;height:4px;border-radius:2px;background:#16301a}
+.pet .eye.a{left:5px}.pet .eye.b{left:11px}
+
+/* survol */
+.L-peek{width:460px;height:76px;display:flex;align-items:center;gap:14px;padding:0 22px 0 14px}
+.art{border-radius:12px;background:
+  radial-gradient(circle at 30% 30%,#ffd08a 0 14%,transparent 15%),
+  radial-gradient(120% 90% at 100% 100%,#7e57c2 0,transparent 60%),
+  linear-gradient(135deg,#ff8a65,#e0457b 55%,#5e35b1);flex:none}
+.L-peek .art{width:52px;height:52px}
+.meta{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.meta b{font-weight:500;font-size:15px}
+.meta span{font-size:12.5px;color:rgba(255,255,255,.6)}
+.ctl{display:flex;gap:10px;align-items:center;color:#fff}
+.ctl .ms{font-size:24px}
+.ctl .play{width:38px;height:38px;border-radius:50%;background:var(--primary);color:var(--inkPrimary);display:grid;place-items:center}
+
+/* panneau ouvert (740 × 540) */
+.L-open,.L-apps{width:740px;height:540px;transform-origin:50% 0;padding:14px 24px 24px;display:flex;flex-direction:column;gap:18px}
+.tabs{display:flex;gap:6px;justify-content:center}
+.tabs span{width:44px;height:34px;border-radius:17px;display:grid;place-items:center;color:var(--inkVar);font-size:21px}
+.tabs span.on{background:var(--primaryC);color:var(--inkPrimaryC)}
+.media{flex:1;display:flex;gap:28px;align-items:center;padding:0 12px}
+.media .art{width:250px;height:250px;border-radius:24px;box-shadow:0 18px 40px -16px rgba(0,0,0,.8)}
+.mcol{flex:1;display:flex;flex-direction:column;gap:14px;min-width:0}
+.mcol b{font-size:26px;font-weight:500}
+.mcol .who{font-size:15px;color:var(--inkVar)}
+.seek{height:6px;border-radius:3px;background:var(--surfaceHighest);overflow:hidden}
+.seek i{display:block;height:100%;width:44%;background:var(--primary);border-radius:3px}
+.times{display:flex;justify-content:space-between;font-size:12px;color:var(--outline);font-variant-numeric:tabular-nums}
+.mcol .ctl{gap:22px;justify-content:center}
+.mcol .ctl .ms{font-size:30px}
+.mcol .ctl .play{width:58px;height:58px}
+.chips{display:flex;gap:8px;justify-content:center}
+.chips span{height:32px;padding:0 12px;border-radius:12px;background:var(--surfaceHigh);display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--inkVar)}
+.chips .ms{font-size:17px}
+
+/* activité (casque connecté) */
+.L-act{width:340px;height:52px;display:flex;align-items:center;gap:12px;padding:0 18px}
+.L-act .ico{width:32px;height:32px;border-radius:50%;background:var(--primaryC);color:var(--inkPrimaryC);display:grid;place-items:center;flex:none}
+.L-act .ico .ms{font-size:19px}
+.L-act .meta b{font-size:13.5px}
+.L-act .meta span{font-size:11.5px}
+.bar{height:4px;border-radius:2px;background:var(--surfaceHighest);margin-top:4px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:2px;background:var(--primary);width:0}
+.pct{font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--primary);min-width:38px;text-align:right}
+
+/* applis + dépôt */
+.grid{position:relative;flex:1;display:grid;grid-template-columns:repeat(5,1fr);grid-auto-rows:118px;gap:6px;padding:10px}
+.app{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-size:12.5px;color:var(--inkVar);border-radius:16px}
+.app i{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;font-style:normal;color:#fff}
+.app i .ms{font-size:28px}
+.zone{position:absolute;inset:0;border-radius:18px;border:2px solid var(--primary);pointer-events:none;transform-origin:50% 50%}
+.zone .tint{position:absolute;inset:0;border-radius:16px;background:color-mix(in srgb,var(--primary) 9%,transparent)}
+.zone .lbl{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;height:36px;padding:0 16px 0 12px;
+  border-radius:18px;background:var(--primary);color:var(--inkPrimary);font-size:13px;font-weight:500;white-space:nowrap}
+.zone .lbl .ms{font-size:20px}
+.ghost{position:absolute;left:0;top:0;pointer-events:none;z-index:3}
+.ghost .doc{position:absolute;left:-8px;top:-52px;width:46px;height:46px;border-radius:9px;background:#fff;color:#d93025;display:grid;place-items:center;
+  box-shadow:0 10px 24px rgba(0,0,0,.35);opacity:.92}
+.ghost .doc .ms{font-size:28px}
+.ghost svg{position:absolute;left:0;top:0;width:16px;height:23px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))}
+
+@media (prefers-reduced-motion:reduce){.tgl .sw,.tgl .sw::after{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Animations de l'îlot</h1>
+    <p class="lead">Cinq pistes pour se rapprocher de Nusa. Chaque comparaison joue l'avant et l'après en même temps.
+      L'« avant » reprend les durées et les courbes actuelles du QML. L'« après » ne change que ce qui est décrit.
+      Le ralenti divise la vitesse par quatre.</p>
+  </header>
+
+  <div class="controls" role="toolbar" aria-label="Lecture">
+    <button class="tgl" id="slow" aria-pressed="false"><span class="sw"></span>Ralenti ×4</button>
+    <button class="tgl" id="loop" aria-pressed="true"><span class="sw"></span>Boucle</button>
+    <button class="btn" id="all"><span class="ms">replay</span>Tout rejouer</button>
+  </div>
+
+  <section class="demo" data-demo="open">
+    <div class="demo-head"><div>
+      <h2>1. Le contenu attend que la forme ait grandi</h2>
+      <p>Avant : le panneau apparaît 60 ms après le début de l'ouverture. On le voit donc rogné pendant que l'îlot s'élargit.
+        Après : le contenu attend 170 ms, puis apparaît en 260 ms. À la fermeture, il disparaît en 120 ms avant que la forme se rétracte.</p>
+      <div class="refs"><code>Panel.qml:19-50</code> <code>Pill.qml:15</code></div>
+    </div><button class="btn replay"><span class="ms">replay</span>Rejouer</button></div>
+    <div class="pair">
+      <figure><figcaption><span class="tag before">Avant</span>0.4.21</figcaption><div class="screen" data-v="before"></div></figure>
+      <figure><figcaption><span class="tag after">Après</span>délai 170 ms, sortie rapide</figcaption><div class="screen" data-v="after"></div></figure>
+    </div>
+  </section>
+
+  <section class="demo" data-demo="smooth">
+    <div class="demo-head"><div>
+      <h2>2. Fluidité : aucune image sautée</h2>
+      <p>Avant : pendant le morphing, la zone cliquable et le fond sont recalculés à chaque image (<code>SetWindowRgn</code>, D2D, <code>SetWindowPos</code>).
+        Le compagnon est animé par une horloge à 25 images/s. Après : la zone est posée une seule fois au début de l'animation,
+        et le compagnon suit la fréquence de l'écran.</p>
+      <div class="refs"><code>Main.qml:125-131</code> <code>Ilot.qml:531</code> <code>BACKLOG.md</code> « Animations d'ouverture »</div>
+    </div><button class="btn replay"><span class="ms">replay</span>Rejouer</button></div>
+    <div class="pair">
+      <figure><figcaption><span class="tag before">Avant</span>images sautées, compagnon à 25 im/s</figcaption><div class="screen" data-v="before"></div></figure>
+      <figure><figcaption><span class="tag after">Après</span>fréquence de l'écran</figcaption><div class="screen" data-v="after"></div></figure>
+    </div>
+    <div class="note"><span class="ms">info</span>Les images sautées sont simulées pour montrer le symptôme attendu. Leur fréquence réelle reste à mesurer sur le poste.
+      En ralenti, les paliers du compagnon à 25 images/s deviennent bien visibles.</div>
+  </section>
+
+  <section class="demo" data-demo="shadow">
+    <div class="demo-head"><div>
+      <h2>3. Profondeur : une ombre qui grandit avec l'îlot</h2>
+      <p>Avant : l'îlot ouvert est posé à plat sur le fond d'écran. Après : une ombre douce, presque invisible quand l'îlot est replié,
+        se creuse à l'ouverture (même idée que Nusa : 0 14 px 34 px, rayon négatif, 95 % de noir).</p>
+      <div class="refs"><code>Island.qml</code> (nouvelle couche sous <code>bg</code>)</div>
+    </div><button class="btn replay"><span class="ms">replay</span>Rejouer</button></div>
+    <div class="pair">
+      <figure><figcaption><span class="tag before">Avant</span>sans ombre</figcaption><div class="screen" data-v="before"></div></figure>
+      <figure><figcaption><span class="tag after">Après</span>ombre liée à l'ouverture</figcaption><div class="screen" data-v="after"></div></figure>
+    </div>
+  </section>
+
+  <section class="demo" data-demo="act">
+    <div class="demo-head"><div>
+      <h2>4. Activité : la jauge se remplit une fois arrivée</h2>
+      <p>Avant : la barre se remplit de façon linéaire en 900 ms, pendant que la pilule est encore en train de s'élargir.
+        Après : l'icône rebondit, puis la barre se remplit avec un léger dépassement et le pourcentage compte jusqu'à sa valeur.</p>
+      <div class="refs"><code>Pill.qml:410-424</code> (activité « small »)</div>
+    </div><button class="btn replay"><span class="ms">replay</span>Rejouer</button></div>
+    <div class="pair">
+      <figure><figcaption><span class="tag before">Avant</span>barre linéaire immédiate</figcaption><div class="screen" data-v="before"></div></figure>
+      <figure><figcaption><span class="tag after">Après</span>rebond, puis remplissage</figcaption><div class="screen" data-v="after"></div></figure>
+    </div>
+  </section>
+
+  <section class="demo" data-demo="drop">
+    <div class="demo-head"><div>
+      <h2>5. Dépôt de fichier : la zone réagit, le fichier tombe à sa place</h2>
+      <p>Avant : le cadre de dépôt apparaît d'un coup et le fichier rangé s'affiche sans transition.
+        Après : le cadre apparaît en fondu, la zone grossit légèrement et une étiquette dit quoi faire. Une fois lâché, le fichier tombe dans la grille avec un rebond.</p>
+      <div class="refs"><code>AppsPage.qml:549-557</code></div>
+    </div><button class="btn replay"><span class="ms">replay</span>Rejouer</button></div>
+    <div class="pair">
+      <figure><figcaption><span class="tag before">Avant</span>cadre affiché d'un coup</figcaption><div class="screen" data-v="before"></div></figure>
+      <figure><figcaption><span class="tag after">Après</span>zone vivante, chute du fichier</figcaption><div class="screen" data-v="after"></div></figure>
+    </div>
+  </section>
+
+  <p class="note"><span class="ms">check_circle</span>Paroles : pas de maquette, on est déjà au niveau. La ligne en cours grossit avec le ressort (<code>MediaPage.qml:627-631</code>), comme chez Nusa.</p>
+</div>
+
+<script>
+// ------------------------------------------------------------ courbes
+function bez(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by
+  const X = t => ((ax * t + bx) * t + cx) * t, Y = t => ((ay * t + by) * t + cy) * t
+  return x => {
+    if (x <= 0) return 0
+    if (x >= 1) return 1
+    let lo = 0, hi = 1, t = x
+    for (let i = 0; i < 24; i++) { const v = X(t); if (Math.abs(v - x) < 1e-5) break; if (v < x) lo = t; else hi = t; t = (lo + hi) / 2 }
+    return Y(t)
+  }
+}
+// Theme.qml : spring, emph, std ; et celles de Nusa pour la chute et le remplissage
+const E = { spring: bez(.34, 1.36, .5, 1), emph: bez(.05, .7, .1, 1), std: bez(.2, 0, 0, 1), lin: x => x,
+  pop: bez(.34, 1.6, .5, 1), fill: bez(.3, 1.2, .5, 1), drag: bez(.45, .05, .25, 1) }
+
+// ------------------------------------------------------------ horloge
+let T = 0, speed = 1, loop = true
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
+if (reduced) loop = false
+
+const SIZES = {
+  collapsed: { w: 183, h: 30, r: 15 }, clock: { w: 132, h: 30, r: 15 }, petPill: { w: 207, h: 30, r: 15 },
+  peek: { w: 460, h: 76, r: 26 }, open: { w: 740, h: 540, r: 30 }, act: { w: 340, h: 52, r: 20 }
+}
+
+// ------------------------------------------------------------ scène
+class Stage {
+  constructor(screen, kind, after) {
+    this.kind = kind; this.after = after
+    this.v = {}; this.tw = {}; this.frame = 0; this.seq = []; this.t0 = 0; this.done = 0
+    screen.innerHTML = this.template()
+    this.root = screen.querySelector(".stage")
+    this.q = s => this.root.querySelector(s)
+    this.body = this.q(".body"); this.isl = this.q(".isl")
+    new ResizeObserver(() => { this.root.style.transform = "scale(" + screen.clientWidth / 900 + ")" }).observe(screen)
+  }
+  template() {
+    const tabs = on => '<div class="tabs">' + ["home", "music_note", "apps", "tune", "settings"].map(i => '<span class="ms' + (i === on ? " on" : "") + '">' + i + "</span>").join("") + "</div>"
+    const pill = this.kind === "act" || this.kind === "drop"
+      ? '<div class="L L-pill" style="width:132px;justify-content:center"><span class="clock">14:32</span></div>'
+      : '<div class="L L-pill" style="width:' + (this.kind === "smooth" ? 207 : 183) + 'px"><span class="disc"><i></i></span>'
+        + (this.kind === "smooth" ? '<span class="pet"><span class="eye a"></span><span class="eye b"></span></span>' : "")
+        + '<span class="clock">14:32</span></div>'
+    let layers = pill
+    if (this.kind === "act")
+      layers += '<div class="L L-act"><span class="ico"><span class="ms">headphones</span></span><div class="meta"><b>Shure SRH1540</b><span>Connecté · batterie</span><div class="bar"><i></i></div></div><span class="pct">0 %</span></div>'
+    else if (this.kind === "drop") {
+      const apps = [["Discord", "#5865f2", "forum"], ["Spotify", "#1db954", "music_note"], ["Steam", "#1b2838", "sports_esports"], ["Code", "#2b7bd6", "code"],
+        ["Photos", "#e0457b", "photo"], ["Notes", "#f2a33a", "edit_note"], ["Calc.", "#5e6b7d", "calculate"], ["Explorateur", "#f6c343", "folder"], ["Paramètres", "#6c757d", "settings"]]
+      layers += '<div class="L L-apps">' + tabs("apps") + '<div class="grid">'
+        + apps.map(a => '<div class="app"><i style="background:' + a[1] + '"><span class="ms">' + a[2] + "</span></i>" + a[0] + "</div>").join("")
+        + '<div class="app tile"><i style="background:#fff;color:#d93025"><span class="ms">picture_as_pdf</span></i>rapport.pdf</div>'
+        + '<div class="zone"><div class="tint"></div><div class="lbl"><span class="ms">south</span><span class="t">Relâcher pour ranger</span></div></div>'
+        + "</div></div>"
+    } else
+      layers += '<div class="L L-peek"><span class="art"></span><div class="meta"><b>Midnight City</b><span>M83</span></div><div class="ctl"><span class="ms">skip_previous</span><span class="play"><span class="ms">pause</span></span><span class="ms">skip_next</span></div></div>'
+        + '<div class="L L-open">' + tabs("music_note") + '<div class="media"><span class="art"></span><div class="mcol"><div><b>Midnight City</b><div class="who">M83 · Hurry Up, We\'re Dreaming</div></div>'
+        + '<div><div class="seek"><i></i></div><div class="times"><span>1:48</span><span>4:03</span></div></div>'
+        + '<div class="ctl"><span class="ms">shuffle</span><span class="ms">skip_previous</span><span class="play"><span class="ms">pause</span></span><span class="ms">skip_next</span><span class="ms">lyrics</span></div>'
+        + '<div class="chips"><span><span class="ms">speaker</span>Speakers</span><span><span class="ms">graphic_eq</span>Égaliseur</span></div></div></div></div>'
+    const ghost = this.kind === "drop" ? '<div class="ghost"><span class="doc"><span class="ms">picture_as_pdf</span></span><svg viewBox="0 0 16 23"><path d="M1 1v19l5-5 3.5 7 3-1.5L9 14h6.5z" fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round"/></svg></div>' : ""
+    return '<div class="stage"><div class="wall"></div><div class="isl"><div class="ear l"></div><div class="ear r"></div><div class="body">' + layers + "</div></div>" + ghost + "</div>"
+  }
+  // valeurs animees : to() part de la valeur courante, comme un Behavior
+  val(p) {
+    const t = this.tw[p]
+    if (!t) return this.v[p]
+    const k = (T - t.start) / t.dur
+    if (k < 0) return t.from
+    if (k >= 1) { this.v[p] = t.to; delete this.tw[p]; return t.to }
+    return t.from + (t.to - t.from) * t.ease(k)
+  }
+  to(p, to, dur, ease = E.std, delay = 0) {
+    const from = this.val(p)
+    if (!dur) { delete this.tw[p]; this.v[p] = to; return }
+    this.tw[p] = { from, to, start: T + delay, dur, ease }
+  }
+  set(o) { for (const k in o) { delete this.tw[k]; this.v[k] = o[k] } }
+  shell(mode, delay = 0) {
+    const s = SIZES[mode]
+    this.to("w", s.w, 500, E.spring, delay); this.to("h", s.h, 500, E.spring, delay); this.to("r", s.r, 400, E.std, delay)
+  }
+  play(steps, len) { this.seq = steps; this.len = len; this.t0 = T; this.done = 0; this.ended = false }
+  tick() {
+    const lt = T - this.t0
+    while (this.done < this.seq.length && this.seq[this.done][0] <= lt) this.seq[this.done++][1](this)
+    if (lt >= this.len) this.ended = true
+  }
+  render() {
+    this.frame++
+    // images sautees (simulation) : l'image precedente reste affichee
+    // pendant que la forme change de taille
+    if (this.kind === "smooth" && !this.after && (this.tw.w || this.tw.h)) {
+      const n = this.frame % 19
+      if (n === 3 || n === 4 || n === 9 || n === 14 || n === 15 || n === 16) return
+    }
+    const g = p => this.val(p) ?? 0
+    const w = g("w"), h = g("h"), r = Math.max(0, Math.min(g("r"), w / 2, h))
+    this.body.style.width = w + "px"; this.body.style.height = h + "px"
+    this.body.style.borderRadius = "0 0 " + r + "px " + r + "px"
+    this.isl.style.setProperty("--e", Math.max(0, Math.min(12, h - r)) + "px")
+    const sh = g("sh")
+    this.body.style.boxShadow = sh > 0.001 ? "0 " + (6 + 18 * sh) + "px " + (18 + 44 * sh) + "px " + (-8 - 10 * sh) + "px rgba(0,0,0," + (0.35 + 0.55 * sh) + ")" : "none"
+    const L = (sel, o, s = 1, y = 0) => {
+      const el = this.q(sel); if (!el) return
+      el.style.opacity = o; el.style.visibility = o > 0.001 ? "visible" : "hidden"
+      el.style.transform = "translateX(-50%) translateY(" + y + "px) scale(" + s + ")"
+    }
+    L(".L-pill", g("pillO"))
+    L(".L-peek", g("peekO"), 1, g("peekY"))
+    L(".L-open", g("openO"), g("openS"), g("openY"))
+    L(".L-apps", g("openO"), g("openS"), g("openY"))
+    L(".L-act", g("actO"), g("actS"))
+    if (this.kind === "smooth") {
+      // compagnon : petit saut toutes les 2 s, regard qui balaie
+      const tp = this.after ? T : Math.floor(T / 40) * 40
+      const ph = (tp % 2000) / 2000
+      const hop = ph < 0.3 ? -Math.sin(ph / 0.3 * Math.PI) * 6 : 0
+      const sq = ph < 0.3 ? 1 + Math.sin(ph / 0.3 * Math.PI) * 0.08 : 1 - Math.max(0, Math.sin((ph - 0.3) / 0.08 * Math.PI)) * 0.1 * (ph < 0.38 ? 1 : 0)
+      this.q(".pet").style.transform = "translateY(" + hop + "px) scaleY(" + sq + ")"
+      const look = Math.sin(tp / 520) * 2.2
+      this.q(".pet .eye.a").style.transform = this.q(".pet .eye.b").style.transform = "translateX(" + look + "px)"
+    }
+    if (this.kind === "act") {
+      const f = g("fill")
+      this.q(".bar i").style.width = Math.max(0, f) * 100 + "%"
+      this.q(".pct").textContent = Math.round(Math.min(Math.max(this.after ? g("count") : f, 0), 1) * 100) + " %"
+      this.q(".ico").style.transform = "scale(" + g("icoS") + ")"
+    }
+    if (this.kind === "drop") {
+      const gh = this.q(".ghost")
+      gh.style.transform = "translate(" + g("gx") + "px," + g("gy") + "px)"; gh.style.opacity = g("gO")
+      const z = this.q(".zone")
+      z.style.opacity = g("zO"); z.style.transform = "scale(" + g("zS") + ")"
+      z.querySelector(".tint").style.opacity = this.after ? 1 : 0
+      const lb = z.querySelector(".lbl")
+      lb.style.display = this.after ? "flex" : "none"
+      lb.style.transform = "translateX(-50%) translateY(" + (1 - g("lbl")) * 10 + "px)"
+      lb.style.opacity = g("lbl")
+      lb.querySelector(".ms").style.transform = "translateY(" + (this.after ? Math.sin(T / 180) * 2.5 * g("lbl") : 0) + "px)"
+      const tl = this.q(".tile")
+      tl.style.opacity = g("tO"); tl.style.transform = "translateY(" + g("tY") + "px) scale(" + g("tS") + ")"
+    }
+  }
+}
+
+// ------------------------------------------------------------ scenarios
+// avant = valeurs actuelles du QML ; apres = seulement ce que decrit la carte
+function openCurrent(s) {
+  s.shell("open"); s.to("peekO", 0, 100); s.to("pillO", 0, 100)
+  s.to("openO", 1, 200, E.std, 60); s.to("openS", 1, 500, E.emph, 60); s.to("openY", 0, 500, E.emph, 60)
+}
+function closeCurrent(s) {
+  s.shell("collapsed"); s.to("openO", 0, 200); s.to("openS", 0.97, 500, E.emph); s.to("openY", -24, 500, E.emph); s.to("pillO", 1, 250)
+}
+function openAfter(s) {
+  s.shell("open"); s.to("peekO", 0, 100); s.to("pillO", 0, 100)
+  s.to("openO", 1, 260, E.std, 170); s.to("openS", 1, 500, E.emph, 140); s.to("openY", 0, 500, E.emph, 140)
+}
+function closeAfter(s) {
+  s.to("openO", 0, 120); s.to("openS", 0.98, 300, E.emph); s.to("openY", -12, 300, E.emph)
+  s.shell("collapsed", 40); s.to("pillO", 1, 250, E.std, 150)
+}
+function peek(s) { s.shell("peek"); s.to("pillO", 0, 100); s.to("peekO", 1, 250); s.to("peekY", 0, 400, E.emph) }
+const base = { pillO: 1, peekO: 0, peekY: -8, openO: 0, openS: 0.97, openY: -24, actO: 0, actS: 0.92, sh: 0 }
+
+const SCENES = {
+  open: s => [[[0, s => { s.set(Object.assign({}, base, SIZES.collapsed)) }],
+    [600, peek],
+    [1700, s.after ? openAfter : openCurrent],
+    [3900, s.after ? closeAfter : closeCurrent]], 5600],
+  smooth: s => [[[0, s => { s.set(Object.assign({}, base, SIZES.petPill)) }],
+    [2200, openCurrent],
+    [4000, s => { closeCurrent(s); s.shell("petPill") }]], 6400],
+  shadow: s => [[[0, s => { s.set(Object.assign({}, base, SIZES.collapsed, { sh: s.after ? 0.15 : 0 })) }],
+    [700, s => { openCurrent(s); if (s.after) s.to("sh", 1, 500, E.emph) }],
+    [3300, s => { closeCurrent(s); if (s.after) s.to("sh", 0.15, 400) }]], 5000],
+  act: s => [[[0, s => { s.set(Object.assign({}, base, SIZES.clock, { fill: 0, count: 0, icoS: 1 })) }],
+    [600, s => {
+      s.shell("act"); s.to("pillO", 0, 150)
+      s.to("actO", 1, 250, E.lin, 80); s.to("actS", 1, 400, E.emph, 80)
+      if (s.after) { s.set({ icoS: 0.4 }); s.to("icoS", 1, 550, E.pop, 120); s.to("fill", 0.8, 1000, E.fill, 380); s.to("count", 0.8, 900, E.emph, 380) }
+      else s.to("fill", 0.8, 900, E.lin)
+    }],
+    [3000, s => { s.to("actO", 0, 250); s.to("actS", 0.92, 250); s.shell("clock"); s.to("pillO", 1, 250, E.std, 100) }]], 4300],
+  drop: s => [[[0, s => { s.set(Object.assign({}, base, SIZES.clock, { gx: 760, gy: 500, gO: 0, zO: 0, zS: 1, lbl: 0, tO: 0, tY: 0, tS: 1 })) }],
+    [100, s => s.to("gO", 1, 200)],
+    [250, s => { s.to("gx", 470, 900, E.drag); s.to("gy", 22, 900, E.drag) }],
+    [1150, s => { openCurrent(s); s.to("gx", 735, 800, E.drag, 150); s.to("gy", 300, 800, E.drag, 150) }],
+    [1600, s => {
+      if (s.after) { s.to("zO", 1, 200); s.to("zS", 1.015, 450, E.spring); s.to("lbl", 1, 350, E.emph, 80) }
+      else s.set({ zO: 1 })
+    }],
+    [2700, s => {
+      s.to("gO", 0, 150)
+      if (s.after) { s.to("zO", 0, 250); s.to("zS", 1, 300); s.to("lbl", 0, 200); s.set({ tY: -46, tS: 0.7 }); s.to("tO", 1, 260); s.to("tY", 0, 750, E.pop); s.to("tS", 1, 750, E.pop) }
+      else s.set({ zO: 0, tO: 1 })
+    }],
+    [4300, closeCurrent]], 5900]
+}
+
+// ------------------------------------------------------------ montage
+const demos = [...document.querySelectorAll(".demo")].map(sec => {
+  const kind = sec.dataset.demo
+  const stages = [...sec.querySelectorAll(".screen")].map(sc => new Stage(sc, kind, sc.dataset.v === "after"))
+  const start = () => stages.forEach(st => { const [steps, len] = SCENES[kind](st); st.play(steps, len); st.tick(); st.render() })
+  sec.querySelector(".replay").addEventListener("click", start)
+  start()
+  return { stages, start }
+})
+
+const pressed = (b, on) => b.setAttribute("aria-pressed", on ? "true" : "false")
+const slowB = document.getElementById("slow"), loopB = document.getElementById("loop")
+pressed(loopB, loop)
+slowB.addEventListener("click", () => { speed = speed === 1 ? 0.25 : 1; pressed(slowB, speed !== 1) })
+loopB.addEventListener("click", () => { loop = !loop; pressed(loopB, loop); if (loop) demos.forEach(d => d.stages[0].ended && d.start()) })
+document.getElementById("all").addEventListener("click", () => demos.forEach(d => d.start()))
+
+let last = performance.now()
+function frame(ts) {
+  T += Math.min(ts - last, 100) * speed
+  last = ts
+  for (const d of demos) {
+    d.stages.forEach(st => { st.tick(); st.render() })
+    if (loop && d.stages.every(st => st.ended)) d.start()
+  }
+  requestAnimationFrame(frame)
+}
+if (!reduced) requestAnimationFrame(frame)
+else {
+  // mouvements reduits : rien ne boucle ; Rejouer lance une lecture
+  let running = false
+  const run = () => { if (running) return; running = true; last = performance.now(); requestAnimationFrame(frame) }
+  document.querySelectorAll(".replay, #all").forEach(b => b.addEventListener("click", run))
+}
+</script>

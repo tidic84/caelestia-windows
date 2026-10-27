@@ -172,7 +172,7 @@ Item {
             const v = valo
             if (v.phase === "pregame") {
                 if (v.done)
-                    return { icon: "check_circle", text: "Prêt", hot: false, away: false }
+                    return { icon: "check", text: "Prêt", hot: false, away: false }
                 return { icon: v.locked ? "lock" : "timer", text: (v.exact ? "" : "≈") + valoLeft() + " s", hot: !v.locked && valoLeft() <= 10, away: false }
             }
             if (v.phase === "found")

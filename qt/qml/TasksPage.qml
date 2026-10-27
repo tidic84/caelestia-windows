@@ -597,7 +597,7 @@ Item {
                             id: statusIcon
                             visible: cell.statusText !== ""
                             anchors.verticalCenter: taskName.verticalCenter
-                            name: cell.status === "suspended" ? "pause_circle" : cell.status === "hung" ? "hourglass_empty" : "eco"
+                            name: cell.status === "suspended" ? "pause" : cell.status === "hung" ? "hourglass_top" : "eco"
                             size: 15
                             color: Theme.inkVariant
                             HoverHandler {

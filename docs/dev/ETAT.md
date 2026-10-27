@@ -35,6 +35,71 @@ reprendre.
 
 ## Journal
 
+### 2026-10-27 : comparaison avec Nusa, paroles dans la pilule
+
+- **Nusa** (rama2555.github.io/nusa, notch Windows en Rust) : nos courbes
+  sont presque les mêmes (même ressort). L'écart d'« effet wow » vient de la
+  fluidité, de l'ordre d'apparition et de micro-animations. Maquette
+  avant / après : `docs/dev/maquettes/animations.html`. Pistes : contenu
+  du panneau décalé à 170 ms, zone cliquable posée une fois par animation
+  (BACKLOG « Animations d'ouverture »), compagnon à la fréquence de l'écran,
+  ombre portée, jauges d'activité, dépôt de fichier.
+- **Maquette implémentée** (validée par l'utilisateur), sauf l'ombre et la
+  chute du fichier :
+  - `Panel.qml` : opacité 170 ms d'attente + 260 ms à l'ouverture,
+    120 ms à la fermeture ; échelle et translation 140 ms d'attente,
+    300 ms à la fermeture. `Pill.qml` : la pilule revient après 150 ms.
+  - `Main.qml` `updateHit` : pendant une animation, la zone de l'îlot
+    couvre max(dessinée, cible × 1,1, précédente) (`hitBox`), donc plus
+    de `SetWindowRgn` à chaque image. Taille exacte au repos.
+    `setBackdrop` reste appelé à chaque image en mode acrylique (le flou
+    doit suivre la forme).
+  - `Ilot.qml` : horloge d'ambiance en `FrameAnimation` (`ambFrames`)
+    quand `ambSmooth` (promenade du compagnon, ou îlot ouvert avec aurore
+    ou contour rgb / pulse), Timer de 40 ms sinon. `ambDelta` = durée du
+    dernier pas, utilisé par `Aurora.qml`.
+  - `Pill.qml` actBox : à l'arrivée d'une activité, l'icône rebondit
+    (`iconK`) ; la barre OSD se remplit avec dépassement et le nombre
+    compte (`fillK`, animation `intro`).
+  - `AppsPage.qml` : cadre de dépôt en fondu, échelle 1,015 et étiquette
+    (« Ranger dans *dossier* » / « Relâcher pour choisir une action »).
+  - Pas faits : l'ombre (le masque de la fenêtre coupe tout ce qui sort
+    de l'îlot, voir BACKLOG) ; la chute du fichier dans la grille (le
+    dépôt ouvre un menu ou range dans un dossier, pas de tuile).
+  - Vérifié : compilé, journal vide, capture de l'îlot ouvert (Média)
+    normale. Relu : rien de bloquant ; appliqué : `ambSmooth` restreint à
+    ce qui se voit, étiquette de dépôt gardée pendant le fondu. Non
+    vérifié à la main : ouverture et fermeture, volume, dépôt de fichier.
+- **Paroles dans la pilule** (Réglages › Lecteur › Pilule repliée, clé
+  `player_mini_lyrics`, désactivée par défaut) : la ligne chantée suit le
+  disque, la pilule s'élargit à chaque ligne (320 px max). L'état des
+  paroles (`ly`, `lyOn`, `loadLyrics`, `parseLrc`) est passé de
+  `MediaPage.qml` à `Ilot.qml`, partagé entre l'onglet Média et la pilule.
+  Repliée, la position est relue à l'heure de la ligne suivante (timer à un
+  coup dans `Pill.qml`), pas en sondage. La ligne prend la couleur de la
+  pochette (`playerPal.primary`, éclaircie en thème clair avec l'îlot noir)
+  avec un halo dégradé de la même couleur (20 %) qui suit le dépliage.
+  Texte dans le style des paroles de l'onglet Média, selon
+  `player_layout` : colonne = blanc gras + lueur `MultiEffect` de la
+  couleur du lecteur ; côté à côte = couleur du lecteur en demi-gras. Une
+  pastille claire a été essayée à la place du halo, puis retirée à la
+  demande de l'utilisateur.
+  Tant qu'une ligne s'affiche, la pilule ne garde que le disque et la ligne
+  (`mini.lyOnly`, largeur `lyPillW + 110` dans `sizeFor`). L'heure, les
+  icônes, le compagnon et le voyant caméra/micro sont masqués ; le voyant
+  pourrait être gardé, à décider par l'utilisateur.
+- Vérifié : compilé, journal Qt vide au lancement. Relu par un agent : rien
+  de bloquant. Deux remarques appliquées (index hors limites, sondage de
+  250 ms remplacé par le réveil sur la ligne suivante).
+- **Icônes affichées en texte** (absentes du sous-ensemble de police,
+  vérifié avec fontTools) : `pause_circle` (Réglages › Apparence, « Bouton
+  lecture ») → `play_arrow` ; `check_circle` (pastille Valorant « Prêt »,
+  `Watch.qml`) → `check` ; `pause_circle` et `hourglass_empty` (statuts
+  dans `TasksPage.qml:600`) → `pause`, `hourglass_top`. Les autres
+  icônes du QML sont toutes dans la police.
+- Non vérifié : le rendu avec une vraie chanson synchronisée, et l'onglet
+  Média après le déplacement (paroles, nouvel essai après erreur). À tester
+  par l'utilisateur. Rien n'est commité.
 ### 2026-10-27 : pas de focus devant une appli en plein écran (0.4.22)
 
 - **Demande** : que l'îlot ne puisse pas prendre le focus quand une appli

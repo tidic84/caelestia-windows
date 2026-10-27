@@ -45,57 +45,12 @@ Rectangle {
     // src/lyrics.rs (lrclib.net, puis NetEase) ; la ligne en cours suit la
     // position du lecteur. Affichees ou non : garde dans ui.json
     readonly property bool lyricsOn: Ilot.ui.lyrics !== false
-    property var ly: ({ key: "", lines: [], state: "" })
-    property string lyErr: ""
-    readonly property string lyKey: (Ilot.media.artist || "") + "|" + (Ilot.media.title || "")
-    function parseLrc(t) {
-        const out = []
-        for (const row of t.split(/\r?\n/)) {
-            const re = /\[(\d+):(\d+(?:[.:]\d+)?)\]/g
-            const tags = []
-            let m
-            while ((m = re.exec(row)) !== null)
-                tags.push(m)
-            if (!tags.length)
-                continue
-            const text = row.replace(/\[[^\]]*\]/g, "").trim()
-            for (const g of tags)
-                out.push({ t: Number(g[1]) * 60 + parseFloat(g[2].replace(":", ".")), text: text })
-        }
-        return out.sort((a, b) => a.t - b.t)
-    }
+    // etat et chargement dans Ilot (partages avec la pilule repliee)
+    readonly property var ly: Ilot.ly
+    readonly property string lyKey: Ilot.lyKey
+    readonly property int lyOn: Ilot.lyOn
     function loadLyrics() {
-        const key = lyKey
-        if (!Ilot.hasMedia || !Ilot.media.title) {
-            ly = { key: key, lines: [], state: "none" }
-            return
-        }
-        if (ly.key === key && ly.state !== "error")
-            return
-        ly = { key: key, lines: [], state: "loading" }
-        Api.invoke("lyrics_get", { artist: Ilot.media.artist || "", title: Ilot.media.title, album: Ilot.media.album || "", duration: Ilot.media.duration || 0 }).then(r => {
-            if (page.ly.key !== key)
-                return
-            const synced = r.synced ? page.parseLrc(r.synced) : []
-            const lines = synced.length ? synced : r.plain.split(/\r?\n/).map(t => ({ t: -1, text: t }))
-            page.ly = { key: key, lines: r.instrumental ? [] : lines, state: r.instrumental ? "instr" : synced.length ? "synced" : r.plain ? "plain" : "none" }
-        }, () => {
-            if (page.ly.key !== key)
-                return
-            // serveurs de paroles surcharges : nouvel essai tout seul dans 30 s
-            page.ly = { key: key, lines: [], state: "error" }
-            Ilot.later(30000, () => { if (page.ly.key === key && page.ly.state === "error") page.loadLyrics() })
-        })
-    }
-    // ligne en cours (petite avance : la ligne s'allume avec la voix)
-    readonly property int lyOn: {
-        if (ly.state !== "synced")
-            return -1
-        const p = Ilot.pos + 0.25
-        let i = -1
-        while (i + 1 < ly.lines.length && ly.lines[i + 1].t <= p)
-            i++
-        return i
+        Ilot.loadLyrics()
     }
     Timer {
         interval: 200
@@ -644,7 +599,7 @@ Rectangle {
             }
         }
     }
-    onLyricsOnChanged: if (lyricsOn) { ly = { key: "", lines: [], state: "" }; loadLyrics() }
+    onLyricsOnChanged: if (lyricsOn) { Ilot.ly = { key: "", lines: [], state: "" }; loadLyrics() }
     Component.onCompleted: if (lyricsOn) loadLyrics()
 
     // paroles, playlists : pastilles en bas a droite (en haut a droite en

@@ -132,7 +132,7 @@ Window {
             onWidthChanged: Qt.callLater(win.updateHit)
             onHeightChanged: Qt.callLater(win.updateHit)
             onRChanged: Qt.callLater(win.updateBackdrop)
-            onEarChanged: Qt.callLater(win.updateBackdrop)
+            onEarChanged: Qt.callLater(win.updateHit)
             onEarTopChanged: Qt.callLater(win.updateBackdrop)
         }
 
@@ -151,11 +151,27 @@ Window {
     }
 
     // zones cliquables (masque de la fenetre)
+    // pendant une animation, la zone de l'ilot couvre sa taille de depart et
+    // d'arrivee (+10 % pour le rebond du ressort) et ne fait que grandir :
+    // le masque de la fenetre (SetWindowRgn) n'est pas refait a chaque image.
+    // Au repos, elle reprend la taille exacte de l'ilot.
+    property var hitBox: null
     function updateHit() {
         const rects = [{ x: hoverZone.x, y: 0, w: hoverZone.width, h: hoverZone.height }]
-        // l'ilot tel qu'il est dessine (pendant les animations, a sa taille)
         const k = Ilot.pillK
-        rects.push({ x: island.x + island.width * (1 - k) / 2 - island.ear * k, y: 0, w: (island.width + island.ear * 2) * k, h: (island.height + 2) * k })
+        const s = Ilot.size
+        let w = island.width, h = island.height, e = island.ear
+        if (Math.abs(w - s.w) < 0.5 && Math.abs(h - s.h) < 0.5 && Math.abs(e - Ilot.ear) < 0.5) {
+            hitBox = null
+        } else {
+            const b = hitBox || { w: 0, h: 0, e: 0 }
+            w = Math.max(w, s.w * 1.1, b.w)
+            h = Math.max(h, s.h * 1.1, b.h)
+            e = Math.max(e, Ilot.ear, b.e)
+            hitBox = { w: w, h: h, e: e }
+        }
+        // centre comme l'ilot (island.x = (largeur - island.width) / 2)
+        rects.push({ x: island.parent.width / 2 - (w / 2 + e) * k, y: 0, w: (w + e * 2) * k, h: (h + 2) * k })
         if (bar.visible)
             for (const r of bar.hitRects())
                 rects.push(r)

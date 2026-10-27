@@ -24,7 +24,7 @@ Item {
     Connections {
         target: Ilot
         enabled: au.moving
-        function onAmbChanged() { au.at += Ilot.ambStep / au.speed }
+        function onAmbChanged() { au.at += Ilot.ambDelta / au.speed }
     }
     scale: 1 + bass * 0.12
     Behavior on scale { NumberAnimation { duration: 120 } }

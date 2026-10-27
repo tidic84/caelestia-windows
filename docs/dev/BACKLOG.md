@@ -100,9 +100,14 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   peuvent arriver dans le désordre. Chacune contient la configuration complète
   et écrase `cfg`. Correction possible : un numéro de séquence, ou fusionner
   seulement les clés du `patch`.
-- 🟠 **Animations d'ouverture** : `Main.qml:101-106,137`. `setHit` et
-  `setBackdrop` sont appelés à chaque image, ce qui recrée D2D,
-  `SetWindowRgn` et `SetWindowPos`. Il faudrait les limiter.
+- 🟢 **Animations d'ouverture** : `setHit` n'est plus refait à chaque
+  image (`hitBox`, `Main.qml`, 2026-10-27). Reste : `setBackdrop` à chaque
+  image en mode acrylique, nécessaire pour que le flou suive la forme ; à
+  mesurer si ce mode saccade.
+- 🟢 **Ombre portée de l'îlot** (maquette `animations.html`, 3) : impossible
+  telle quelle, le masque de la fenêtre (`setMask`, `SetWindowRgn`) coupe
+  tout ce qui sort de l'îlot. Il faudrait une fenêtre d'ombre séparée,
+  transparente aux clics (`WS_EX_TRANSPARENT`), sous l'îlot.
 - 🟠 **`shell.cpp:177-199`** : `place()` fait plusieurs `invokeSync("screens")`
   et est appelé deux fois quand `bar` change.
 - 🟠 **`winctl.cpp:94,182`** : un timer de 500 ms qui appelle `SetWindowPos`

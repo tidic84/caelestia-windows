@@ -16,10 +16,13 @@ Item {
 
     opacity: open ? 1 : 0
     visible: opacity > 0
+    // ouverture : le contenu attend que la forme ait grandi (sinon il
+    // apparait rogne) ; fermeture : il part vite, avant que la forme se
+    // retracte (docs/dev/maquettes/animations.html, 1)
     Behavior on opacity {
         SequentialAnimation {
-            PauseAnimation { duration: panel.open ? 60 : 0 }
-            NumberAnimation { duration: 200; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std }
+            PauseAnimation { duration: panel.open ? 170 : 0 }
+            NumberAnimation { duration: panel.open ? 260 : 120; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std }
         }
     }
     transform: [
@@ -36,8 +39,8 @@ Item {
             yScale: xScale
             Behavior on xScale {
                 SequentialAnimation {
-                    PauseAnimation { duration: panel.open ? 60 : 0 }
-                    NumberAnimation { duration: 500; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph }
+                    PauseAnimation { duration: panel.open ? 140 : 0 }
+                    NumberAnimation { duration: panel.open ? 500 : 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph }
                 }
             }
         },
@@ -45,8 +48,8 @@ Item {
             y: panel.open ? 0 : -24
             Behavior on y {
                 SequentialAnimation {
-                    PauseAnimation { duration: panel.open ? 60 : 0 }
-                    NumberAnimation { duration: 500; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph }
+                    PauseAnimation { duration: panel.open ? 140 : 0 }
+                    NumberAnimation { duration: panel.open ? 500 : 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph }
                 }
             }
         }

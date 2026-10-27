@@ -48,7 +48,7 @@ Item {
         // light / normal / strong
         media_blur: "medium", media_drift: true, media_dim: "normal",
         // pilule repliee : anneau de progression, disque qui tourne
-        player_mini_ring: true, player_mini_spin: true,
+        player_mini_ring: true, player_mini_spin: true, player_mini_lyrics: false,
         // Reglages > Son : sorties masquees {id: nom Windows} (null : tri
         // automatique du melangeur) et noms choisis {id: nom}
         audio_hidden: null, audio_alias: {}
@@ -337,6 +337,10 @@ Item {
         }
         if (act)
             return act.size
+        // paroles dans la pilule : seulement le disque (24 + 10 d'espacement)
+        // et la ligne chantee, l'heure et les icones sont masquees (Pill.qml)
+        if (lyPillW > 0)
+            return { w: lyPillW + 110, h: 30 }
         // musique : disque + anneau de 24 px (+ 10 d'espacement)
         let w = hasMedia ? 183 : 132
         w += indCount * 24 + clockExtra
@@ -556,14 +560,33 @@ Item {
     readonly property int ambStep: 40
     // millisecondes d'ambiance ecoulees
     property real amb: 0
+    // la promenade du compagnon (quand on ne fait rien) et le
+    // clignotement « partie trouvee » continuent sans personne
+    readonly property bool ambRunning: (root.ambient && root.ambientUsed) || ((Watch.petWinOn || Watch.matchFlash) && !Theme.reduced && !root.fullscreen)
+    // a la frequence de l'ecran quand ca se voit en grand (compagnon en
+    // promenade, aurore ou contour anime de l'ilot ouvert) ; sinon
+    // 25 images/s (pilule repliee, repos)
+    readonly property bool ambSmooth: Watch.petWinOn
+        || (mode === "open" && (cfg.island_bg === "aurora" || cfg.border === "rgb" || cfg.border === "pulse"))
     property Timer ambClock: Timer {
         interval: root.ambStep
         repeat: true
-        // la promenade du compagnon (quand on ne fait rien) et le
-        // clignotement « partie trouvee » continuent sans personne
-        running: (root.ambient && root.ambientUsed) || ((Watch.petWinOn || Watch.matchFlash) && !Theme.reduced && !root.fullscreen)
-        onTriggered: root.amb += root.ambStep
+        running: root.ambRunning && !root.ambSmooth
+        onTriggered: {
+            root.ambDelta = root.ambStep
+            root.amb += root.ambStep
+        }
     }
+    property FrameAnimation ambFrames: FrameAnimation {
+        running: root.ambRunning && root.ambSmooth
+        onTriggered: {
+            root.ambDelta = Math.min(frameTime, 0.1) * 1000
+            root.amb += root.ambDelta
+        }
+    }
+    // duree du dernier pas de l'horloge (40 ms, ou une image) : pour avancer
+    // un temps a son propre rythme (Aurora.qml)
+    property real ambDelta: ambStep
     // va-et-vient 0 -> 1 -> 0 en `period` ms (deux NumberAnimation InOutSine)
     function wave(t, period) {
         return 0.5 - 0.5 * Math.cos(2 * Math.PI * t / period)
@@ -601,6 +624,67 @@ Item {
         let p = media.position + (media.playing ? (Date.now() - mediaAt) / 1000 : 0)
         return media.duration ? Math.min(p, media.duration) : p
     }
+
+    // ------------------------------------------- paroles synchronisees
+    // src/lyrics.rs (lrclib.net, puis NetEase). Partagees par l'onglet Media
+    // et la pilule repliee (Reglages > Lecteur > Paroles dans la pilule)
+    property var ly: ({ key: "", lines: [], state: "" })
+    readonly property string lyKey: (media.artist || "") + "|" + (media.title || "")
+    function parseLrc(t) {
+        const out = []
+        for (const row of t.split(/\r?\n/)) {
+            const re = /\[(\d+):(\d+(?:[.:]\d+)?)\]/g
+            const tags = []
+            let m
+            while ((m = re.exec(row)) !== null)
+                tags.push(m)
+            if (!tags.length)
+                continue
+            const text = row.replace(/\[[^\]]*\]/g, "").trim()
+            for (const g of tags)
+                out.push({ t: Number(g[1]) * 60 + parseFloat(g[2].replace(":", ".")), text: text })
+        }
+        return out.sort((a, b) => a.t - b.t)
+    }
+    function loadLyrics() {
+        const key = lyKey
+        if (!hasMedia || !media.title) {
+            ly = { key: key, lines: [], state: "none" }
+            return
+        }
+        if (ly.key === key && ly.state !== "error")
+            return
+        ly = { key: key, lines: [], state: "loading" }
+        Api.invoke("lyrics_get", { artist: media.artist || "", title: media.title, album: media.album || "", duration: media.duration || 0 }).then(r => {
+            if (root.ly.key !== key)
+                return
+            const synced = r.synced ? root.parseLrc(r.synced) : []
+            const lines = synced.length ? synced : r.plain.split(/\r?\n/).map(t => ({ t: -1, text: t }))
+            root.ly = { key: key, lines: r.instrumental ? [] : lines, state: r.instrumental ? "instr" : synced.length ? "synced" : r.plain ? "plain" : "none" }
+        }, () => {
+            if (root.ly.key !== key)
+                return
+            // serveurs de paroles surcharges : nouvel essai tout seul dans 30 s
+            root.ly = { key: key, lines: [], state: "error" }
+            root.later(30000, () => { if (root.ly.key === key && root.ly.state === "error") root.loadLyrics() })
+        })
+    }
+    // ligne en cours (petite avance : la ligne s'allume avec la voix)
+    readonly property int lyOn: {
+        if (ly.state !== "synced")
+            return -1
+        const p = pos + 0.25
+        let i = -1
+        while (i + 1 < ly.lines.length && ly.lines[i + 1].t <= p)
+            i++
+        return i
+    }
+    // pilule repliee : les paroles suivent le morceau meme panneau ferme ;
+    // lyPillW est la largeur que la pilule donne a la ligne (Pill.qml)
+    readonly property bool lyMini: !!cfg.player_mini_lyrics && hasMedia
+    onLyMiniChanged: if (lyMini) loadLyrics()
+    onLyKeyChanged: if (lyMini) Qt.callLater(loadLyrics)
+    property real lyPillW: 0
     function applyMedia(m) {
         media = m
         mediaAt = Date.now()

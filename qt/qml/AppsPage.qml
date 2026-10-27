@@ -546,14 +546,62 @@ Item {
         }
         Scroller { flick: list; visible: list.visible && list.contentHeight > list.height + 1 }
 
-        // fichiers deposes depuis l'Explorateur
+        // fichiers deposes depuis l'Explorateur : le cadre arrive en fondu,
+        // la zone grossit un peu et une etiquette dit ce que fera le depot
+        // (docs/dev/maquettes/animations.html, 5)
         Rectangle {
+            id: dropFrame
             anchors.fill: parent
             radius: 18
-            color: "transparent"
+            color: Theme.alpha(Theme.primary, 0.09)
             border.width: 2
             border.color: Theme.primary
-            visible: drop.containsDrag
+            opacity: drop.containsDrag ? 1 : 0
+            visible: opacity > 0
+            scale: drop.containsDrag ? 1.015 : 1
+            Behavior on opacity { NumberAnimation { duration: Theme.dur(200) } }
+            Behavior on scale { NumberAnimation { duration: Theme.dur(450); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.springCurve } }
+            Rectangle {
+                id: dropLabel
+                // dossier vise, garde pendant le fondu de sortie (le depot
+                // remet dropChip a null)
+                property var folder: null
+                Binding on folder {
+                    when: drop.containsDrag
+                    value: page.dropChip ? page.findFolder(page.dropChip.fid) : null
+                    restoreMode: Binding.RestoreNone
+                }
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 16
+                width: dropRow.implicitWidth + 28
+                height: 36
+                radius: 18
+                color: Theme.primary
+                opacity: drop.containsDrag ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Theme.dur(350); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
+                transform: Translate {
+                    y: drop.containsDrag ? 0 : 10
+                    Behavior on y { NumberAnimation { duration: Theme.dur(350); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
+                }
+                Row {
+                    id: dropRow
+                    anchors.centerIn: parent
+                    spacing: 8
+                    Ms {
+                        name: dropLabel.folder ? "folder" : "download"
+                        size: 18
+                        color: Theme.inkPrimary
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Txt {
+                        text: dropLabel.folder ? "Ranger dans " + dropLabel.folder.name : "Relâcher pour choisir une action"
+                        weight: Font.Medium
+                        color: Theme.inkPrimary
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+            }
         }
         DropArea {
             id: drop

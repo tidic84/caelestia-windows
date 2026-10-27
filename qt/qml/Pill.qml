@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Shapes
 
 // Pilule de l'ilot ferme : replie (heure, indicateurs), survol (titre ou
@@ -12,7 +13,13 @@ Item {
 
     opacity: closed ? 1 : 0
     visible: opacity > 0
-    Behavior on opacity { NumberAnimation { duration: pill.closed ? 250 : 100; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std } }
+    // au retour du panneau ouvert, la pilule attend qu'il soit parti
+    Behavior on opacity {
+        SequentialAnimation {
+            PauseAnimation { duration: pill.closed ? 150 : 0 }
+            NumberAnimation { duration: pill.closed ? 250 : 100; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std }
+        }
+    }
 
     // clic : ouvre le panneau (ou l'onglet de l'activite) ; clic molette :
     // lecture / pause ; molette : volume (Maj : appli au premier plan)
@@ -96,6 +103,8 @@ Item {
         anchors.centerIn: parent
         spacing: 10
         readonly property bool on: pill.collapsed && !pill.actOn
+        // paroles affichees : seulement le disque et la ligne chantee
+        readonly property bool lyOnly: Ilot.lyPillW > 0
         opacity: on ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 250 } }
@@ -117,7 +126,7 @@ Item {
         // n'est plus dans la pilule)
         Loader {
             active: Watch.petShown
-            visible: active
+            visible: active && !mini.lyOnly
             anchors.verticalCenter: parent.verticalCenter
             sourceComponent: Pet {
                 opacity: Watch.petWinOn ? 0 : 1
@@ -179,22 +188,130 @@ Item {
                 onTriggered: Ilot.pos = Ilot.position()
             }
         }
+        // Reglages > Lecteur : paroles dans la pilule. La ligne chantee suit
+        // le disque ; la pilule s'elargit ou se resserre a chaque ligne et
+        // revient a sa taille pendant les silences et la pause
+        Item {
+            id: lyMini
+            // ly et lyOn changent ensemble mais sont notifies l'un apres l'autre
+            readonly property string line: { const l = Ilot.ly.lines[Ilot.lyOn]; return l ? (l.text || "") : "" }
+            readonly property bool shown: Ilot.lyMini && Ilot.media.playing && line !== ""
+            width: Ilot.lyPillW
+            height: 20
+            visible: width > 0.5
+            anchors.verticalCenter: parent.verticalCenter
+            // vers 0 (silence, pause) : d'un coup, l'heure et les icones
+            // reviennent aussitot et l'ilot fait la transition
+            Behavior on width {
+                enabled: Ilot.lyPillW > 0
+                NumberAnimation { duration: Theme.dur(500); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.springCurve }
+            }
+            // couleur de la pochette (comme le lecteur), en fondu au changement de morceau
+            // (clair + ilot noir : primaire sombre sur noir, eclairci pour rester lisible)
+            property color tint: Theme.light && Theme.islandBlack ? Theme.mix(Ilot.playerPal.primary, Qt.rgba(1, 1, 1, 1), 0.5) : Ilot.playerPal.primary
+            Behavior on tint { ColorAnimation { duration: 600 } }
+            // texte dans le style des paroles de l'onglet Media (MediaPage.qml,
+            // lyBox) : colonne = ligne blanche en gras avec une lueur de la
+            // couleur du lecteur ; cote a cote = ligne de la couleur du lecteur
+            readonly property bool col: (Ilot.cfg.player_layout || "col") !== "side"
+            // halo de la couleur du morceau derriere la ligne, sur toute la
+            // hauteur de la pilule
+            Rectangle {
+                x: -16
+                width: parent.width + 32
+                height: 30
+                anchors.verticalCenter: parent.verticalCenter
+                // suit le depliage (pas de tache avant que la ligne s'ouvre)
+                opacity: Math.min(1, lyMini.width / 60)
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop { position: 0; color: Theme.alpha(lyMini.tint, 0) }
+                    GradientStop { position: 0.3; color: Theme.alpha(lyMini.tint, 0.2) }
+                    GradientStop { position: 0.7; color: Theme.alpha(lyMini.tint, 0.2) }
+                    GradientStop { position: 1; color: Theme.alpha(lyMini.tint, 0) }
+                }
+            }
+            Binding {
+                target: Ilot
+                property: "lyPillW"
+                value: lyMini.shown ? Math.min(320, Math.ceil(lyMeasure.implicitWidth)) : 0
+            }
+            Txt {
+                id: lyMeasure
+                visible: false
+                text: lyMini.line
+                px: 12.5
+                weight: lyTxt.weight
+            }
+            // changement de ligne : l'ancienne monte en s'effacant, la
+            // nouvelle arrive par le bas
+            Txt {
+                id: lyTxt
+                // largeur finale d'emblee : la texture de la lueur n'est pas reallouee
+                // a chaque image du depliage (l'ilot coupe ce qui depasse)
+                width: Ilot.lyPillW
+                height: parent.height
+                elide: Text.ElideRight
+                px: 12.5
+                weight: lyMini.col ? Font.Bold : Font.DemiBold
+                color: lyMini.col ? Theme.ink : lyMini.tint
+                transform: Translate { id: lyShift }
+                // lueur sous la ligne (text-shadow de l'onglet Media, reduite
+                // a la taille du texte)
+                layer.enabled: lyMini.col && !Theme.reduced
+                layer.effect: MultiEffect {
+                    shadowEnabled: true
+                    shadowColor: lyMini.tint
+                    shadowHorizontalOffset: 0
+                    shadowVerticalOffset: 0
+                    blurMax: 16
+                    shadowBlur: 0.6
+                }
+            }
+            onLineChanged: lySwap.restart()
+            Component.onCompleted: lyTxt.text = line
+            SequentialAnimation {
+                id: lySwap
+                ParallelAnimation {
+                    NumberAnimation { target: lyTxt; property: "opacity"; to: 0; duration: Theme.dur(120) }
+                    NumberAnimation { target: lyShift; property: "y"; to: -6; duration: Theme.dur(120) }
+                }
+                ScriptAction { script: { lyTxt.text = lyMini.line; lyShift.y = 6 } }
+                ParallelAnimation {
+                    NumberAnimation { target: lyTxt; property: "opacity"; to: 1; duration: Theme.dur(200) }
+                    NumberAnimation { target: lyShift; property: "y"; to: 0; duration: Theme.dur(350); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph }
+                }
+            }
+            // replie, la position n'est relue que toutes les 2 s (anneau du
+            // disque) : trop lent pour suivre les lignes. Reveil a l'heure de
+            // la ligne suivante plutot qu'un sondage
+            Timer {
+                id: lyNext
+                readonly property var next: Ilot.ly.lines[Ilot.lyOn + 1]
+                interval: next ? Math.max(100, Math.min(3000, (next.t - 0.25 - Ilot.pos) * 1000 + 30)) : 3000
+                running: Ilot.lyMini && Ilot.media.playing && mini.on && Ilot.ly.state === "synced" && !Ilot.fullscreen
+                onTriggered: {
+                    Ilot.pos = Ilot.position()
+                    restart()
+                }
+            }
+        }
         Ms {
-            visible: Ilot.caffeine
+            visible: Ilot.caffeine && !mini.lyOnly
             name: "coffee"
             size: 16
             color: Theme.primary
             anchors.verticalCenter: parent.verticalCenter
         }
         Ms {
-            visible: !!Ilot.cfg.dnd
+            visible: !!Ilot.cfg.dnd && !mini.lyOnly
             name: "do_not_disturb_on"
             size: 16
             color: Theme.primary
             anchors.verticalCenter: parent.verticalCenter
         }
         Ms {
-            visible: Ilot.unread > 0
+            visible: Ilot.unread > 0 && !mini.lyOnly
             name: "mail"
             size: 16
             color: Theme.tertiary
@@ -204,11 +321,12 @@ Item {
         ClaudeMark {
             opacity: Watch.ccShown ? 1 : 0
             scale: 0.6 + 0.4 * opacity
-            visible: opacity > 0
+            visible: opacity > 0 && !mini.lyOnly
             anchors.verticalCenter: parent.verticalCenter
             Behavior on opacity { NumberAnimation { duration: 350 } }
         }
         PillClock {
+            visible: !mini.lyOnly
             anchors.verticalCenter: parent.verticalCenter
         }
         Txt {
@@ -219,13 +337,13 @@ Item {
             color: Theme.inkVariant
             opacity: Watch.ccShown ? 1 : 0
             scale: 0.6 + 0.4 * opacity
-            visible: opacity > 0
+            visible: opacity > 0 && !mini.lyOnly
             anchors.verticalCenter: parent.verticalCenter
             Behavior on opacity { NumberAnimation { duration: 350 } }
         }
         // activite : telechargement Steam, jeu en cours, GPU charge
         Row {
-            visible: Watch.actShown && !!Watch.chip
+            visible: Watch.actShown && !!Watch.chip && !mini.lyOnly
             spacing: 3
             anchors.verticalCenter: parent.verticalCenter
             readonly property color fg: Watch.chip && Watch.chip.hot ? Theme.bad : Watch.chip && Watch.chip.away ? Theme.inkVariant : Theme.primary
@@ -246,7 +364,7 @@ Item {
         }
         // Discord en vocal : micro (sourdine en rouge)
         Rectangle {
-            visible: Watch.dcShown
+            visible: Watch.dcShown && !mini.lyOnly
             width: 20
             height: 20
             radius: 10
@@ -263,7 +381,7 @@ Item {
         }
         // extinction programmee : visible dans les 30 dernieres minutes
         Row {
-            visible: Watch.offShown
+            visible: Watch.offShown && !mini.lyOnly
             spacing: 3
             anchors.verticalCenter: parent.verticalCenter
             Ms {
@@ -282,7 +400,7 @@ Item {
         }
         // voyant : une appli utilise la camera (vert) ou le micro (orange)
         Row {
-            visible: Watch.privShown
+            visible: Watch.privShown && !mini.lyOnly
             spacing: 3
             anchors.verticalCenter: parent.verticalCenter
             Rectangle {
@@ -301,7 +419,7 @@ Item {
             }
         }
         Row {
-            visible: Ilot.timerShown
+            visible: Ilot.timerShown && !mini.lyOnly
             spacing: 3
             anchors.verticalCenter: parent.verticalCenter
             Ms {
@@ -617,6 +735,28 @@ Item {
         onAChanged: if (a) shownAct = a
         readonly property var s: shownAct || {}
 
+        // arrivee d'une activite : l'icone rebondit, puis la barre (OSD) se
+        // remplit avec un leger depassement et le nombre compte jusqu'a sa
+        // valeur. Les changements suivants (crans de volume) restent directs
+        // (docs/dev/maquettes/animations.html, 4)
+        property real iconK: 1
+        property real fillK: 1
+        readonly property bool arriving: pill.actOn
+        onArrivingChanged: if (arriving && !Theme.reduced && Theme.animK > 0) intro.restart()
+        ParallelAnimation {
+            id: intro
+            SequentialAnimation {
+                PropertyAction { target: actBox; property: "iconK"; value: 0.4 }
+                PauseAnimation { duration: Theme.dur(120) }
+                NumberAnimation { target: actBox; property: "iconK"; to: 1; duration: Theme.dur(550); easing.type: Easing.BezierSpline; easing.bezierCurve: [0.34, 1.6, 0.5, 1, 1, 1] }
+            }
+            SequentialAnimation {
+                PropertyAction { target: actBox; property: "fillK"; value: 0 }
+                PauseAnimation { duration: Theme.dur(250) }
+                NumberAnimation { target: actBox; property: "fillK"; to: 1; duration: Theme.dur(700); easing.type: Easing.BezierSpline; easing.bezierCurve: [0.3, 1.2, 0.5, 1, 1, 1] }
+            }
+        }
+
         // OSD : volume, luminosite
         Row {
             visible: actBox.s.kind === "osd"
@@ -625,6 +765,7 @@ Item {
             Ms {
                 name: actBox.s.icon || ""
                 color: Theme.primary
+                scale: actBox.iconK
                 anchors.verticalCenter: parent.verticalCenter
             }
             Rectangle {
@@ -638,14 +779,18 @@ Item {
                     height: parent.height
                     radius: 3
                     color: Theme.primary
-                    width: parent.width * (actBox.s.value || 0)
-                    Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std } }
+                    width: parent.width * (actBox.s.value || 0) * actBox.fillK
+                    Behavior on width {
+                        enabled: !intro.running
+                        NumberAnimation { duration: 150; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std }
+                    }
                 }
             }
             Txt {
                 width: 26
                 horizontalAlignment: Text.AlignRight
-                text: actBox.s.label || ""
+                // nombre : compte jusqu'a sa valeur pendant l'arrivee ; « – » (muet) tel quel
+                text: /^\d+$/.test(actBox.s.label || "") ? String(Math.round(Number(actBox.s.label) * Math.min(1, actBox.fillK))) : (actBox.s.label || "")
                 weight: Font.Medium
                 tnum: true
                 anchors.verticalCenter: parent.verticalCenter
@@ -660,6 +805,7 @@ Item {
             Ms {
                 name: actBox.s.icon || ""
                 color: Theme.primary
+                scale: actBox.iconK
                 anchors.verticalCenter: parent.verticalCenter
             }
             Row {

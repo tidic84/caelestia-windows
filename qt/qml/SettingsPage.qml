@@ -817,7 +817,7 @@ Item {
 
                 // bouton lecture
                 SetRow {
-                    icon: "pause_circle"
+                    icon: "play_arrow"
                     title: "Bouton lecture"
                 }
                 SubTitle { text: "Forme" }
@@ -954,6 +954,13 @@ Item {
                     toggle: true
                     checked: page.cfg.player_mini_spin !== false
                     onToggled: on => Ilot.setCfg({ player_mini_spin: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Paroles synchronisées dans la pilule"
+                    toggle: true
+                    checked: page.cfg.player_mini_lyrics === true
+                    onToggled: on => Ilot.setCfg({ player_mini_lyrics: on })
                 }
 
                 // pochette de l'onglet Media
