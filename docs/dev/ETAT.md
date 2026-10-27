@@ -35,6 +35,42 @@ reprendre.
 
 ## Journal
 
+### 2026-10-27 : pilule de dépôt des fichiers, page de conversion
+
+- **Pilule de dépôt** (`FileDrop.qml`, nouveau) : des fichiers glissés sur
+  l'îlot le mettent en mode peek, agrandi à 480 × 84 (`Ilot.sizeFor`,
+  `Watch.dropOpen`). La pilule ne montre qu'une rangée de zones, sans
+  panneau ni onglets : Convertir, Réduire (images), Zip, Discord,
+  Quick Share, Applis. Lâcher lance l'action, puis le résultat tient sur
+  une ligne (Afficher, Ouvrir, Discord, Fermer). « Applis », survolée
+  350 ms, ouvre le panneau sur les applis. Ressortir sans lâcher replie
+  l'îlot. `Pill.qml` s'efface pendant ce temps.
+- **Page de conversion** (`Convert.qml`, nouveau, posée dans `Panel.qml`
+  comme Quick Share, `Watch.convertOpen` / `openConvert`). Façon
+  Convertio : une ligne par fichier, un format au choix (catégories Image,
+  Audio, Vidéo à gauche, formats à droite), « Tout convertir en », puis
+  Convertir. Les fichiers sont traités un par un. Un dépôt sur la page
+  ajoute des fichiers.
+- **Rust** : `files::file_convert` et `ffmpeg_ok`. Les formats sont dans
+  une liste fermée. Les images passent par le crate image (conversion en
+  RGBA pour webp, bmp et gif ; pas de fichier vide en cas d'échec). Le
+  reste passe par ffmpeg, trouvé dans le PATH (`-n`, `-vn` pour une sortie
+  audio, pas de fenêtre).
+- Essais abandonnés à la demande de l'utilisateur : des zones dans la page
+  Applis, puis une page de zones dans le panneau ouvert. `AppsPage.qml`
+  est inchangé.
+- Vérifié : `qt\build.cmd`, `cargo clippy` (rien de nouveau), journal Qt
+  sans erreur, installé. Commandes ffmpeg testées à la main (mp4 vers
+  mp3, webm, gif ; mp3 vers opus). Captures de la page de conversion et
+  de la liste des formats, prises avec un TEMP-TEST retiré ensuite. Trois
+  relectures par un agent, dont les bugs ont été corrigés : pilule
+  bloquée, marge sans zone de dépôt, dépôt sur la conversion intercepté
+  par l'îlot, fichier vide ou fichier d'un autre supprimé.
+- **Non vérifié** : un vrai glisser depuis l'Explorateur, une vraie
+  conversion depuis l'appli, l'écriture WebP. Rien n'est commité.
+- **Reprendre** : retour du test de l'utilisateur, une ligne dans
+  `CHANGELOG.md` (section « à venir »), puis le commit.
+
 ### 2026-10-27 : audit, mises à jour signées, réglages, Échap (0.4.22)
 
 Vérification d'un audit externe (8 points). Retenus et corrigés : 2, 3, 5,

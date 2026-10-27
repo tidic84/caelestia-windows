@@ -11,7 +11,8 @@ Item {
     readonly property bool actOn: !!Ilot.act && collapsed
     readonly property bool closed: Ilot.mode !== "open"
 
-    opacity: closed ? 1 : 0
+    // fichiers glisses : les zones de depot (FileDrop) prennent la place
+    opacity: closed && !Watch.dropOpen ? 1 : 0
     visible: opacity > 0
     // au retour du panneau ouvert, la pilule attend qu'il soit parti
     Behavior on opacity {

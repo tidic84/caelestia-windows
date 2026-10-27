@@ -216,23 +216,28 @@ Item {
             id: panel
             anchors.horizontalCenter: parent.horizontalCenter
         }
+        FileDrop {
+            anchors.fill: parent
+            opacity: Watch.dropOpen ? 1 : 0
+            visible: opacity > 0
+            enabled: Watch.dropOpen
+            Behavior on opacity { NumberAnimation { duration: Theme.dur(200); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std } }
+        }
     }
 
-    // fichiers glisses depuis l'Explorateur : l'ilot s'ouvre sur les applis
-    // (actions sur les fichiers) et le bouton Quick Share s'allume. Ouvert
+    // fichiers glisses depuis l'Explorateur : la pilule survolee montre les
+    // zones de depot (FileDrop.qml), et elle se replie si on ressort. Ouvert
     // sur les applis, les sons ou Quick Share, leurs propres zones de depot
-    // prennent le relais.
+    // prennent le relais ; ailleurs, le panneau laisse place aux zones.
     DropArea {
         anchors.fill: parent
-        enabled: Ilot.mode !== "open" || (["apps", "sounds"].indexOf(Ilot.currentTab) < 0 && !Watch.shareOpen)
+        enabled: !Watch.dropOpen && (Ilot.mode !== "open" || (["apps", "sounds"].indexOf(Ilot.currentTab) < 0 && !Watch.shareOpen && !Watch.convertOpen))
         onEntered: d => {
             if (!d.hasUrls)
                 return
             Ilot.dragIn()
-            if (Ilot.mode !== "open")
-                Ilot.fileDragOpened = true
-            Ilot.pinned = true
-            Ilot.open("apps")
+            Ilot.fileDragOpened = true
+            Watch.openDrop(Ilot.dropPaths(d.urls))
         }
         // desactivee par l'ouverture : les zones de l'ilot ouvert prennent le relais
         onExited: if (Ilot.mode !== "open") Ilot.dragLeft()

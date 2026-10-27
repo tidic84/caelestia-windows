@@ -131,7 +131,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 Singletons    Api (invoke/call/listen) · Ilot (état global : réglages, thème, pilule, lecteur, météo, minuteur, horloge d'ambiance amb/wave)
               Watch (jeux, absence, Valorant, extinction, caméra/micro, services) · Theme (Material You, polices, courbes)
 Fenêtres      Main (îlot) · Bar (écrans sans îlot) · Captions · TipWindow · PetWindow (promenade du compagnon)
-Îlot          Island · Pill · PillClock · Panel · BarContent · BarTask · TaskIcon · TaskPreview · QuickShare · Ear
+Îlot          Island · Pill · PillClock · Panel · BarContent · BarTask · TaskIcon · TaskPreview · QuickShare · FileDrop (pilule de dépôt des fichiers, `Watch.dropOpen`) · Convert (page de conversion, `Watch.convertOpen`, `files::file_convert`) · Ear
 Pages         HomePage · MediaPage · CtrlPage (+ Mixer : pastilles de sorties, applis groupées) · AppsPage · ClipsPage · WallsPage · MailPage · TasksPage · PcPage · ClaudeUsagePage
               SoundsPage · AssistPage · SettingsPage (onglet Son : sorties affichées, noms choisis)
 Cartes PC     PcCard · ServicesCard · HealthCard · ShutdownCard · SensCard

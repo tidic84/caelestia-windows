@@ -196,7 +196,7 @@ Item {
             id: ind
             readonly property Item on: tabsRow.children[Ilot.tabs.indexOf(Ilot.currentTab)] || null
             // Quick Share ouvert : aucun onglet n'est actif
-            opacity: Watch.shareOpen ? 0 : 1
+            opacity: Watch.shareOpen || Watch.convertOpen ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: 200 } }
             x: on ? on.x + 4 : 4
             y: 4
@@ -218,7 +218,7 @@ Item {
                 Btn {
                     id: tab
                     required property var modelData
-                    readonly property bool on: Ilot.currentTab === modelData.id && !Watch.shareOpen
+                    readonly property bool on: Ilot.currentTab === modelData.id && !Watch.shareOpen && !Watch.convertOpen
                     // panneau normal : avec trop d'onglets pour tous les nommer, seul
                     // l'onglet actif garde son nom (les autres l'ont en info-bulle)
                     readonly property bool named: modelData.label !== "" && (Ilot.big || on || panel.allNamed)
@@ -347,7 +347,7 @@ Item {
                 required property var modelData
                 required property int index
                 readonly property bool on: Ilot.currentTab === modelData.id
-                readonly property bool shown: on && !Watch.shareOpen
+                readonly property bool shown: on && !Watch.shareOpen && !Watch.convertOpen
                 // une page n'est creee qu'a sa premiere ouverture, puis gardee
                 // tant que son addon reste active (sauf dechargement, plus bas)
                 property bool wanted: false
@@ -391,6 +391,20 @@ Item {
                 }
                 if (freed)
                     gc()
+            }
+        }
+
+        // conversion des fichiers deposes, a la place de la page en cours
+        Convert {
+            anchors.fill: parent
+            z: 10
+            opacity: Watch.convertOpen ? 1 : 0
+            visible: opacity > 0
+            enabled: Watch.convertOpen
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std } }
+            transform: Translate {
+                x: Watch.convertOpen ? 0 : -24
+                Behavior on x { NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
             }
         }
 

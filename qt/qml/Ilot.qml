@@ -358,6 +358,9 @@ Item {
         if (s === "open")
             return big ? bigSize : openSize
         if (s === "peek") {
+            // fichiers glisses : une rangee de zones de depot (FileDrop.qml)
+            if (Watch.dropOpen)
+                return { w: 480, h: 84 }
             // sans musique ni activite : le compagnon se montre a cote de l'heure
             const p = hasMedia ? { w: 460, h: 76 } : Watch.actShown ? { w: 380, h: 60 }
                 : { w: (weather ? 320 : 250) + (Watch.petShown ? 40 : 0), h: 50 }

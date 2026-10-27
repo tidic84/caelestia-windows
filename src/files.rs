@@ -67,6 +67,72 @@ pub fn img_convert(path: String, to: String) -> Result<String, String> {
     Ok(out.to_string_lossy().to_string())
 }
 
+/// Formats d'image ecrits sans ffmpeg (crate image)
+const IMG_OUT: [&str; 5] = ["png", "jpg", "webp", "bmp", "gif"];
+/// Formats audio : extraits d'une video sans la piste d'image (`-vn`)
+const AUDIO_OUT: [&str; 6] = ["mp3", "wav", "flac", "ogg", "m4a", "opus"];
+/// Formats video (ffmpeg) ; gif est aussi dans IMG_OUT
+const VIDEO_OUT: [&str; 5] = ["mp4", "mkv", "webm", "avi", "mov"];
+
+/// ffmpeg.exe dans le PATH, s'il est installe (audio et video).
+fn ffmpeg() -> Option<PathBuf> {
+    std::env::split_paths(&std::env::var_os("PATH")?).map(|d| d.join("ffmpeg.exe")).find(|p| p.is_file())
+}
+
+pub fn ffmpeg_ok() -> bool {
+    ffmpeg().is_some()
+}
+
+/// Conversion vers `to` (extension : « png », « mp3 »...) : images par le
+/// crate image, le reste par ffmpeg. Renvoie le chemin cree.
+pub fn file_convert(path: String, to: String) -> Result<String, String> {
+    let to = to.to_lowercase();
+    let t = to.as_str();
+    // liste fermee : un format comme m3u8 ferait ecrire a ffmpeg des fichiers annexes
+    if !(IMG_OUT.contains(&t) || AUDIO_OUT.contains(&t) || VIDEO_OUT.contains(&t)) {
+        return Err("Format inconnu".into());
+    }
+    let src = Path::new(&path);
+    if IMG_OUT.contains(&t) {
+        if let Ok(img) = image::open(&path) {
+            let p = out_path(src, "", t);
+            let res = if t == "jpg" {
+                save_jpeg(&img, &p)
+            } else {
+                // webp, bmp et gif refusent le 16 bits et parfois les gris
+                let img = if t == "png" { img } else { DynamicImage::ImageRgba8(img.to_rgba8()) };
+                let fmt = ImageFormat::from_extension(t).ok_or("Format inconnu")?;
+                img.save_with_format(&p, fmt).map_err(|e| e.to_string())
+            };
+            // le fichier est cree avant l'encodage : pas de reste vide
+            if let Err(e) = res {
+                let _ = std::fs::remove_file(&p);
+                return Err(e);
+            }
+            return Ok(p.to_string_lossy().to_string());
+        }
+    }
+    let ff = ffmpeg().ok_or("ffmpeg introuvable (à installer pour l’audio et la vidéo)")?;
+    let out = out_path(src, "", t);
+    let mut cmd = Command::new(ff);
+    cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-n", "-i"]).arg(&path).creation_flags(CREATE_NO_WINDOW);
+    if AUDIO_OUT.contains(&t) {
+        cmd.arg("-vn");
+    }
+    let st = cmd.arg(&out).output().map_err(|e| e.to_string())?;
+    if !st.status.success() || !out.exists() {
+        // -n : ffmpeg n'ecrase rien ; un fichier apparu entre-temps sous ce
+        // nom n'est pas le notre, et un echec de ffmpeg avant l'ecriture n'a
+        // rien cree. Seule une sortie partielle (code d'erreur) est retiree.
+        if !st.status.success() && out.exists() && !String::from_utf8_lossy(&st.stderr).contains("already exists") {
+            let _ = std::fs::remove_file(&out);
+        }
+        let err = String::from_utf8_lossy(&st.stderr);
+        return Err(err.lines().last().unwrap_or("Conversion impossible").trim().to_string());
+    }
+    Ok(out.to_string_lossy().to_string())
+}
+
 /// Image reduite (1920 px maxi) et compressee ; garde le PNG si l'image a de
 /// la transparence, sinon JPEG.
 pub fn img_shrink(path: String) -> Result<String, String> {

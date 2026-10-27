@@ -82,6 +82,20 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   booléen et ne suit plus la forme de la pochette (pas de retour à « auto »
   dans l'UI).
 
+- 🟢 **Pilule de dépôt et conversion** (`FileDrop.qml`, `Convert.qml`,
+  `files::file_convert`, 2026-10-27) : à tester avec un vrai glisser.
+  Restes connus :
+  - lâcher directement sur « Applis » (avant 350 ms) ne transmet pas les
+    fichiers ;
+  - quitter l'appli pendant une longue conversion ffmpeg attend la fin
+    (`waitForDone`, ffmpeg n'est pas tué) ;
+  - tif, heic et avif sont proposés vers une image même sans ffmpeg, puis
+    échouent avec « ffmpeg introuvable » ;
+  - « Tout convertir en » pendant une passe peut faire réessayer les lignes
+    en erreur ;
+  - un GIF animé converti en image ne garde que la première image ;
+  - WebP est enregistré sans perte (fichiers gros).
+
 - 🟢 **Infobulle au-dessus d'un menu natif** : `Btn.qml`. Après un clic sur
   une icône de la zone de notification, le menu de l'appli capture la souris.
   Notre infobulle peut rester affichée jusqu'au prochain mouvement sur la

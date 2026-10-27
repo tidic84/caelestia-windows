@@ -705,14 +705,23 @@ Item {
         function onEscapeOverlay(what) {
             if (what === "share")
                 w.shareOpen = false
+            if (what === "convert")
+                w.convertOpen = false
         }
-        // un onglet choisi referme Quick Share
+        // un onglet choisi referme Quick Share, la conversion et les zones de depot
         function onTabShown(tab) {
             w.shareOpen = false
+            w.convertOpen = false
+            w.dropOpen = false
         }
         function onModeChanged() {
-            if (Ilot.mode !== "open")
+            if (Ilot.mode !== "open") {
                 w.shareOpen = false
+                w.convertOpen = false
+            }
+            // les zones de depot n'existent que dans la pilule survolee
+            if (Ilot.mode !== "peek")
+                w.dropOpen = false
         }
     }
     function openShare(paths) {
@@ -721,7 +730,40 @@ Item {
         Ilot.pinned = true
         if (Ilot.mode !== "open")
             Ilot.open()
+        dropOpen = false
+        convertOpen = false
         shareOpen = true
+    }
+
+    // conversion des fichiers deposes (Convert.qml), a la place de la page
+    // en cours, comme Quick Share
+    property bool convertOpen: false
+    property var convertPaths: []
+    onConvertOpenChanged: {
+        if (convertOpen)
+            Ilot.overlay = "convert"
+        else if (Ilot.overlay === "convert")
+            Ilot.overlay = ""
+    }
+    function openConvert(paths) {
+        convertPaths = paths
+        Ilot.pinned = true
+        Ilot.open()
+        shareOpen = false
+        convertOpen = true
+    }
+
+    // fichiers glisses sur l'ilot : la pilule survolee montre seulement les
+    // zones de depot (FileDrop.qml), sans le panneau
+    property bool dropOpen: false
+    property var dropPaths: []
+    function openDrop(paths) {
+        dropPaths = paths
+        // un repli deja programme (souris sortie du panneau) ne doit pas
+        // couper le glisser
+        Ilot.leaveTimer.stop()
+        Ilot.setMode("peek")
+        dropOpen = true
     }
     function addShareFiles(paths) {
         qsFiles = qsFiles.concat(paths.filter(p => qsFiles.indexOf(p) < 0))

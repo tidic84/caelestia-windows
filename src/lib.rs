@@ -352,6 +352,8 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "file_reveal" => json(files::file_reveal(a!("path"))),
         "img_convert" => files::img_convert(a!("path"), a!("to")).and_then(json),
         "img_shrink" => files::img_shrink(a!("path")).and_then(json),
+        "file_convert" => files::file_convert(a!("path"), a!("to")).and_then(json),
+        "ffmpeg_ok" => json(files::ffmpeg_ok()),
         "zip_files" => files::zip_files(a!("paths")).and_then(json),
         "files_copy" => json(files::files_copy(a!("paths"))),
         // Quick Share

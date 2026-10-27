@@ -7,7 +7,7 @@ import QtQuick
 // garder le defilement, le survol et les lignes d'un rafraichissement a l'autre.
 Item {
     id: page
-    readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "tasks" && !Watch.shareOpen
+    readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "tasks" && !Watch.shareOpen && !Watch.convertOpen
     property var tasks: []
     property var netRate: ({ down: 0, up: 0 })
     // totaux de l'en-tete (compteurs de Windows)
