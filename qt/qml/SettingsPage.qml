@@ -535,7 +535,7 @@ Item {
                 sec: "look"
                 SetRow {
                     icon: "palette"
-                    title: "Apparence"
+                    title: "Couleurs"
                     sub: page.cfg.color === "art" ? "Les couleurs suivent la pochette du morceau (sinon le fond d'écran)"
                         : page.cfg.color && page.cfg.color !== "auto" ? "Couleur choisie" : "Les couleurs sont tirées du fond d'écran"
                 }
@@ -575,7 +575,7 @@ Item {
                         }
                     }
                 }
-                SubTitle { text: "Couleur" }
+                SubTitle { text: "Couleur d'accent" }
                 Flow {
                     width: parent.width
                     topPadding: 8
@@ -637,32 +637,8 @@ Item {
                         }
                     }
                 }
-                SubTitle { text: "Thème" }
-                Chips {
-                    model: [["auto", "Comme Windows"], ["dark", "Sombre"], ["light", "Clair"], ["time", "Selon l’heure"], ["sun", "Lever / coucher du soleil"]]
-                    current: page.cfg.mode
-                    onPicked: v => Ilot.setCfg({ mode: v })
-                }
-                Row {
-                    visible: page.cfg.mode === "time"
-                    topPadding: 8
-                    spacing: 8
-                    Txt { text: "Clair de"; anchors.verticalCenter: parent.verticalCenter }
-                    TimeField { value: page.cfg.day || "07:00"; onDone: v => Ilot.setCfg({ day: v }) }
-                    Txt { text: "à"; anchors.verticalCenter: parent.verticalCenter }
-                    TimeField { value: page.cfg.night || "20:00"; onDone: v => Ilot.setCfg({ night: v }) }
-                }
-                Txt {
-                    visible: page.cfg.mode === "sun"
-                    topPadding: 6
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    px: 11.5
-                    color: Theme.inkVariant
-                    text: Ilot.sunTimes ? "Clair de " + Ilot.pad(Math.floor(Ilot.sunTimes[0] / 60)) + ":" + Ilot.pad(Ilot.sunTimes[0] % 60)
-                        + " à " + Ilot.pad(Math.floor(Ilot.sunTimes[1] / 60)) + ":" + Ilot.pad(Ilot.sunTimes[1] % 60) + " (" + (page.cfg.city ? page.cfg.city.name : "") + ")"
-                        : "Choisis une ville dans Météo pour connaître les heures du soleil."
-                }
+                // style de la palette : apercu de chaque variante
+                SubTitle { text: "Style de la palette" }
                 Flow {
                     id: variants
                     width: parent.width
@@ -731,6 +707,32 @@ Item {
                         }
                     }
                 }
+                SubTitle { text: "Clair ou sombre" }
+                Chips {
+                    model: [["auto", "Comme Windows"], ["dark", "Sombre"], ["light", "Clair"], ["time", "Selon l’heure"], ["sun", "Lever / coucher du soleil"]]
+                    current: page.cfg.mode
+                    onPicked: v => Ilot.setCfg({ mode: v })
+                }
+                Row {
+                    visible: page.cfg.mode === "time"
+                    topPadding: 8
+                    spacing: 8
+                    Txt { text: "Clair de"; anchors.verticalCenter: parent.verticalCenter }
+                    TimeField { value: page.cfg.day || "07:00"; onDone: v => Ilot.setCfg({ day: v }) }
+                    Txt { text: "à"; anchors.verticalCenter: parent.verticalCenter }
+                    TimeField { value: page.cfg.night || "20:00"; onDone: v => Ilot.setCfg({ night: v }) }
+                }
+                Txt {
+                    visible: page.cfg.mode === "sun"
+                    topPadding: 6
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    px: 11.5
+                    color: Theme.inkVariant
+                    text: Ilot.sunTimes ? "Clair de " + Ilot.pad(Math.floor(Ilot.sunTimes[0] / 60)) + ":" + Ilot.pad(Ilot.sunTimes[0] % 60)
+                        + " à " + Ilot.pad(Math.floor(Ilot.sunTimes[1] / 60)) + ":" + Ilot.pad(Ilot.sunTimes[1] % 60) + " (" + (page.cfg.city ? page.cfg.city.name : "") + ")"
+                        : "Choisis une ville dans Météo pour connaître les heures du soleil."
+                }
                 SetRow {
                     subRow: true
                     title: "Appliquer la couleur d'accent à Windows"
@@ -747,28 +749,34 @@ Item {
                 SetRow {
                     subRow: true
                     title: "Appliquer le mode clair / sombre à Windows"
-                    sub: "Quand le mode n'est pas « Auto »"
+                    sub: "Quand le mode n'est pas « Comme Windows »"
                     toggle: true
                     checked: !!page.cfg.win_mode
                     onToggled: on => Ilot.setCfg({ win_mode: on })
                 }
+            }
+
+            // ilot : fond, contour, forme, animations
+            Block {
+                sec: "look"
                 SetRow {
-                    subRow: true
-                    title: "Fond de l'îlot"
-                    sub: "Opaque, translucide, ou flou acrylique de Windows derrière l'îlot et la barre"
+                    icon: "auto_awesome"
+                    title: "Îlot"
+                    sub: "Fond, contour, forme et animations de l'îlot et de la barre"
                 }
+                SubTitle { text: "Fond" }
                 Chips {
                     model: [["solid", "Opaque"], ["black", "Noir pur"], ["glass", "Translucide"], ["clear", "Très transparent"], ["wall", "Acrylique"], ["aurora", "Aurore boréale"]]
                     current: page.cfg.island_bg || "solid"
                     onPicked: v => Ilot.setCfg({ island_bg: v })
                 }
-                SubTitle { text: "Contour de l'îlot" }
+                SubTitle { text: "Contour" }
                 Chips {
                     model: [["none", "Aucun"], ["line", "Liseré"], ["glow", "Lueur"], ["rgb", "Arc-en-ciel"], ["pulse", "Pulsation"]]
                     current: page.cfg.border || "none"
                     onPicked: v => Ilot.setCfg({ border: v })
                 }
-                SubTitle { text: "Forme de l'îlot" }
+                SubTitle { text: "Forme" }
                 Chips {
                     model: [["round", "Arrondie"], ["pill", "Pilule"], ["square", "Carrée"]]
                     current: page.cfg.shape || "round"
@@ -780,8 +788,26 @@ Item {
                     current: page.cfg.anim || "normal"
                     onPicked: v => Ilot.setCfg({ anim: v })
                 }
+            }
 
-                // lecteur : survol de la pilule, onglet Media, carte de l'accueil
+            // ------------------------------------------ rotation des fonds
+            Block {
+                sec: "look"
+                SetRow {
+                    icon: "autorenew"
+                    title: "Changer de fond automatiquement"
+                    sub: "Au hasard parmi vos fonds (ou ceux de Wallpaper Engine s'il tourne)"
+                }
+                Chips {
+                    model: [[0, "Jamais"], [15, "15 min"], [30, "30 min"], [60, "1 h"], [180, "3 h"], [1440, "1 jour"]]
+                    current: page.cfg.rotate_min
+                    onPicked: v => Ilot.setCfg({ rotate_min: v })
+                }
+            }
+
+            // lecteur : survol de la pilule, onglet Media, carte de l'accueil
+            Block {
+                sec: "look"
                 SetRow {
                     icon: "music_note"
                     title: "Lecteur de musique"
@@ -814,19 +840,22 @@ Item {
                         }
                     }
                 }
+            }
 
-                // bouton lecture
+            // bouton lecture
+            Block {
+                sec: "look"
                 SetRow {
                     icon: "play_arrow"
                     title: "Bouton lecture"
                 }
-                SubTitle { text: "Forme" }
+                SubTitle { text: "Forme du bouton" }
                 Chips {
                     model: [["cookie", "Festonné"], ["round", "Rond"], ["none", "Icône seule"]]
                     current: page.cfg.player_btn || "cookie"
                     onPicked: v => Ilot.setCfg({ player_btn: v })
                 }
-                SubTitle { text: "Couleur" }
+                SubTitle { text: "Couleur du bouton" }
                 Chips {
                     id: btnColorChips
                     // "#rrggbb" = couleur fixe ; "fixed" n'est jamais stocke
@@ -909,8 +938,11 @@ Item {
                         || (btnColorChips.val.charAt(0) === "#" && btnColorChips.val.toLowerCase() !== "#ffffff")
                     onToggled: on => Ilot.setCfg({ player_btn_glow: on })
                 }
+            }
 
-                // barre de progression
+            // barre de progression
+            Block {
+                sec: "look"
                 SetRow {
                     icon: "graphic_eq"
                     title: "Barre de progression"
@@ -935,11 +967,15 @@ Item {
                     current: page.cfg.player_bar_amp || "normal"
                     onPicked: v => Ilot.setCfg({ player_bar_amp: v })
                 }
+            }
 
-                // pilule repliee
+            // pilule repliee et son survol : glisser, molette
+            Block {
+                sec: "look"
                 SetRow {
                     icon: "pill"
-                    title: "Pilule repliée"
+                    title: "Lecteur dans la pilule"
+                    sub: "La pilule repliée, et son survol"
                 }
                 SetRow {
                     subRow: true
@@ -962,13 +998,39 @@ Item {
                     checked: page.cfg.player_mini_lyrics === true
                     onToggled: on => Ilot.setCfg({ player_mini_lyrics: on })
                 }
+                SetRow {
+                    subRow: true
+                    title: "Glisser la pochette pour changer de titre"
+                    sub: "Au survol de la pilule : vers la gauche, titre suivant ; vers la droite, précédent"
+                    toggle: true
+                    checked: !!page.cfg.player_swipe
+                    onToggled: on => Ilot.setCfg({ player_swipe: on })
+                }
+                SetRow {
+                    subRow: true
+                    title: "Molette : volume de l'appli qui joue"
+                    sub: "Pendant la musique, la molette sur la pilule règle le volume de Spotify (ou de l'appli qui joue) au lieu du volume général"
+                    toggle: true
+                    checked: !!page.cfg.player_wheel
+                    onToggled: on => Ilot.setCfg({ player_wheel: on })
+                }
+            }
 
-                // pochette de l'onglet Media
+            // onglet Media : disposition, pochette, fond
+            Block {
+                sec: "look"
                 SetRow {
                     icon: "album"
-                    title: "Pochette de l'onglet Média"
+                    title: "Onglet Média"
                 }
-                SubTitle { text: "Forme" }
+                SubTitle { text: "Disposition" }
+                Chips {
+                    model: [["col", "Colonne (paroles à droite)"], ["side", "Côte à côte (paroles en bas)"]]
+                    current: page.cfg.player_layout || "col"
+                    onPicked: v => Ilot.setCfg({ player_layout: v })
+                }
+                SubTitle { text: "Pochette"; topPadding: 18; px: 12.5; color: Theme.primary }
+                SubTitle { text: "Forme de la pochette" }
                 Chips {
                     model: [["round", "Arrondie"], ["scallop", "Festonnée"], ["disc", "Ronde"]]
                     current: page.cfg.player_art || "scallop"
@@ -983,13 +1045,8 @@ Item {
                         ? (page.cfg.player_art || "scallop") === "scallop" : !!page.cfg.player_spectrum
                     onToggled: on => Ilot.setCfg({ player_spectrum: on })
                 }
-
-                // fond de l'onglet Media
-                SetRow {
-                    icon: "wallpaper"
-                    title: "Fond de l'onglet Média"
-                }
-                SubTitle { text: "Fond" }
+                SubTitle { text: "Fond"; topPadding: 18; px: 12.5; color: Theme.primary }
+                SubTitle { text: "Type de fond" }
                 Chips {
                     model: [["art", "Pochette floutée"], ["color", "Couleur"], ["gradient", "Dégradé"], ["none", "Aucun"]]
                     current: page.cfg.media_bg || "art"
@@ -1017,30 +1074,6 @@ Item {
                         current: page.cfg.media_dim || "normal"
                         onPicked: v => Ilot.setCfg({ media_dim: v })
                     }
-                }
-
-                // onglet Media : disposition ; survol de la pilule : glisser, molette
-                SubTitle { text: "Disposition de l'onglet Média" }
-                Chips {
-                    model: [["col", "Colonne (paroles à droite)"], ["side", "Côte à côte (paroles en bas)"]]
-                    current: page.cfg.player_layout || "col"
-                    onPicked: v => Ilot.setCfg({ player_layout: v })
-                }
-                SetRow {
-                    subRow: true
-                    title: "Glisser la pochette pour changer de titre"
-                    sub: "Au survol de la pilule : vers la gauche, titre suivant ; vers la droite, précédent"
-                    toggle: true
-                    checked: !!page.cfg.player_swipe
-                    onToggled: on => Ilot.setCfg({ player_swipe: on })
-                }
-                SetRow {
-                    subRow: true
-                    title: "Molette : volume de l'appli qui joue"
-                    sub: "Pendant la musique, la molette sur la pilule règle le volume de Spotify (ou de l'appli qui joue) au lieu du volume général"
-                    toggle: true
-                    checked: !!page.cfg.player_wheel
-                    onToggled: on => Ilot.setCfg({ player_wheel: on })
                 }
             }
 
@@ -1886,21 +1919,6 @@ Item {
                             Ilot.later(300, () => Ilot.refreshEvents(true))
                         }
                     }
-                }
-            }
-
-            // ------------------------------------------ rotation des fonds
-            Block {
-                sec: "look"
-                SetRow {
-                    icon: "autorenew"
-                    title: "Changer de fond automatiquement"
-                    sub: "Au hasard parmi vos fonds (ou ceux de Wallpaper Engine s'il tourne)"
-                }
-                Chips {
-                    model: [[0, "Jamais"], [15, "15 min"], [30, "30 min"], [60, "1 h"], [180, "3 h"], [1440, "1 jour"]]
-                    current: page.cfg.rotate_min
-                    onPicked: v => Ilot.setCfg({ rotate_min: v })
                 }
             }
 

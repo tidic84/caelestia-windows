@@ -35,6 +35,25 @@ reprendre.
 
 ## Journal
 
+### 2026-10-27 : Réglages › Apparence réorganisés
+
+- **Maquette** `docs/dev/maquettes/apparence.html` (actuel avec repères des
+  défauts / proposé), validée par l'utilisateur.
+- **`SettingsPage.qml`**, section `look` : la grande carte devient huit
+  cartes (Couleurs, Îlot, Changer de fond automatiquement remontée,
+  Lecteur de musique, Bouton lecture, Barre de progression, Lecteur dans la
+  pilule, Onglet Média). Intertitres renommés : « Couleur d'accent »,
+  « Style de la palette » (la grille des variantes n'avait pas de titre),
+  « Clair ou sombre » (ex « Thème »), « Forme du bouton », « Couleur du
+  bouton », « Forme de la pochette », « Type de fond » ; « Fond de l'îlot »
+  passe en intertitre. Glisser et molette rejoignent la carte de la pilule,
+  la disposition passe en tête de la carte Onglet Média (sous-groupes
+  Pochette et Fond en couleur primaire). Aucun réglage ni comportement
+  changé.
+- **Vérifié** : compilation, captures `ILOT_QT_SHOT` de toute la section
+  (TEMP-TEST retirés, settings.json et ui.json inchangés). Relu par un agent
+  de relecture (l'agent `relecteur` n'existe pas sur le poste).
+
 ### 2026-10-27 : pilule de dépôt des fichiers, page de conversion
 
 - **Pilule de dépôt** (`FileDrop.qml`, nouveau) : des fichiers glissés sur

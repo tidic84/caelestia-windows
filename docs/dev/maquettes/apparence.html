@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Réglages › Apparence</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block" rel="stylesheet">
+<style>
+/* Maquette : Réglages › Apparence (qt/qml/SettingsPage.qml, sec: "look").
+   À gauche la page actuelle (repères = défauts), à droite la proposition.
+   Mesures de la page : carte (Block) marge 14, coins 22, écart 10 ;
+   en-tête SetRow 40 ; SubTitle haut 14 ; Chips haut 12 ; subRow 44. */
+:root {
+  --primary: #cfbdfe; --primary-container: #4d3d75; --ink-primary-container: #e9ddff;
+  --secondary-container: #4a4458; --ink-secondary-container: #e8def8;
+  --surface: #141218; --surface-c: #211f26; --surface-high: #2b2930; --surface-highest: #36343b;
+  --ink: #e6e0e9; --ink-variant: #cac4d0; --outline: #938f99; --error: #ffb4ab;
+  --mark: #ff8a65;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #0d0c10; color: var(--ink); font-family: Rubik, system-ui, sans-serif; padding: 24px 16px 60px; }
+.ms { font-family: "Material Symbols Rounded"; font-size: 22px; line-height: 1; font-variation-settings: "FILL" 1, "opsz" 24; }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+.lead { color: var(--ink-variant); font-size: 13px; margin: 0 0 22px; max-width: 1180px; line-height: 1.5; }
+.cols { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+.col { width: 560px; max-width: 100%; }
+.col > h2 { font-size: 11px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: #ffffff80; margin: 0 0 10px; }
+.pane { background: var(--surface); border-radius: 26px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+
+/* carte (Block) */
+.card { background: var(--surface-c); border-radius: 22px; padding: 14px; position: relative; }
+/* en-tête (SetRow avec icône) */
+.hd { display: flex; align-items: center; gap: 14px; min-height: 40px; }
+.hd .ic { width: 40px; height: 40px; border-radius: 14px; background: var(--secondary-container); color: var(--ink-secondary-container); display: grid; place-items: center; flex: none; }
+.t { font-size: 14px; font-weight: 500; }
+.s { font-size: 12px; color: var(--ink-variant); margin-top: 2px; line-height: 1.35; }
+/* intertitre (SubTitle) */
+.sub { font-size: 12px; font-weight: 500; color: var(--ink-variant); padding-top: 14px; }
+.sub.grp { font-size: 12.5px; color: var(--primary); padding-top: 18px; letter-spacing: .2px; }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 12px; }
+.flow.p8 { padding-top: 8px; }
+.chip { height: 30px; border-radius: 15px; padding: 0 12px; background: var(--surface-high); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+.chip.on { background: var(--secondary-container); color: var(--ink-secondary-container); }
+.chip .dot { width: 12px; height: 12px; border-radius: 6px; }
+.sw { width: 30px; height: 30px; border-radius: 15px; background: var(--surface-high); display: grid; place-items: center; color: var(--ink-variant); }
+.sw .ms { font-size: 17px; }
+.sw.on { box-shadow: 0 0 0 2px var(--surface-c), 0 0 0 4px var(--primary); }
+.hex { width: 100px; height: 30px; border-radius: 15px; background: var(--surface-high); display: flex; align-items: center; gap: 4px; padding-left: 8px; color: var(--outline); font-size: 12px; }
+.hex .ms { font-size: 16px; color: var(--ink-variant); }
+/* ligne à interrupteur (subRow) */
+.tg { display: flex; align-items: center; min-height: 44px; padding: 12px 0 0 54px; gap: 14px; }
+.tg > div:first-child { flex: 1; }
+.tg.flat { padding-left: 0; }
+.tg.off { opacity: .5; }
+.swi { width: 52px; height: 32px; border-radius: 16px; background: var(--surface-highest); border: 2px solid var(--outline); position: relative; flex: none; }
+.swi::after { content: ""; position: absolute; left: 6px; top: 6px; width: 16px; height: 16px; border-radius: 8px; background: var(--outline); }
+.swi.on { background: var(--primary); border-color: var(--primary); }
+.swi.on::after { left: 22px; top: 2px; width: 24px; height: 24px; border-radius: 12px; background: #381e72; }
+.vars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding-top: 12px; }
+.var { height: 66px; border-radius: 16px; background: var(--surface-high); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 11px; }
+.var.on { background: var(--primary-container); color: var(--ink-primary-container); }
+.var .bar { height: 26px; width: 52px; border-radius: 13px; display: flex; align-items: center; justify-content: center; }
+.var .bar i { width: 16px; height: 16px; border-radius: 8px; margin: 0 -1.5px; box-shadow: 0 0 0 2px var(--surface-high); }
+.note { font-size: 11.5px; color: var(--ink-variant); padding-top: 6px; }
+
+/* repères des défauts */
+.mk { position: relative; }
+.mk::before { content: attr(data-n); position: absolute; left: -24px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border-radius: 9px; background: var(--mark); color: #2a0f05; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.zone { outline: 1.5px dashed #ff8a6599; outline-offset: 3px; border-radius: 8px; }
+.gap0 { outline: 1.5px dashed #ff8a65; outline-offset: 0; }
+.legend { margin-top: 16px; font-size: 12.5px; line-height: 1.55; color: var(--ink-variant); counter-reset: n; padding: 0; list-style: none; }
+.legend li { position: relative; padding-left: 28px; margin-bottom: 8px; }
+.legend li b { color: var(--ink); font-weight: 500; }
+.legend li::before { counter-increment: n; content: counter(n); position: absolute; left: 0; top: 1px; width: 18px; height: 18px; border-radius: 9px; background: var(--mark); color: #2a0f05; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.changes { margin-top: 16px; font-size: 12.5px; line-height: 1.55; color: var(--ink-variant); padding-left: 18px; }
+.changes b { color: var(--ink); font-weight: 500; }
+.col.cur .pane { padding-left: 30px; }
+</style>
+</head>
+<body>
+<h1>Réglages › Apparence</h1>
+<p class="lead">À gauche, la page telle qu'elle est (une seule carte de près de 60 éléments, avec les repères des défauts). À droite, la proposition. Seuls l'ordre, le découpage en cartes et les titres changent. Les réglages, leurs choix et ce qu'ils font restent les mêmes. Faites défiler les deux colonnes côte à côte.</p>
+
+<div class="cols">
+  <div class="col cur"><h2>Actuel</h2><div class="pane" id="cur"></div>
+    <ol class="legend">
+      <li><b>« Thèmes prêts » puis « Thème »</b> : deux titres presque identiques. Le second règle en fait clair ou sombre.</li>
+      <li><b>Grille sans titre</b> (Tonal Spot, Vibrant…) : rien n'indique que c'est le style de la palette.</li>
+      <li><b>Les deux réglages Windows</b> coupent la page entre les couleurs et le fond de l'îlot.</li>
+      <li><b>« Fond de l'îlot »</b> est une ligne décalée, sans interrupteur, alors que « Contour » et « Forme », juste en dessous, sont des intertitres.</li>
+      <li><b>Pas d'espace avant les en-têtes</b> (Lecteur de musique, Bouton lecture, Barre de progression, Pilule repliée, Pochette, Fond) : chaque groupe colle au précédent, dans la même carte.</li>
+      <li><b>Titres répétés sans contexte</b> : « Couleur » apparaît deux fois, « Forme » deux fois, et « Fond » sous « Fond de l'onglet Média ».</li>
+      <li><b>Fin de carte sans en-tête</b> : la disposition de l'onglet Média, puis deux réglages du survol de la pilule, placés après le fond.</li>
+      <li><b>« Changer de fond automatiquement »</b> est tout en bas, loin des couleurs tirées du fond d'écran.</li>
+    </ol>
+  </div>
+  <div class="col"><h2>Proposé</h2><div class="pane" id="new"></div>
+    <ul class="changes">
+      <li><b>Huit cartes au lieu de deux.</b> L'écart de 10 px entre les cartes sépare les groupes, comme dans les autres sections des réglages.</li>
+      <li><b>Couleurs</b> : thèmes prêts, couleur d'accent, « Style de la palette », « Clair ou sombre », puis les deux réglages Windows en fin de carte. Le sous-titre « Quand le mode n'est pas « Auto » » devient « Comme Windows », le nom du choix réel.</li>
+      <li><b>Îlot</b> : fond, contour, forme et animations, sous des intertitres du même style. La rotation des fonds suit, dans sa carte.</li>
+      <li><b>Lecteur de musique</b> : une carte par partie (bouton, barre, pilule repliée et son survol, onglet Média). Les intertitres disent ce qu'ils règlent (« Forme du bouton », « Couleur de l'icône »…).</li>
+      <li>Les sous-groupes de l'onglet Média (pochette, fond) gardent un intertitre en couleur, avec un peu plus d'espace au-dessus.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const sw = ["#6750a4","#3f51b5","#1e88e5","#00bcd4","#00897b","#43a047","#c0ca33","#fbc02d","#fb8c00","#e53935","#d81b60","#8e24aa","#795548","#607d8b"];
+const presets = [["Minuit","#1e88e5"],["Néon","#d81b60"],["Forêt","#43a047"],["Coucher de soleil","#fb8c00"],["Glace","#4fc3f7"],["Rétro","#c0ca33"],["Monochrome","#9e9e9e"]];
+const vars = [["Tonal Spot",["#d0bcff","#ccc2dc","#efb8c8"],1],["Vibrant",["#e0b6ff","#d7bde4","#ffb0c9"]],["Expressive",["#a7c8ff","#e4b7f2","#ffb4a9"]],["Fidélité",["#cfbcff","#cbc2db","#f2b8c4"]],["Contenu",["#cdbdff","#cbc3dc","#f3b7c8"]],["Arc-en-ciel",["#d0bcff","#c7c6ca","#f5b8c4"]],["Salade de fruits",["#ffb4a8","#a8c8ff","#c8bfff"]],["Neutre",["#cac4cf","#c9c5cb","#d1c3c8"]],["Monochrome",["#c6c6c6","#c6c6c6","#e2e2e2"]]];
+
+const H = (ic, t, s) => `<div class="hd"><div class="ic"><span class="ms">${ic}</span></div><div><div class="t">${t}</div>${s ? `<div class="s">${s}</div>` : ""}</div></div>`;
+const S = (t, cls = "") => `<div class="sub ${cls}">${t}</div>`;
+const C = (list, cur, extra = "") => `<div class="flow ${extra}">${list.map(x => `<div class="chip${x === cur ? " on" : ""}">${x}</div>`).join("")}</div>`;
+const T = (t, s, on, opt = "") => `<div class="tg ${opt}"><div><div class="t">${t}</div>${s ? `<div class="s">${s}</div>` : ""}</div><div class="swi${on ? " on" : ""}"></div></div>`;
+const SW = (icons, withHex) => `<div class="flow p8">${icons.map((x, i) => `<div class="sw${i === 0 ? " on" : ""}"><span class="ms">${x}</span></div>`).join("")}${sw.map(c => `<div class="sw" style="background:${c}"></div>`).join("")}${withHex ? `<div class="hex"><span class="ms">colorize</span>#6750a4</div>` : ""}</div>`;
+const P = () => `<div class="flow p8">${presets.map(([n, c]) => `<div class="chip"><span class="dot" style="background:${c}"></span>${n}</div>`).join("")}</div>`;
+const V = () => `<div class="vars">${vars.map(([n, d, on]) => `<div class="var${on ? " on" : ""}"><div class="bar" style="background:#1d1b20">${d.map(c => `<i style="background:${c}"></i>`).join("")}</div>${n}</div>`).join("")}</div>`;
+const mk = (n, html, cls = "zone") => `<div class="mk ${cls}" data-n="${n}">${html}</div>`;
+const card = html => `<div class="card">${html}</div>`;
+
+const modes = ["Comme Windows","Sombre","Clair","Selon l’heure","Lever / coucher du soleil"];
+const bg = ["Opaque","Noir pur","Translucide","Très transparent","Acrylique","Aurore boréale"];
+const border = ["Aucun","Liseré","Lueur","Arc-en-ciel","Pulsation"];
+const shape = ["Arrondie","Pilule","Carrée"];
+const anim = ["Normale","Rapide","Douce","Sans rebond","Instantanée"];
+const btnShape = ["Festonné","Rond","Icône seule"];
+const btnColor = ["Auto","Couleur du lecteur","Blanc","Couleur fixe"];
+const ink = ["Auto","Blanche","Noire"];
+const autoNote = `<div class="note">Auto : blanc lumineux dans l'onglet Média, couleur du lecteur ailleurs</div>`;
+const rotate = ["Jamais","15 min","30 min","1 h","3 h","1 jour"];
+const btnToggles = () => T("Rotation pendant la lecture", "", true) + T("Change de forme entre pause et lecture", "", true) + T("Petit rebond de l'icône au clic", "", true) + T("Ombre colorée", "", true);
+const miniToggles = () => T("Anneau de progression autour du disque", "", true) + T("Le disque tourne pendant la lecture", "", true) + T("Paroles synchronisées dans la pilule", "", false);
+const swipe = () => T("Glisser la pochette pour changer de titre", "Au survol de la pilule : vers la gauche, titre suivant ; vers la droite, précédent", false);
+const wheel = () => T("Molette : volume de l'appli qui joue", "Pendant la musique, la molette sur la pilule règle le volume de Spotify (ou de l'appli qui joue) au lieu du volume général", false);
+const mediaBgRest = () => S("Flou") + C(["Léger","Moyen","Fort"], "Moyen") + T("Le fond dérive lentement", "", true) + S("Assombrissement en bas") + C(["Léger","Normal","Fort"], "Normal");
+
+// ------------------------------------------------------------ actuel
+document.getElementById("cur").innerHTML =
+  card(
+    H("palette", "Apparence", "Les couleurs sont tirées du fond d'écran") +
+    mk(1, S("Thèmes prêts")) + P() +
+    S("Couleur") + SW(["wallpaper","album"], true) +
+    mk(1, S("Thème")) + C(modes, "Comme Windows") +
+    mk(2, V()) +
+    mk(3, T("Appliquer la couleur d'accent à Windows", "Barre des tâches, menu Démarrer, bordures de fenêtres", false) +
+          T("Appliquer le mode clair / sombre à Windows", "Quand le mode n'est pas « Auto »", false)) +
+    mk(4, `<div class="tg"><div><div class="t">Fond de l'îlot</div><div class="s">Opaque, translucide, ou flou acrylique de Windows derrière l'îlot et la barre</div></div></div>`) +
+    C(bg, "Opaque") +
+    S("Contour de l'îlot") + C(border, "Aucun") +
+    S("Forme de l'îlot") + C(shape, "Arrondie") +
+    S("Animations") + C(anim, "Normale") +
+    mk(5, H("music_note", "Lecteur de musique", "Survol de la pilule, onglet Média et carte de l'accueil"), "gap0") +
+    S("Couleur du lecteur") + SW(["album","palette"], false) +
+    mk(5, H("play_arrow", "Bouton lecture"), "gap0") +
+    mk(6, S("Forme")) + C(btnShape, "Festonné") +
+    mk(6, S("Couleur")) + C(btnColor, "Auto") + autoNote +
+    S("Couleur de l'icône") + C(ink, "Auto") + btnToggles() +
+    mk(5, H("graphic_eq", "Barre de progression"), "gap0") +
+    S("Style") + C(["Ondulée","Plate"], "Ondulée") +
+    S("Épaisseur") + C(["Fine","Normale","Épaisse"], "Normale") +
+    S("Amplitude de l'onde") + C(["Faible","Normale","Forte"], "Normale") +
+    mk(5, H("pill", "Pilule repliée"), "gap0") + miniToggles() +
+    mk(5, H("album", "Pochette de l'onglet Média"), "gap0") +
+    mk(6, S("Forme")) + C(["Arrondie","Festonnée","Ronde"], "Festonnée") +
+    T("Spectre autour de la pochette", "", true) +
+    mk(5, H("wallpaper", "Fond de l'onglet Média"), "gap0") +
+    mk(6, S("Fond")) + C(["Pochette floutée","Couleur","Dégradé","Aucun"], "Pochette floutée") + mediaBgRest() +
+    mk(7, S("Disposition de l'onglet Média") + C(["Colonne (paroles à droite)","Côte à côte (paroles en bas)"], "Colonne (paroles à droite)") + swipe() + wheel())
+  ) +
+  mk(8, card(H("autorenew", "Changer de fond automatiquement", "Au hasard parmi vos fonds (ou ceux de Wallpaper Engine s'il tourne)") + C(rotate, "Jamais")));
+
+// ----------------------------------------------------------- proposé
+document.getElementById("new").innerHTML =
+  card(
+    H("palette", "Couleurs", "Les couleurs sont tirées du fond d'écran") +
+    S("Thèmes prêts") + P() +
+    S("Couleur d'accent") + SW(["wallpaper","album"], true) +
+    S("Style de la palette") + V() +
+    S("Clair ou sombre") + C(modes, "Comme Windows") +
+    T("Appliquer la couleur d'accent à Windows", "Barre des tâches, menu Démarrer, bordures de fenêtres", false) +
+    T("Appliquer le mode clair / sombre à Windows", "Quand le mode n'est pas « Comme Windows »", false)
+  ) +
+  card(
+    H("auto_awesome", "Îlot", "Fond, contour, forme et animations de l'îlot et de la barre") +
+    S("Fond") + C(bg, "Opaque") +
+    S("Contour") + C(border, "Aucun") +
+    S("Forme") + C(shape, "Arrondie") +
+    S("Animations") + C(anim, "Normale")
+  ) +
+  card(H("autorenew", "Changer de fond automatiquement", "Au hasard parmi vos fonds (ou ceux de Wallpaper Engine s'il tourne)") + C(rotate, "Jamais")) +
+  card(
+    H("music_note", "Lecteur de musique", "Survol de la pilule, onglet Média et carte de l'accueil") +
+    S("Couleur du lecteur") + SW(["album","palette"], false)
+  ) +
+  card(
+    H("play_arrow", "Bouton lecture") +
+    S("Forme du bouton") + C(btnShape, "Festonné") +
+    S("Couleur du bouton") + C(btnColor, "Auto") + autoNote +
+    S("Couleur de l'icône") + C(ink, "Auto") + btnToggles()
+  ) +
+  card(
+    H("graphic_eq", "Barre de progression") +
+    S("Style") + C(["Ondulée","Plate"], "Ondulée") +
+    S("Épaisseur") + C(["Fine","Normale","Épaisse"], "Normale") +
+    S("Amplitude de l'onde") + C(["Faible","Normale","Forte"], "Normale")
+  ) +
+  card(H("pill", "Lecteur dans la pilule", "La pilule repliée, et son survol") + miniToggles() + swipe() + wheel()) +
+  card(
+    H("album", "Onglet Média") +
+    S("Disposition") + C(["Colonne (paroles à droite)","Côte à côte (paroles en bas)"], "Colonne (paroles à droite)") +
+    S("Pochette", "grp") +
+    S("Forme de la pochette") + C(["Arrondie","Festonnée","Ronde"], "Festonnée") +
+    T("Spectre autour de la pochette", "", true) +
+    S("Fond", "grp") +
+    S("Type de fond") + C(["Pochette floutée","Couleur","Dégradé","Aucun"], "Pochette floutée") + mediaBgRest()
+  );
+</script>
+</body>
+</html>
