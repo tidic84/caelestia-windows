@@ -27,6 +27,9 @@ WinCtl::WinCtl(QObject *parent) : QObject(parent)
         if (m_win && m_fullscreen)
             m_win->hide();
     });
+    // mode "auto" : suit la souris pendant que la fenetre est masquee
+    m_peekTimer.setInterval(50);
+    connect(&m_peekTimer, &QTimer::timeout, this, &WinCtl::pollPeek);
 }
 
 WinCtl::~WinCtl()
@@ -87,6 +90,24 @@ void WinCtl::setTopBand(qreal h)
         }
     }
     Q_EMIT topBandChanged();
+}
+
+void WinCtl::setFsMode(const QString &m)
+{
+    if (m == m_fsMode)
+        return;
+    m_fsMode = m;
+    checkFullscreen();
+    Q_EMIT fsModeChanged();
+}
+
+void WinCtl::setFsApps(const QStringList &l)
+{
+    if (l == m_fsApps)
+        return;
+    m_fsApps = l;
+    checkFullscreen();
+    Q_EMIT fsAppsChanged();
 }
 
 void WinCtl::setHit(const QVariantList &rects)
@@ -172,8 +193,24 @@ void WinCtl::pollTop()
     }
 }
 
+// Nom de l'executable d'un processus, en minuscules (« rocketleague.exe »)
+static QString exeOf(DWORD pid)
+{
+    HANDLE p = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!p)
+        return {};
+    wchar_t buf[1024];
+    DWORD n = DWORD(sizeof(buf) / sizeof(buf[0]));
+    QString name;
+    if (QueryFullProcessImageNameW(p, 0, buf, &n))
+        name = QString::fromWCharArray(buf, int(n)).section(QLatin1Char('\\'), -1).toLower();
+    CloseHandle(p);
+    return name;
+}
+
 // Meme regle que l'ilot Tauri : fenetre au premier plan couvrant tout
-// l'ecran de la fenetre, sans etre simplement maximisee.
+// l'ecran de la fenetre, sans etre simplement maximisee. fsMode decide
+// ensuite si la fenetre se masque.
 void WinCtl::checkFullscreen()
 {
     if (!m_win)
@@ -183,23 +220,66 @@ void WinCtl::checkFullscreen()
     if (m_backdrop)
         m_backdrop->place(own, m_win->isVisible());
     HWND fg = GetForegroundWindow();
-    bool fs = false;
-    if (fg && fg != own && !IsZoomed(fg)) {
+    bool fs = false, zoomed = false;
+    if (fg && fg != own) {
         wchar_t cls[64] = {};
         GetClassNameW(fg, cls, 64);
         bool shell = !wcscmp(cls, L"Progman") || !wcscmp(cls, L"WorkerW") || !wcscmp(cls, L"Shell_TrayWnd");
         HMONITOR mon = MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST);
-        RECT r;
-        MONITORINFO mi{sizeof(mi)};
-        if (!shell && mon == MonitorFromWindow(own, MONITOR_DEFAULTTONEAREST) && GetWindowRect(fg, &r)
-            && GetMonitorInfoW(mon, &mi)) {
-            const RECT &m = mi.rcMonitor;
-            fs = r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
+        if (!shell && mon == MonitorFromWindow(own, MONITOR_DEFAULTTONEAREST)) {
+            zoomed = IsZoomed(fg) != FALSE;
+            RECT r;
+            MONITORINFO mi{sizeof(mi)};
+            if (!zoomed && GetWindowRect(fg, &r) && GetMonitorInfoW(mon, &mi)) {
+                const RECT &m = mi.rcMonitor;
+                fs = r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
+            }
         }
     }
+    const bool custom = m_fsMode == QLatin1String("custom");
+    // executable : en plein ecran (Reglages > Jeu et absence le propose), et pour
+    // une fenetre maximisee en mode "custom" (jeux en fenetre sans bordure)
+    QString exe;
+    if (fs || (zoomed && custom)) {
+        DWORD pid = 0;
+        GetWindowThreadProcessId(fg, &pid);
+        if (pid != m_fgPid) {
+            m_fgPid = pid;
+            m_fgExe = exeOf(pid);
+        }
+        exe = m_fgExe;
+    }
+    if (fs && !exe.isEmpty() && exe != m_fsExe) {
+        m_fsExe = exe;
+        Q_EMIT fsExeChanged();
+    }
+    if (fs != m_covered) {
+        m_covered = fs;
+        Q_EMIT coveredChanged();
+    }
+    bool hide = fs;
+    if (m_fsMode == QLatin1String("show"))
+        hide = false;
+    else if (custom)
+        hide = (fs || zoomed) && !exe.isEmpty() && m_fsApps.contains(exe);
+    m_hideWanted = hide;
+    if (hide && m_fsMode == QLatin1String("auto")) {
+        if (!m_peekTimer.isActive())
+            m_peekTimer.start();
+    } else {
+        m_peekTimer.stop();
+        m_peek = false;
+        m_peekOut = 0;
+    }
+    setHidden(hide && !m_peek);
+}
+
+void WinCtl::setHidden(bool fs)
+{
     if (fs == m_fullscreen)
         return;
     m_fullscreen = fs;
+    HWND own = HWND(m_win->winId());
     if (fs) {
         m_hideTimer.start();
         m_topTimer.stop();
@@ -216,4 +296,29 @@ void WinCtl::checkFullscreen()
             m_topTimer.start();
     }
     Q_EMIT fullscreenChanged();
+}
+
+// Mode "auto" : la fenetre est masquee devant l'appli en plein ecran. La
+// souris tout en haut de l'ecran, vers le milieu (au-dessus de l'ilot), la
+// fait revenir ; elle reste tant que la souris est sur l'ilot ou le panneau,
+// puis se masque de nouveau 0,6 s apres son depart.
+void WinCtl::pollPeek()
+{
+    if (!m_win || !m_hideWanted)
+        return;
+    const QPoint p = QCursor::pos();
+    const QRect g = m_win->geometry();
+    const bool top = p.y() <= g.top() + 1 && p.x() >= g.left() + g.width() / 3 && p.x() <= g.right() - g.width() / 3;
+    bool in = top;
+    if (m_peek && !in)
+        in = m_mask.boundingRect().translated(g.topLeft()).adjusted(-24, 0, 24, 24).contains(p);
+    if (in)
+        m_peekOut = 0;
+    else if (m_peek && ++m_peekOut < 12)
+        in = true;
+    if (in == m_peek)
+        return;
+    m_peek = in;
+    m_peekOut = 0;
+    setHidden(!in);
 }

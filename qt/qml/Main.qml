@@ -28,9 +28,14 @@ Window {
         label: "island"
         // masquage auto : une bande au bord de l'ecran affiche la barre, qui
         // reste tant que la souris est dessus
-        topBand: Ilot.barAuto && !Ilot.fullscreen ? (Ilot.barPeek ? Ilot.barH + 8 : 2) : 0
+        topBand: Ilot.barAuto && !Ilot.covered ? (Ilot.barPeek ? Ilot.barH + 8 : 2) : 0
+        // Reglages > Jeu et absence > Îlot en plein écran
+        fsMode: Ilot.cfg.fs_hide || "normal"
+        fsApps: Ilot.fsApps
         onTopHoverChanged: Ilot.setAtTop(topHover)
         onFullscreenChanged: Ilot.setFullscreen(fullscreen)
+        onCoveredChanged: Ilot.covered = covered
+        onFsExeChanged: Ilot.sawFullscreen(fsExe)
     }
     Connections {
         target: Ilot

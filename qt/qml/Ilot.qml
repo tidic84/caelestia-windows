@@ -19,7 +19,7 @@ Item {
         // tels quels par le coeur dans settings.json)
         color: "auto", day: "07:00", night: "20:00", border: "none", shape: "round", anim: "normal",
         text_size: 100, contrast: "normal", motion: "system", cvd: "off", activity: true, game_mode: true,
-        game_perf: true, game_notif: false, match_alert: true, valorant: true, mix_auto: true, away: "on", pet: "blob",
+        game_perf: true, game_notif: false, fs_hide: "normal", fs_apps: [], fs_seen: [], match_alert: true, valorant: true, mix_auto: true, away: "on", pet: "blob",
         pet_walk: true, clock: "digital", privacy: true, wxfx: true, dc_pill: true, media_bg: "art", pill_size: "m",
         assist_tr: true, assist_claude: true, bar_titles: true,
         // Claude Code (hooks) : animation, son de fin, duree minimale (s)
@@ -176,7 +176,11 @@ Item {
     property bool pinned: false
     property bool locked: false
     property bool big: false
+    // ilot masque devant une appli en plein ecran (selon Reglages > Jeu et absence
+    // > Îlot en plein écran) ; covered : une appli est en plein ecran, que
+    // l'ilot reste affiche ou non (barre, notifications, compagnon)
     property bool fullscreen: false
+    property bool covered: false
     // barre affichee (masquage automatique) et souris dans la bande du haut
     property bool barPeek: false
     property bool atTop: false
@@ -286,7 +290,7 @@ Item {
     property var tip: null
 
     readonly property bool barAuto: !!(cfg.bar && cfg.bar_autohide)
-    readonly property bool barVisible: !!cfg.bar && !fullscreen && (!cfg.bar_autohide || barPeek)
+    readonly property bool barVisible: !!cfg.bar && !covered && (!cfg.bar_autohide || barPeek)
     readonly property bool barDocked: barVisible && !cfg.bar_islands
 
     signal focusSearch()
@@ -426,6 +430,15 @@ Item {
             leaveTimer.interval = 450
             leaveTimer.start()
         }
+    }
+    // Reglages > Jeu et absence > Îlot en plein écran, « Personnalisé » : applis
+    // devant lesquelles l'ilot se masque (executables en minuscules)
+    readonly property var fsApps: Array.isArray(cfg.fs_apps) ? cfg.fs_apps.filter(a => typeof a === "string") : []
+    // applis deja vues en plein ecran, proposees dans ce reglage (8 au plus)
+    function sawFullscreen(exe) {
+        const seen = Array.isArray(cfg.fs_seen) ? cfg.fs_seen : []
+        if (exe && seen.indexOf(exe) < 0)
+            setCfg({ fs_seen: [exe].concat(seen).slice(0, 8) })
     }
     function setFullscreen(fs) {
         fullscreen = fs

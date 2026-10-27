@@ -18,7 +18,7 @@ Item {
     // l'ilot s'agrandit quelques secondes ; elles passent l'une apres l'autre
     property var queue: []
     function notify(n) {
-        if (!cfg.notif_popups || cfg.dnd || Ilot.fullscreen)
+        if (!cfg.notif_popups || cfg.dnd || Ilot.covered)
             return
         // mode jeu : pas de notification (sauf bilan, partie trouvee...)
         if (gameOn && !cfg.game_notif && !n.force)
@@ -470,7 +470,7 @@ Item {
             maybeInstall()
         if (cfg.away === "off")
             return
-        if (!away.on && s >= awaySecs && !gameOn && !Ilot.fullscreen) {
+        if (!away.on && s >= awaySecs && !gameOn && !Ilot.covered) {
             const paused = cfg.away === "on" && Ilot.hasMedia && Ilot.media.playing && !videoApps.test(Ilot.media.app)
             if (paused)
                 Ilot.mediaAction("toggle")
@@ -662,7 +662,7 @@ Item {
     }
     // mode auto : seulement apres 10 min sans clavier ni souris, hors jeu
     function maybeInstall() {
-        if (upd.status === "ready" && cfg.update_mode === "auto" && idle >= awaySecs && !gameOn && !Ilot.fullscreen && Ilot.mode === "collapsed")
+        if (upd.status === "ready" && cfg.update_mode === "auto" && idle >= awaySecs && !gameOn && !Ilot.covered && Ilot.mode === "collapsed")
             installUpdate()
     }
     function installUpdate() {
@@ -841,7 +841,7 @@ Item {
     Timer {
         interval: 1000
         // pas de notes ni de « z » animes quand personne ne regarde
-        running: w.petShown && !Ilot.fullscreen && !Theme.reduced && (Ilot.ambient || w.petWinOn)
+        running: w.petShown && !Ilot.covered && !Theme.reduced && (Ilot.ambient || w.petWinOn)
         repeat: true
         onTriggered: w.petStep()
     }
@@ -958,7 +958,7 @@ Item {
     }
     function petIdle(s) {
         const demo = Date.now() < petDemoUntil
-        const can = petShown && !Ilot.fullscreen && !Theme.reduced
+        const can = petShown && !Ilot.covered && !Theme.reduced
             && (demo || (!!cfg.pet_walk && !gameOn && Ilot.mode === "collapsed" && !Ilot.act))
         if (can && (demo || s >= petIdleSecs))
             setPetOut(true)

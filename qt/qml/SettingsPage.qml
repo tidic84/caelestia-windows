@@ -1586,6 +1586,84 @@ Item {
                 }
             }
 
+            // ------------------------------------- ilot en plein ecran
+            Block {
+                sec: "game"
+                SetRow {
+                    icon: "visibility"
+                    title: "Îlot en plein écran"
+                    sub: "Quand un jeu ou une vidéo occupe tout l'écran"
+                }
+                Chips {
+                    model: [["normal", "Normal"], ["show", "Toujours affiché"], ["auto", "Masquer auto"], ["custom", "Personnalisé"]]
+                    current: page.cfg.fs_hide || "normal"
+                    onPicked: v => Ilot.setCfg({ fs_hide: v })
+                }
+                Txt {
+                    topPadding: 8
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    px: 11.5
+                    color: Theme.inkVariant
+                    text: page.cfg.fs_hide === "show" ? "L'îlot reste par-dessus les applis en plein écran. La barre, les notifications et le compagnon restent masqués."
+                        : page.cfg.fs_hide === "auto" ? "L'îlot se masque en plein écran et revient quand la souris touche le haut de l'écran, au milieu."
+                        : page.cfg.fs_hide === "custom" ? "L'îlot ne se masque que devant les applis choisies, en plein écran ou en fenêtre agrandie. Ailleurs, il reste affiché."
+                        : "L'îlot se masque dès qu'une appli passe en plein écran."
+                }
+                // applis choisies, puis applis proposees (vues en plein ecran,
+                // ouvertes)
+                Column {
+                    visible: page.cfg.fs_hide === "custom"
+                    width: parent.width
+                    topPadding: 8
+                    onVisibleChanged: if (visible) page.loadFsOpen()
+                    SubTitle { text: "Masquer devant" }
+                    Repeater {
+                        model: Ilot.fsApps
+                        FsAppRow { chosen: true }
+                    }
+                    Txt {
+                        visible: !Ilot.fsApps.length
+                        topPadding: 6
+                        bottomPadding: 4
+                        text: "Aucune appli choisie : l'îlot reste affiché partout."
+                        px: 12
+                        color: Theme.inkVariant
+                    }
+                    SubTitle {
+                        visible: page.fsChoices.length > 0
+                        topPadding: 10
+                        text: "Ajouter (vues en plein écran, puis ouvertes)"
+                    }
+                    Repeater {
+                        model: page.fsChoices
+                        FsAppRow {}
+                    }
+                    // executable d'une appli qui n'est pas ouverte
+                    Row {
+                        topPadding: 10
+                        spacing: 8
+                        Field {
+                            id: fsExeField
+                            width: 220
+                            height: 32
+                            bg: Theme.surfaceHigh
+                            placeholder: "Autre appli : jeu.exe"
+                            onFocused: {
+                                Ilot.pinned = true
+                                Ilot.grabFocus()
+                            }
+                            onAccepted: page.fsAddTyped()
+                        }
+                        TextBtn {
+                            icon: "add"
+                            text: "Ajouter"
+                            onClicked: page.fsAddTyped()
+                        }
+                    }
+                }
+            }
+
             // --------------------------------------------- accessibilite
             Block {
                 sec: "access"
@@ -2378,6 +2456,43 @@ Item {
         const a = Ilot.apps.find(x => x.id === id)
         return [k, a ? a.name : id.split(/[\\!]/).pop(), a ? a.icon || "" : ""]
     }).sort((a, b) => a[1].localeCompare(b[1]))
+
+    // Jeu et absence > Îlot en plein écran, « Personnalisé » : fenetres
+    // ouvertes par executable ({exe: {key, id, title}}), relues a l'affichage
+    property var fsOpen: ({})
+    function loadFsOpen() {
+        Api.invoke("bar_windows").then(t => {
+            const m = {}
+            for (const w of (t && t.windows) || []) {
+                const exe = String(w.icon || "").split("\n").pop().split("\\").pop().toLowerCase()
+                if (/\.exe$/.test(exe) && exe !== "ilot.exe" && exe !== "explorer.exe" && !m[exe])
+                    m[exe] = { key: w.icon, id: w.id, title: w.title }
+            }
+            page.fsOpen = m
+        })
+    }
+    // proposees : deja vues en plein ecran, puis ouvertes, sauf les choisies
+    readonly property var fsChoices: {
+        const seen = Array.isArray(cfg.fs_seen) ? cfg.fs_seen : []
+        const out = []
+        for (const e of seen.concat(Object.keys(fsOpen)))
+            if (typeof e === "string" && out.indexOf(e) < 0 && Ilot.fsApps.indexOf(e) < 0)
+                out.push(e)
+        return out
+    }
+    function fsSet(exe, on) {
+        const l = Ilot.fsApps.filter(a => a !== exe)
+        Ilot.setCfg({ fs_apps: on ? l.concat([exe]) : l })
+    }
+    function fsAddTyped() {
+        let e = fsExeField.text.trim().split(/[\\/]/).pop().toLowerCase()
+        if (!e)
+            return
+        if (!/\.exe$/.test(e))
+            e += ".exe"
+        fsExeField.text = ""
+        fsSet(e, true)
+    }
     property bool appPick: false
     readonly property var appMatches: {
         const q = appSearch.text.trim().toLowerCase()
@@ -2817,6 +2932,52 @@ Item {
                 weight: kr.combo ? Font.Medium : Font.Normal
                 color: kr.rec ? Theme.inkPrimary : kr.combo ? Theme.inkSecondaryContainer : Theme.inkVariant
             }
+        }
+    }
+
+    // Îlot en plein écran : une appli (executable), choisie (croix pour la
+    // retirer) ou proposee (plus pour l'ajouter)
+    component FsAppRow: Item {
+        id: fr
+        required property var modelData
+        property bool chosen: false
+        readonly property var win: page.fsOpen[modelData] || null
+        width: parent ? parent.width : 0
+        height: 40
+        TaskIcon {
+            x: 54 - 34
+            anchors.verticalCenter: parent.verticalCenter
+            size: 26
+            key: fr.win ? fr.win.key : ""
+            winId: fr.win ? fr.win.id : 0
+            title: fr.modelData
+        }
+        Column {
+            x: 54
+            width: fsBtn.x - x - 10
+            anchors.verticalCenter: parent.verticalCenter
+            Txt {
+                width: parent.width
+                text: fr.modelData.replace(/\.exe$/, "")
+                elide: Text.ElideRight
+            }
+            Txt {
+                visible: !!fr.win && !!fr.win.title
+                width: parent.width
+                text: fr.win ? fr.win.title : ""
+                px: 11.5
+                color: Theme.inkVariant
+                elide: Text.ElideRight
+            }
+        }
+        IconBtn {
+            id: fsBtn
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            small: true
+            icon: fr.chosen ? "close" : "add"
+            tip: fr.chosen ? "Ne plus masquer devant cette appli" : "Masquer l'îlot devant cette appli"
+            onClicked: page.fsSet(fr.modelData, !fr.chosen)
         }
     }
 
