@@ -4,7 +4,7 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
-## 0.4.22 — à venir
+## 0.4.22 — 2026-10-27
 
 - **Glisser des fichiers sur l'îlot** : la pilule s'agrandit et ne montre plus que des zones de dépôt (Convertir, Réduire pour les images, Zip, Discord, Quick Share, Applis), sans le panneau ni les onglets. Lâcher sur une zone lance l'action, et le résultat s'affiche dans la pilule (afficher dans l'Explorateur, ouvrir, envoyer sur Discord). Survoler « Applis » ouvre l'onglet Apps pour ranger les fichiers dans un dossier. Ressortir sans lâcher replie l'îlot.
 - **Conversion de fichiers**, à la manière de Convertio : la zone « Convertir » ouvre une page avec une ligne par fichier. Pour chacun, on choisit un format : image (PNG, JPG, WEBP, BMP, GIF), audio (MP3, WAV, FLAC, OGG, M4A, OPUS) ou vidéo (MP4, MKV, WEBM, AVI, MOV, GIF). Une vidéo peut aussi donner son audio. « Tout convertir en… » règle tous les fichiers d'un coup. Les fichiers convertis sont créés à côté des originaux. L'audio et la vidéo demandent ffmpeg (`winget install ffmpeg`).
@@ -13,6 +13,7 @@ description à chaque version publiée sur GitHub.
 - **Nouvelles commandes** (taper `>` dans la recherche) : volume à N % (`>volume 30`), couper ou rétablir le son, lecture / pause, piste suivante ou précédente, ouvrir un onglet (Accueil, Média, Presse-papiers…), Corbeille, Téléchargements, dossier des fonds d'écran, Gestionnaire des tâches de Windows, actualiser les applications et les jeux, rechercher une mise à jour.
 - **Paroles dans la pilule** (Réglages › Apparence › Lecteur dans la pilule) : la ligne chantée s'affiche directement dans l'îlot fermé, à côté du disque, dans le style des paroles de l'onglet Média, sur un halo de la couleur de la pochette. La pilule s'élargit à chaque ligne ; l'heure et les icônes s'effacent le temps des paroles et reviennent pendant les silences et la pause. Désactivé par défaut.
 - **Réglages › Apparence plus lisibles** : la page est découpée en cartes (Couleurs, Îlot, changement de fond, puis une carte par partie du lecteur : bouton, barre de progression, pilule, onglet Média), avec de l'espace entre les groupes. Les titres disent ce qu'ils règlent : « Clair ou sombre » au lieu de « Thème », « Style de la palette » pour la grille des variantes, « Forme du bouton », « Forme de la pochette »… Les réglages eux-mêmes ne changent pas.
+- **Presse-papiers au clavier (Win+V)** : dans l'historique, les flèches haut et bas choisissent un élément et Entrée le valide. Valider, au clavier ou d'un clic, copie l'élément et referme l'îlot : il ne reste qu'à coller avec Ctrl+V dans l'appli d'avant.
 - **Animations plus fluides** :
   - à l'ouverture, le contenu attend que l'îlot ait grandi au lieu d'apparaître rogné ; à la fermeture, il s'efface avant que l'îlot se rétracte ;
   - l'îlot ne recalcule plus sa zone cliquable à chaque image de l'animation ;

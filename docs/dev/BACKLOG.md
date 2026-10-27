@@ -13,6 +13,11 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🟢 **Historique du presse-papiers au clavier (2026-10-27)** : valider
+  referme l'îlot même verrouillé (on ne copie plus plusieurs éléments à la
+  suite). Avec la touche Windows remappée (F24), Win+↑/↓ puis relâcher Win
+  referme l'îlot (la page accepte la flèche, `winTap` reste vrai). Cas rare.
+
 - 🟠 **Îlot en plein écran (2026-10-27)** : pas compilé ni testé sur le
   poste (session cloud). Limites connues :
   - Devant une appli en plein écran, l'îlot n'a jamais le clavier : pas de

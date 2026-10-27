@@ -10,6 +10,49 @@ Item {
     property string status: ""
     readonly property int n: Ilot.clips.length
     readonly property string count: n ? n + " élément" + (n > 1 ? "s" : "") : "Historique vide"
+    // historique a l'ecran (Win+V) : fleches pour choisir, Entree pour valider
+    readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "clips" && view === "hist"
+        && !Watch.shareOpen && !Watch.convertOpen
+    property int sel: 0
+    onShownChanged: if (shown) resetSel()
+    // Win+V alors que l'historique est deja affiche : le focus revient a la liste
+    Connections {
+        target: Ilot
+        function onTabShown(tab) { if (tab === "clips" && page.shown) page.resetSel() }
+    }
+    onNChanged: sel = Math.max(0, Math.min(sel, n - 1))
+    function resetSel() {
+        sel = 0
+        flick.contentY = 0
+        // la page vient d'etre activee (enabled) : focus apres
+        Qt.callLater(() => page.forceActiveFocus())
+    }
+    // copie l'element, puis referme l'ilot (clic ou Entree)
+    function pick(id) {
+        Api.invoke("clip_copy", { id: id })
+        Ilot.close()
+    }
+    function ensureVisible(i) {
+        const it = clipRep.itemAt(i)
+        if (!it)
+            return
+        if (it.y < flick.contentY)
+            flick.contentY = it.y
+        else if (it.y + it.height > flick.contentY + flick.height)
+            flick.contentY = it.y + it.height - flick.height
+    }
+    Keys.onPressed: e => {
+        if (!shown || !n)
+            return
+        if (e.key === Qt.Key_Down || e.key === Qt.Key_Up) {
+            sel = Math.max(0, Math.min(n - 1, sel + (e.key === Qt.Key_Down ? 1 : -1)))
+            ensureVisible(sel)
+            e.accepted = true
+        } else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
+            e.accepted = true
+            pick(Ilot.clips[sel].id)
+        }
+    }
     function noteStatus() {
         const c = notes.text.length
         return c ? c + " caractère" + (c > 1 ? "s" : "") : "Note vide"
@@ -272,27 +315,28 @@ Item {
                 text: "Copiez du texte ou une image : ils apparaîtront ici."
             }
             Repeater {
+                id: clipRep
                 model: Ilot.clips
                 Btn {
                     id: clip
                     required property var modelData
+                    required property int index
                     readonly property bool isText: modelData.text !== null && modelData.text !== undefined
+                    readonly property bool selected: page.sel === clip.index
                     property bool done: false
                     width: col.width
                     height: isText ? Math.max(42, txt.implicitHeight + 22) : Math.min(120, imgBox.h) + 16
                     radius: 16
-                    color: hovered ? Theme.surfaceHigh : Theme.surfaceC
+                    color: hovered || selected ? Theme.surfaceHigh : Theme.surfaceC
+                    border.width: selected ? 1.5 : 0
+                    border.color: Theme.primary
                     Behavior on color { ColorAnimation { duration: 150 } }
                     Timer {
                         id: doneTimer
                         interval: 1200
                         onTriggered: clip.done = false
                     }
-                    onClicked: {
-                        Api.invoke("clip_copy", { id: modelData.id })
-                        done = true
-                        doneTimer.restart()
-                    }
+                    onClicked: page.pick(clip.modelData.id)
                     Txt {
                         id: txt
                         visible: clip.isText

@@ -35,6 +35,16 @@ reprendre.
 
 ## Journal
 
+### 2026-10-27 : Win+V, historique au clavier
+
+`ClipsPage.qml`, vue Historique : ↑/↓ choisissent un élément (contour
+`Theme.primary`, défilement suivi), Entrée le valide. Valider, au clavier
+ou au clic, copie l'élément (`clip_copy`) puis referme l'îlot
+(`Ilot.close()`, le focus revient à l'appli d'avant). La page prend le
+focus quand l'historique s'affiche (`shown`, et `tabShown` si l'îlot était
+déjà ouvert dessus). Échap et F24 remontent toujours jusqu'à la racine de
+`Main.qml`. Compilé, relu. Pas de collage automatique : on colle avec Ctrl+V.
+
 ### 2026-10-27 : Réglages › Apparence réorganisés
 
 - **Maquette** `docs/dev/maquettes/apparence.html` (actuel avec repères des
