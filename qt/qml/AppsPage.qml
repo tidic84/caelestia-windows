@@ -5,7 +5,7 @@ import "emoji.mjs" as Emoji
 import "rank.mjs" as Rank
 
 // Apps : recherche (> commandes, = calcul, : emoji, ? web), dossiers,
-// Launcher de jeux, tri, menu contextuel, glisser-deposer vers un dossier,
+// puce Jeux (jeux detectes et ajoutes), tri, menu contextuel, glisser-deposer vers un dossier,
 // fichiers deposes depuis l'Explorateur. Les resultats sont classes selon
 // les habitudes (rank.mjs) : les applis les plus lancees passent devant.
 Item {
@@ -61,7 +61,7 @@ Item {
     readonly property var folderIcons: [
         [/jeu|game|gaming/, "sports_esports"], [/cours|ecole|etude|school|fac|lycee/, "school"],
         [/travail|boulot|work|bureau/, "work"], [/musique|music|audio/, "music_note"],
-        [/video|film|stream/, "movie"], [/dev|code|prog/, "code"], [/photo|image|design|dessin/, "palette"],
+        [/launcher/, "rocket_launch"], [/video|film|stream/, "movie"], [/dev|code|prog/, "code"], [/photo|image|design|dessin/, "palette"],
         [/internet|web|navigat/, "language"], [/social|discu|chat|message/, "forum"],
         [/outil|util|tool|systeme/, "build"], [/app/, "apps"]
     ]
@@ -95,7 +95,7 @@ Item {
     }
     function launcherFolder() {
         return {
-            id: games, name: "Launcher",
+            id: games, name: "Jeux",
             get apps() { return Ilot.folders.games || [] },
             set apps(v) { Ilot.folders.games = v }
         }
@@ -150,6 +150,25 @@ Item {
             ],
             timers,
             [{ icon: "nest_eco_leaf", title: "Pomodoro (25 / 5 min)", keys: "pomodoro concentration focus travail", run: () => Ilot.startPomodoro() }],
+            num > 0 && num <= 100 ? [{ icon: "volume_up", title: "Volume à " + num + " %", keys: "volume son niveau " + num, run: () => Ilot.setVolume(num / 100, false) }] : [],
+            [
+                { icon: Ilot.vol.muted ? "volume_up" : "volume_off", title: Ilot.vol.muted ? "Rétablir le son" : "Couper le son", keys: "son muet mute couper retablir volume", run: () => Ilot.setVolume(undefined, !Ilot.vol.muted) },
+                { icon: "play_arrow", title: "Lecture / pause", keys: "lecture pause play musique media", run: () => Ilot.mediaAction("toggle") },
+                { icon: "skip_next", title: "Piste suivante", keys: "suivant suivante next piste musique media", run: () => Ilot.mediaAction("next") },
+                { icon: "skip_previous", title: "Piste précédente", keys: "precedent precedente previous piste musique media", run: () => Ilot.mediaAction("prev") }
+            ],
+            // onglets actives (Apps, Controles et Reglages ont leur commande plus bas)
+            Ilot.tabItems.filter(t => t.label && ["apps", "ctrl"].indexOf(t.id) < 0).map(t => ({
+                icon: t.icon, title: "Ouvrir " + t.label, keys: "ouvrir onglet page " + t.id + " " + t.label, run: () => Ilot.open(t.id), stay: true
+            })),
+            [
+                { icon: "delete", title: "Ouvrir la Corbeille", keys: "corbeille recycle poubelle", run: () => Api.invoke("file_open", { path: "shell:RecycleBinFolder" }) },
+                { icon: "download", title: "Ouvrir les Téléchargements", keys: "telechargements downloads dossier", run: () => Api.invoke("file_open", { path: "shell:Downloads" }) },
+                { icon: "wallpaper", title: "Dossier des fonds d'écran", keys: "dossier fonds ecran wallpaper", run: () => Api.invoke("walls_open_folder") },
+                { icon: "monitoring", title: "Gestionnaire des tâches de Windows", keys: "gestionnaire taches task manager taskmgr processus", run: () => Api.invoke("taskmgr_open") },
+                { icon: "refresh", title: "Actualiser les applications et les jeux", keys: "actualiser rafraichir recharger applications jeux refresh", run: () => { Api.invoke("apps_refresh"); Api.invoke("games_refresh") }, stay: true },
+                { icon: "system_update", title: "Rechercher une mise à jour", keys: "mise a jour update version", run: () => { Api.invoke("update_check").then(u => { Watch.upd = u }); Ilot.open("settings") }, stay: true }
+            ],
             Ilot.tmr.running ? [{ icon: "timer_off", title: "Arrêter le minuteur", keys: "arreter minuteur stop timer", run: () => Ilot.timerReset() }] : [],
             r.wifi !== null ? [{ icon: "wifi", title: r.wifi ? "Couper le Wi-Fi" : "Activer le Wi-Fi", keys: "wifi wi-fi reseau", run: () => Ilot.toggleRadio("wifi") }] : [],
             r.bluetooth !== null ? [{ icon: "bluetooth", title: r.bluetooth ? "Couper le Bluetooth" : "Activer le Bluetooth", keys: "bluetooth bt", run: () => Ilot.toggleRadio("bluetooth") }] : [],
@@ -386,7 +405,7 @@ Item {
             FolderChip {
                 fid: page.games
                 icon: "stadia_controller"
-                name: "Launcher"
+                name: "Jeux"
                 gamesChip: true
                 count: (Ilot.games, Ilot.folders, page.fileRev, page.launcherItems().length) || -1
                 onRightClicked: m => page.hiddenGamesMenu(mapToItem(page, m.x, m.y))
@@ -585,7 +604,7 @@ Item {
                     { type: "sep" },
                     { type: "title", label: "Ranger dans…" }
                 ], sel ? [{ icon: "check", label: sel.name, run: () => { ctx.hide(); page.addFiles(sel, paths) } }] : [], [
-                    { icon: "stadia_controller", label: "Launcher de jeux", run: () => { ctx.hide(); page.addFiles(page.launcherFolder(), paths) } }
+                    { icon: "stadia_controller", label: "Jeux", run: () => { ctx.hide(); page.addFiles(page.launcherFolder(), paths) } }
                 ], Ilot.folders.list.filter(f => f !== sel).map(f => ({ icon: page.folderIcon(f.name), label: f.name, run: () => { ctx.hide(); page.addFiles(f, paths) } })),
                     [{ icon: "create_new_folder", label: "Nouveau dossier…", run: () => page.askName(p, "Nouveau dossier", "", name => page.addFiles(Ilot.newFolder(name), paths)) }]))
             }
@@ -1142,7 +1161,7 @@ Item {
                     : extra ? Api.invoke("app_folder", { id: g.id, name: g.name })
                     : Api.invoke("game_folder", { id: g.id })) },
             { type: "sep" },
-            // jeu detecte : masque (reaffichable) ; ajout manuel : retire du Launcher
+            // jeu detecte : masque (reaffichable) ; ajout manuel : retire de Jeux
             { icon: "delete", label: "Supprimer de l’îlot", danger: true, run: () => {
                 if (extra)
                     Ilot.folders.games = (Ilot.folders.games || []).filter(x => x !== g.id)
@@ -1173,7 +1192,7 @@ Item {
         showCtx(p.x, p.y, entries)
     }
 
-    // clic droit sur « Launcher » : reafficher les jeux supprimes
+    // clic droit sur « Jeux » : reafficher les jeux supprimes
     function hiddenGamesMenu(p) {
         const list = (Ilot.folders.hiddenGames || []).map(id => Ilot.games.find(g => g.id === id)).filter(Boolean)
         const entries = [{ type: "title", label: list.length ? "Jeux supprimés de l’îlot" : "Aucun jeu supprimé" }]
@@ -1192,7 +1211,12 @@ Item {
         showCtx(p.x, p.y, entries)
     }
 
-    function folderMenu(f, p) {
+    function folderMenu(chipData, p) {
+        // le modelData du Repeater est une copie : renommer ou supprimer
+        // doit viser le dossier de Ilot.folders.list
+        const f = Ilot.folders.list.find(x => x.id === chipData.id)
+        if (!f)
+            return
         const entries = [
             { type: "title", label: f.name },
             // dossier reel associe (ex. Documents\Cours) pour y acceder vite

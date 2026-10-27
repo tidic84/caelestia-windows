@@ -925,20 +925,52 @@ Item {
         usage = Rank.empty()
         Api.invoke("store_set", { key: "usage", value: usage })
     }
-    readonly property var gameHints: /steam|epic games|roblox|minecraft|riot client|valorant|league of legends|battle\.net|ubisoft|ea app|gog galaxy|fortnite|rockstar|xbox|playnite|heroic|curseforge|lunar client|genshin|hoyoplay/
+    // un jeu passe avant un launcher : « Minecraft Launcher » est un jeu
+    readonly property var gameHints: /roblox|minecraft|valorant|league of legends|fortnite|lunar client|genshin/
+    readonly property var launcherHints: /steam|epic games|riot client|battle\.net|ubisoft|ea app|gog galaxy|rockstar|xbox|playnite|heroic|curseforge|overwolf|hoyoplay/
+    function isGameApp(a) {
+        return gameHints.test(a.name.toLowerCase()) && !/studio|editor|server/i.test(a.name)
+    }
+    function isLauncherApp(a) {
+        return launcherHints.test(a.name.toLowerCase()) && !gameHints.test(a.name.toLowerCase())
+    }
     function newFolder(name) {
         const f = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name, apps: [] }
         folders.list.push(f)
         return f
     }
-    // range les jeux reconnus dans « Jeux » au premier lancement
+    // layout 1 -> 2 : les launchers vont dans le dossier « Launcher », les
+    // jeux dans la puce « Jeux » (folders.games). Au premier lancement, tri
+    // des applis reconnues ; ensuite, l'ancien dossier « Jeux » est renomme
+    // et ses jeux en sortent.
     function seedGames() {
-        if (folders.seeded !== false || !apps.length)
+        if (folders.layout !== 1 || !apps.length)
             return
-        const jeux = folders.list.find(f => f.name === "Jeux")
-        if (jeux)
-            jeux.apps = apps.filter(a => gameHints.test(a.name.toLowerCase()) && !/studio|editor|server/i.test(a.name)).map(a => a.id)
+        const fresh = folders.seeded === false
         delete folders.seeded
+        folders.layout = 2
+        if (fresh) {
+            // « Jeux » : premier lancement enregistre par une version d'avant
+            const launcher = folders.list.find(f => f.name === "Launcher" || f.name === "Jeux")
+            if (launcher) {
+                launcher.name = "Launcher"
+                launcher.apps = apps.filter(isLauncherApp).map(a => a.id)
+            }
+            folders.games = apps.filter(isGameApp).map(a => a.id)
+        } else {
+            const old = folders.list.find(f => f.name === "Jeux")
+            if (old) {
+                // appli introuvable (desinstallee) : on la laisse
+                const moved = old.apps.filter(id => {
+                    const a = apps.find(x => x.id === id)
+                    return a && !isLauncherApp(a)
+                })
+                const games = folders.games || []
+                old.name = "Launcher"
+                old.apps = old.apps.filter(id => !moved.includes(id))
+                folders.games = games.concat(moved.filter(id => !games.includes(id)))
+            }
+        }
         saveFolders()
     }
 
@@ -1397,11 +1429,11 @@ Item {
             if (saved && Array.isArray(saved.list)) {
                 root.folders = Object.assign({}, saved, {
                     sel: saved.sel || "", hidden: saved.hidden || [], added: saved.added || {}, sort: saved.sort || "name",
-                    games: saved.games || [], hiddenGames: saved.hiddenGames || []
+                    games: saved.games || [], hiddenGames: saved.hiddenGames || [], layout: saved.layout || 1
                 })
             } else {
-                root.folders = { list: [], sel: "" }
-                root.newFolder("Jeux")
+                root.folders = { list: [], sel: "", layout: 1 }
+                root.newFolder("Launcher")
                 root.newFolder("Apps")
                 root.newFolder("Cours")
                 root.folders.seeded = false

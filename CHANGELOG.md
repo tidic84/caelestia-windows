@@ -4,6 +4,12 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.22 — à venir
+
+- **Launcher et Jeux remis à l'endroit** (onglet Apps) : la puce des jeux détectés (Steam, Epic, Ubisoft, GOG) s'appelle maintenant « Jeux », et le dossier des launchers « Launcher ». Au premier lancement, l'ancien dossier « Jeux » est renommé et trié : Steam, Epic, GOG, Ubisoft, Rockstar, Xbox, Riot Client ou CurseForge y restent ; Minecraft, Valorant, Roblox, Lunar Client ou Genshin Impact passent dans la puce « Jeux ».
+- **Dossiers** : « Supprimer le dossier » et « Renommer » (clic droit sur un dossier) fonctionnent de nouveau.
+- **Nouvelles commandes** (taper `>` dans la recherche) : volume à N % (`>volume 30`), couper ou rétablir le son, lecture / pause, piste suivante ou précédente, ouvrir un onglet (Accueil, Média, Presse-papiers…), Corbeille, Téléchargements, dossier des fonds d'écran, Gestionnaire des tâches de Windows, actualiser les applications et les jeux, rechercher une mise à jour.
+
 ## 0.4.21 — 2026-10-26
 
 - **Bluetooth** (Contrôles, chevron de la tuile Bluetooth) : la liste des appareils appairés, avec leur état. Un clic connecte ou déconnecte un casque ou une enceinte ; la corbeille (deux clics) oublie un appareil. En dessous, les appareils à proximité : un clic les appaire, avec le code à confirmer ou à saisir directement dans l'îlot.
