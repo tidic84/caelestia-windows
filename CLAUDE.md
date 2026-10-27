@@ -53,6 +53,10 @@ la garder sauvegardée**. Perdue, plus aucun îlot installé ne se met à jour
 seul (il faudrait une nouvelle clé dans le code et une installation à la
 main). Outil : `examples/sign.rs` (`keygen`, `pub`, `sign`).
 
+**Seul Tidic publie les versions** (une ou deux par jour au plus) : une
+seule clé, la sienne. Les collaborateurs n'en ont pas besoin pour
+contribuer (commit, PR, `install.ps1`).
+
 `release.ps1` vérifie la section datée du changelog, l'arbre propre, le
 commit poussé, et que la clé correspond à `SIGN_KEY`. Il crée le tag par
 `gh release create`. La CI (`release.yml`) ne se lance plus sur un tag : elle
