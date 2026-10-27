@@ -41,6 +41,25 @@ Version : `Cargo.toml`, plus une section dans `CHANGELOG.md` (embarqué dans
 l'appli). Pour publier, pousser un tag `v*` : la CI publie
 `ilot-<ver>-win64.zip`.
 
+**⚠️ Depuis le 2026-10-27, le quota des GitHub Actions est épuisé** : la CI
+(`release.yml`) ne tourne plus pour l'instant. Pour publier, il faut
+compiler en local et créer la release à la main, en refaisant les étapes de
+`release.yml` :
+1. version dans `Cargo.toml` + section `## <ver> — <date>` dans
+   `CHANGELOG.md`, commit ;
+2. `qt\build.cmd` (commande PowerShell des « Pièges connus ») ;
+3. copier `qt\build` dans `dist\Ilot` avec le même `robocopy` que
+   `release.yml` (sans `CMakeFiles`, `.rcc`, `*.obj`, `*.pdb`…), puis
+   `Compress-Archive -Path dist\Ilot -DestinationPath ilot-<ver>-win64.zip`.
+   Le nom doit finir par `.zip` et contenir `ilot.exe` (cherché partout
+   dans l'archive par `src/update.rs`) ; garder le dossier `Ilot\` comme
+   la CI ;
+4. notes = la section `## <ver>` du changelog, dans `notes.md` ;
+5. `gh release create v<ver> ilot-<ver>-win64.zip --title "Îlot <ver>" --notes-file notes.md`
+   (crée aussi le tag ; ne pas pousser le tag avant, sinon la CI se lance
+   et échoue).
+Ne pas commiter `dist\`, le zip ni `notes.md`.
+
 ## Pièges connus
 
 - **Depuis le Bash de Claude Code**, il faut lancer le build par PowerShell en

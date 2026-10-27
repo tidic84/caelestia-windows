@@ -14,6 +14,10 @@ reprendre.
   `v0.4.18` (GitHub Action `release.yml`). La 0.4.17 (addon Claude, hooks
   WSL, Apex) l'a été le même jour. La 0.4.8 n'a jamais été publiée seule : elle
   est incluse dans la 0.4.9.
+- **⚠️ CI indisponible (2026-10-27)** : quota des GitHub Actions épuisé.
+  Les releases se font en local : build, zip, `gh release create`. Étapes
+  dans `CLAUDE.md` (section Commandes). La 0.4.22 est en attente
+  (changelog « à venir »).
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
   un raccourci dans le dossier Démarrage. Elle a été construite depuis les
   sources par `install.ps1`.
