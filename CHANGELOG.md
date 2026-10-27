@@ -10,6 +10,8 @@ description à chaque version publiée sur GitHub.
 - **Dossiers** : « Supprimer le dossier » et « Renommer » (clic droit sur un dossier) fonctionnent de nouveau.
 - **Nouvelles commandes** (taper `>` dans la recherche) : volume à N % (`>volume 30`), couper ou rétablir le son, lecture / pause, piste suivante ou précédente, ouvrir un onglet (Accueil, Média, Presse-papiers…), Corbeille, Téléchargements, dossier des fonds d'écran, Gestionnaire des tâches de Windows, actualiser les applications et les jeux, rechercher une mise à jour.
 
+- **Îlot en plein écran** (Réglages › Jeu et absence) : quatre modes. « Normal » masque l'îlot dès qu'une appli passe en plein écran, comme avant. « Toujours affiché » le garde par-dessus les jeux et les vidéos. « Masquer auto » le masque, puis le fait revenir quand la souris touche le haut de l'écran, au milieu. « Personnalisé » ne le masque que devant les applis choisies, en plein écran ou en fenêtre agrandie (pratique pour les jeux en fenêtre sans bordure). Les applis déjà vues en plein écran et les fenêtres ouvertes sont proposées, et on peut aussi taper le nom d'un exécutable. Dans tous les cas, la barre, les notifications et le compagnon restent masqués en plein écran.
+
 ## 0.4.21 — 2026-10-26
 
 - **Bluetooth** (Contrôles, chevron de la tuile Bluetooth) : la liste des appareils appairés, avec leur état. Un clic connecte ou déconnecte un casque ou une enceinte ; la corbeille (deux clics) oublie un appareil. En dessous, les appareils à proximité : un clic les appaire, avec le code à confirmer ou à saisir directement dans l'îlot.

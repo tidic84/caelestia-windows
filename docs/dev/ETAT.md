@@ -35,6 +35,47 @@ reprendre.
 
 ## Journal
 
+### 2026-10-27 : réglage « Îlot en plein écran » (0.4.22, à venir)
+
+- **Demande** : un réglage pour l'îlot en jeu, avec quatre modes : normal
+  (masqué en plein écran), toujours affiché, masquer auto, et personnalisé
+  (choisir les applis devant lesquelles il se masque).
+- **C++, `qt/src/winctl.*`** : nouvelles propriétés `fsMode`, `fsApps`,
+  `covered` et `fsExe`. `fullscreen` veut maintenant dire « la fenêtre se
+  masque », selon le mode. `covered`, c'est le plein écran brut (en
+  « custom », c'est aussi une appli choisie et agrandie). Le mode « auto »
+  utilise `pollPeek` (50 ms) : la souris sur les 2 px du haut, dans le tiers
+  central de l'écran, rappelle l'îlot. Il reste tant que la souris est sur le
+  masque de la fenêtre (+24 px), puis se masque 0,6 s après son départ.
+  L'exe au premier plan est lu une fois par pid (`exeOf`). Le calcul du
+  plein écran est le même qu'avant.
+- **QML** :
+  - `Main.qml` lie `fsMode` (`cfg.fs_hide`) et `fsApps` (`cfg.fs_apps`).
+  - `Ilot.qml` : `covered`, `fsApps`, `fsSkip` et `sawFullscreen`
+    (`cfg.fs_seen`, 8 au plus, sans les fenêtres système).
+  - `barVisible`, `topBand`, les notifications, le mode absent,
+    l'installation auto et le compagnon suivent `covered` : ils sont masqués
+    en plein écran, même si l'îlot reste affiché.
+  - `SettingsPage.qml` : bloc « Îlot en plein écran » dans Jeu et absence,
+    composant `FsAppRow`, fenêtres ouvertes lues avec `bar_windows`, champ
+    pour taper un `.exe`.
+- **Rust** : rien. La touche Windows reste rendue à Windows en plein écran
+  (`fullscreen_foreground`), quel que soit le mode.
+- **Vérifié** (session cloud sous Linux, pas de Windows) :
+  `clang++ -fsyntax-only` avec cible mingw et en-têtes Qt 6.4 de
+  `winctl.cpp` ; syntaxe QML avec `qmllint` de PySide6, sans les modules du
+  projet.
+- **Relecture** : un agent général (pas de `relecteur`). Rien de bloquant.
+  Cinq points faibles corrigés : `covered` pour une fenêtre agrandie en
+  « custom », fenêtres système exclues de `fs_seen`, borne basse en y dans
+  `pollPeek` (écran placé au-dessus), setters différés
+  (`QTimer::singleShot`) et `Qt.callLater` pour `sawFullscreen`, chargement
+  des fenêtres ouvertes à la création de la liste.
+- **Non vérifié** : **rien n'est compilé avec `qt\build.cmd`**, et rien n'a
+  été testé en vrai. À faire sur le poste : compiler, puis tester les
+  quatre modes avec un jeu en plein écran et une vidéo F11, et « Masquer
+  auto » avec deux écrans.
+
 ### 2026-10-27 : Apps, Launcher et Jeux inversés, dossiers, commandes
 
 - **Demande** : les launchers étaient dans « Jeux » et les jeux dans

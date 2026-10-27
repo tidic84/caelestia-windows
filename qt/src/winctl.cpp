@@ -97,7 +97,8 @@ void WinCtl::setFsMode(const QString &m)
     if (m == m_fsMode)
         return;
     m_fsMode = m;
-    checkFullscreen();
+    // apres la liaison QML en cours (fullscreenChanged y relancerait du QML)
+    QTimer::singleShot(0, this, &WinCtl::checkFullscreen);
     Q_EMIT fsModeChanged();
 }
 
@@ -106,7 +107,7 @@ void WinCtl::setFsApps(const QStringList &l)
     if (l == m_fsApps)
         return;
     m_fsApps = l;
-    checkFullscreen();
+    QTimer::singleShot(0, this, &WinCtl::checkFullscreen);
     Q_EMIT fsAppsChanged();
 }
 
@@ -253,15 +254,16 @@ void WinCtl::checkFullscreen()
         m_fsExe = exe;
         Q_EMIT fsExeChanged();
     }
-    if (fs != m_covered) {
-        m_covered = fs;
-        Q_EMIT coveredChanged();
-    }
     bool hide = fs;
     if (m_fsMode == QLatin1String("show"))
         hide = false;
     else if (custom)
         hide = (fs || zoomed) && !exe.isEmpty() && m_fsApps.contains(exe);
+    // une fenetre agrandie choisie en mode "custom" compte aussi
+    if ((fs || hide) != m_covered) {
+        m_covered = fs || hide;
+        Q_EMIT coveredChanged();
+    }
     m_hideWanted = hide;
     if (hide && m_fsMode == QLatin1String("auto")) {
         if (!m_peekTimer.isActive())
@@ -308,7 +310,7 @@ void WinCtl::pollPeek()
         return;
     const QPoint p = QCursor::pos();
     const QRect g = m_win->geometry();
-    const bool top = p.y() <= g.top() + 1 && p.x() >= g.left() + g.width() / 3 && p.x() <= g.right() - g.width() / 3;
+    const bool top = p.y() >= g.top() && p.y() <= g.top() + 1 && p.x() >= g.left() + g.width() / 3 && p.x() <= g.right() - g.width() / 3;
     bool in = top;
     if (m_peek && !in)
         in = m_mask.boundingRect().translated(g.topLeft()).adjusted(-24, 0, 24, 24).contains(p);

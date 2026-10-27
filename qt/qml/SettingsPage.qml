@@ -1617,6 +1617,7 @@ Item {
                     width: parent.width
                     topPadding: 8
                     onVisibleChanged: if (visible) page.loadFsOpen()
+                    Component.onCompleted: if (visible) page.loadFsOpen()
                     SubTitle { text: "Masquer devant" }
                     Repeater {
                         model: Ilot.fsApps
@@ -2465,7 +2466,7 @@ Item {
             const m = {}
             for (const w of (t && t.windows) || []) {
                 const exe = String(w.icon || "").split("\n").pop().split("\\").pop().toLowerCase()
-                if (/\.exe$/.test(exe) && exe !== "ilot.exe" && exe !== "explorer.exe" && !m[exe])
+                if (/\.exe$/.test(exe) && Ilot.fsSkip.indexOf(exe) < 0 && !m[exe])
                     m[exe] = { key: w.icon, id: w.id, title: w.title }
             }
             page.fsOpen = m

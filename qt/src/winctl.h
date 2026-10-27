@@ -28,7 +28,7 @@ class WinCtl : public QObject
     // selon fsMode
     Q_PROPERTY(bool fullscreen READ fullscreen NOTIFY fullscreenChanged)
     // une appli est en plein ecran sur l'ecran de la fenetre, quel que soit
-    // fsMode
+    // fsMode (ou, en "custom", une appli choisie y est agrandie)
     Q_PROPERTY(bool covered READ covered NOTIFY coveredChanged)
     // plein ecran : "normal" (masquee), "show" (toujours affichee), "auto"
     // (masquee, revient quand la souris touche le haut de l'ecran), "custom"

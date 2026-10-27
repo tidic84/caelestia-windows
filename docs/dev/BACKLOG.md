@@ -13,6 +13,16 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🟠 **Îlot en plein écran (2026-10-27)** : pas compilé ni testé sur le
+  poste (session cloud). Limites connues :
+  - Un clic sur l'îlot affiché par-dessus un jeu (« Toujours affiché »,
+    « Masquer auto ») lui donne le focus : la barre peut apparaître
+    jusqu'au retour dans le jeu, et un jeu en plein écran exclusif se réduit.
+  - Les applis UWP sont vues comme `applicationframehost.exe` : on ne peut
+    pas en choisir une en particulier.
+  - La touche Windows reste rendue à Windows en plein écran, même en
+    « Toujours affiché » (`winkey.rs`, `fullscreen_foreground`).
+
 - 🟢 **Puce Jeux (2026-10-27)** : une appli de `folders.games` qui est aussi
   détectée (Steam…) apparaît deux fois. CurseForge et Overwolf sont rangés
   dans « Launcher ». Les jeux ajoutés à la main ne déclenchent pas le mode

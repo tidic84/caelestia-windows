@@ -35,7 +35,7 @@ Window {
         onTopHoverChanged: Ilot.setAtTop(topHover)
         onFullscreenChanged: Ilot.setFullscreen(fullscreen)
         onCoveredChanged: Ilot.covered = covered
-        onFsExeChanged: Ilot.sawFullscreen(fsExe)
+        onFsExeChanged: Qt.callLater(Ilot.sawFullscreen, fsExe)
     }
     Connections {
         target: Ilot

@@ -434,10 +434,14 @@ Item {
     // Reglages > Jeu et absence > Îlot en plein écran, « Personnalisé » : applis
     // devant lesquelles l'ilot se masque (executables en minuscules)
     readonly property var fsApps: Array.isArray(cfg.fs_apps) ? cfg.fs_apps.filter(a => typeof a === "string") : []
+    // jamais proposees : l'ilot, l'Explorateur (vue des taches), l'ecran
+    // verrouille, la capture d'ecran, le menu Demarrer, la recherche
+    readonly property var fsSkip: ["ilot.exe", "explorer.exe", "lockapp.exe", "screenclippinghost.exe", "snippingtool.exe",
+        "searchhost.exe", "startmenuexperiencehost.exe", "shellexperiencehost.exe"]
     // applis deja vues en plein ecran, proposees dans ce reglage (8 au plus)
     function sawFullscreen(exe) {
         const seen = Array.isArray(cfg.fs_seen) ? cfg.fs_seen : []
-        if (exe && seen.indexOf(exe) < 0)
+        if (exe && fsSkip.indexOf(exe) < 0 && seen.indexOf(exe) < 0)
             setCfg({ fs_seen: [exe].concat(seen).slice(0, 8) })
     }
     function setFullscreen(fs) {
