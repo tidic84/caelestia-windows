@@ -13,6 +13,42 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🟢 **Animations : plan à faire (demande de l'utilisateur, 2026-10-28)** :
+  remplacer les réglages d'animation actuels par un simple « Animations :
+  oui / non », puis revoir toutes les animations une par une. Prévoir une
+  session de planification (maquette de départ :
+  `docs/dev/maquettes/animations.html`). Lié : la grille « Style de la
+  palette » (ex-Variantes, `SettingsPage.qml`) disparaît pendant le fondu de
+  fermeture, car `swatchCache` n'est jamais rempli. L'utilisateur veut le
+  traiter dans ce plan, pas seul.
+- 🟢 **Quick Share avec iPhone (AirDrop), à étudier (2026-10-28)** :
+  recherche faite. AirDrop depuis Windows n'est pas faisable : il faut AWDL,
+  donc une carte Wi-Fi en mode moniteur sous Linux, et OWL/OpenDrop sont
+  archivés. Le pont AirDrop ↔ Quick Share de Google (Pixel 10, puis Galaxy
+  S24-S26…, mode « Tout le monde pendant 10 min ») est propre à Android, et
+  son code n'est pas publié. Pistes réalistes :
+  1. un mini-serveur HTTP local dans le cœur Rust, avec une page d'envoi et
+     de réception ouverte par QR code depuis Safari (rien à installer sur
+     l'iPhone ; environ 2 à 4 jours) ;
+  2. le protocole LocalSend v2 (ouvert, Apache-2.0 ; appli gratuite sur
+     iPhone ; environ 3 à 5 jours).
+  Sources principales : blog.google (security, nov. 2025), MacRumors
+  (2026-06-02), github.com/seemoo-lab/owl (archivé le 2026-10-12),
+  github.com/localsend/protocol.
+- 🟢 **Réglages, saut au changement de section** (relevé du 2026-10-26, non
+  corrigé, l'utilisateur doit le confirmer) : `SettingsPage.qml`, `Behavior
+  on contentY`. Après avoir défilé en bas d'une longue section, cliquer une
+  section courte laisse la zone vide environ 0,2 s, puis le contenu tombe du
+  haut. Correctif prêt : couper le `Behavior` pendant le retour en haut.
+  Même cause : la barre de défilement glissée suit avec retard.
+- 🟢 **Bugs visuels relevés le 2026-10-26 et laissés de côté (choix de
+  l'utilisateur)** : jaquette de jeu qui tremble au bord bas
+  (`AppsPage.qml`, `Translate` au survol), cloche de la barre sans retour
+  au survol avec des notifications (`BarContent.qml`), horloge à volets dont
+  les 4 chiffres basculent (`PillClock.qml`, modèle recréé chaque minute),
+  infobulle au-dessus du menu qu'on vient d'ouvrir (voir plus bas, « menu
+  natif »).
+
 - 🟢 **Historique du presse-papiers au clavier (2026-10-27)** : valider
   referme l'îlot même verrouillé (on ne copie plus plusieurs éléments à la
   suite). Avec la touche Windows remappée (F24), Win+↑/↓ puis relâcher Win
@@ -222,6 +258,9 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Fait
 
+- 2026-10-28, 0.4.23 à venir : 25 bugs visuels (survol, clics qui
+  traversent, coins, thème clair, aperçu des fenêtres, soundboard, Wi-Fi).
+  Détail dans `ETAT.md`, session « bugs visuels ».
 - 2026-10-24, 0.4.18 : `Theme.lift` rend de nouveau une couleur opaque, donc
   les `IconBtn filled`, `TextBtn primary` et `BarContent` sont éclaircis au
   survol au lieu de perdre leur fond. Boucle de liaison `overIsland` corrigée

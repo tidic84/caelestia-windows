@@ -663,11 +663,22 @@ Item {
                         width: killRow.implicitWidth + 14
                         height: Math.min(28, row.height - 4)
                         radius: height / 2
-                        active: !cell.prot
-                        opacity: armed ? 1 : cell.prot ? (row.hovered ? 0.4 : 0) : (row.hovered || hovered ? 1 : 0)
+                        // protege : reste survolable pour son info-bulle, mais sans clic
+                        cursor: cell.prot ? Qt.ArrowCursor : Qt.PointingHandCursor
+                        opacity: armed ? 1 : cell.prot ? (row.hovered || hovered ? 0.4 : 0) : (row.hovered || hovered ? 1 : 0)
                         color: (hovered && !cell.prot) || armed ? Theme.error : "transparent"
                         tip: cell.prot ? "Processus Windows protégé" : cell.main ? "Processus principal : le terminer ferme en général tout le programme" : cell.pid ? "Fin du processus " + cell.pid : cell.n > 1 ? "Fin de tâche (" + cell.n + " processus)" : "Fin de tâche"
+                        // protege : le clic revient a la ligne (ouvrir le groupe, menu)
+                        onRightClicked: m => {
+                            if (cell.prot)
+                                page.showMenu(cell, kill.mapToItem(page, m.x, m.y))
+                        }
                         onClicked: {
+                            if (cell.prot) {
+                                if (cell.canOpen && !cell.sub)
+                                    page.toggle(cell.gkey)
+                                return
+                            }
                             if (!armed) {
                                 page.armed = cell.key
                                 disarm.restart()
@@ -770,7 +781,7 @@ Item {
             px: 12.5
             tnum: true
             weight: c.hot ? Font.DemiBold : Font.Normal
-            color: c.hot ? "#ffffff" : Theme.ink
+            color: c.hot && !Theme.light ? "#ffffff" : Theme.ink
         }
         Column {
             visible: c.head
@@ -783,13 +794,13 @@ Item {
                 px: c.valuePx
                 weight: Font.DemiBold
                 tnum: true
-                color: c.hot ? "#ffffff" : Theme.ink
+                color: c.hot && !Theme.light ? "#ffffff" : Theme.ink
             }
             Txt {
                 anchors.right: parent.right
                 text: c.label + (c.sorted ? (page.asc ? " ▴" : " ▾") : "")
                 px: 11
-                color: c.hot ? "#ffffff" : c.sorted ? Theme.primary : Theme.inkVariant
+                color: c.hot && !Theme.light ? "#ffffff" : c.sorted ? Theme.primary : Theme.inkVariant
             }
         }
         // seulement dans l'en-tete : pas de zone cliquable par ligne

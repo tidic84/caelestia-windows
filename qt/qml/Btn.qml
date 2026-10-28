@@ -24,7 +24,7 @@ Rectangle {
         hoverEnabled: true
         enabled: b.active
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-        cursorShape: Qt.PointingHandCursor
+        cursorShape: b.active ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: m => {
             if (m.button === Qt.RightButton)
                 b.rightClicked(m)

@@ -57,6 +57,12 @@ Rectangle {
         duration: 120
     }
 
+    // le fond du menu garde clics et survol (titres, separateurs, marges)
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.AllButtons
+    }
     Flickable {
         anchors.fill: parent
         anchors.margins: 6

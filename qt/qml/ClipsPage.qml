@@ -327,7 +327,7 @@ Item {
                     width: col.width
                     height: isText ? Math.max(42, txt.implicitHeight + 22) : Math.min(120, imgBox.h) + 16
                     radius: 16
-                    color: hovered || selected ? Theme.surfaceHigh : Theme.surfaceC
+                    color: hovered || noteAdd.hovered || selected ? Theme.surfaceHigh : Theme.surfaceC
                     border.width: selected ? 1.5 : 0
                     border.color: Theme.primary
                     Behavior on color { ColorAnimation { duration: 150 } }
@@ -394,6 +394,7 @@ Item {
                     }
                     // ajouter au bloc-notes
                     Btn {
+                        id: noteAdd
                         visible: clip.isText
                         anchors.right: check.left
                         anchors.rightMargin: 7
@@ -486,7 +487,7 @@ Item {
                 width: noteList.width
                 height: 48
                 radius: 12
-                color: on ? Theme.secondaryContainer : hovered ? Theme.surfaceHigh : "transparent"
+                color: on ? Theme.secondaryContainer : hovered || del.hovered ? Theme.surfaceHigh : "transparent"
                 onClicked: if (!on) page.openNote(modelData.id)
                 Column {
                     x: 10

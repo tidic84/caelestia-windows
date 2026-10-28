@@ -206,6 +206,7 @@ Item {
             readonly property color bg: tone === "secondary" ? Theme.secondaryContainer : tone === "tertiary" ? Theme.tertiaryContainer : Theme.primaryContainer
             readonly property color fg: tone === "secondary" ? Theme.inkSecondaryContainer : tone === "tertiary" ? Theme.inkTertiaryContainer : Theme.inkPrimaryContainer
             Btn {
+                id: tileBtn
                 anchors.fill: parent
                 anchors.margins: 4
                 radius: hovered || cell.on ? 24 : 18
@@ -216,13 +217,19 @@ Item {
                 Behavior on scale { NumberAnimation { duration: 200 } }
                 onClicked: page.play(cell.modelData)
                 onRightClicked: m => page.menu(cell.modelData, mapToItem(page, m.x, m.y))
-                // progression du son en cours
-                Rectangle {
+                // progression du son en cours (coupee, aux coins de la tuile)
+                Item {
                     id: prog
                     height: parent.height
-                    color: Theme.alpha(cell.fg, 0.15)
+                    clip: true
                     property real frac: 0
                     width: parent.width * frac
+                    Rectangle {
+                        width: tileBtn.width
+                        height: parent.height
+                        radius: tileBtn.radius
+                        color: Theme.alpha(cell.fg, 0.15)
+                    }
                     NumberAnimation on frac {
                         id: progAnim
                         running: false
@@ -397,6 +404,8 @@ Item {
 
     // ---------------------------------------------------------- menu
     function menu(s, p) {
+        // modelData est une copie : on modifie l'objet de la liste
+        s = page.sb.list.find(x => x.id === s.id) || s
         const vol = s.vol === undefined ? 1 : s.vol
         ctx.show(p.x, p.y, [
             { type: "title", label: s.name },

@@ -67,7 +67,7 @@ Item {
         anchors.topMargin: -3
         anchors.bottomMargin: -3
         enabled: !sl.disabled
-        cursorShape: Qt.PointingHandCursor
+        cursorShape: sl.disabled ? Qt.ArrowCursor : Qt.PointingHandCursor
         preventStealing: true
         function at(x) {
             const f = Math.max(0, Math.min(1, x / sl.width))

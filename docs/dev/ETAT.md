@@ -35,6 +35,75 @@ reprendre.
 
 ## Journal
 
+### 2026-10-26 au 28 : session bugs visuels (0.4.23 à venir)
+
+Méthode :
+- 5 relecteurs ont fait une analyse statique par zone, avec de petits tests
+  `qmltestrunner` isolés pour une douzaine de mécanismes. Ils ont relevé
+  33 bugs.
+- L'utilisateur les a triés sur une page avant / après interactive :
+  https://claude.ai/artifact/933obEfGm1cT7Kpa9ZTQyz
+- Diff des correctifs : https://claude.ai/artifact/JJjwXZ5PGMPWDoscxk676B
+
+Fait (22 fichiers de `qt/qml`) :
+- **Clics et survol** :
+  - fond qui garde les clics dans `CtxMenu`, la vue du jour (`HomePage`)
+    et Playlists (`MediaPage`) ;
+  - curseur flèche sur `Btn` et `M3Slider` désactivés ;
+  - survol gardé sur le bouton enfant (`ClipsPage`, `TaskPreview`) ;
+  - fond de survol dans le menu des Réglages, les pastilles, les notes de
+    version et `keyBtn` ;
+  - Précédent / Suivant grisés inertes (`HomePage`) ;
+  - infobulle bornée à l'écran (`TipWindow`).
+- **Soundboard** : `menu()` modifie l'objet de `sb.list`, plus la copie
+  `modelData`.
+- **Wi-Fi** : liste mise en attente pendant la saisie d'un mot de passe
+  (`wifiAsking`, `wifiPending`).
+- **Aperçu des fenêtres** :
+  - raccroché à la `BarTask` recréée (`Component.onCompleted`, dépendance
+    à `anchorItem.x`) ;
+  - bord droit borné à `sideMax`, sans réduire la largeur.
+- **Rendu** :
+  - voiles et progression aux coins arrondis (`CtrlPage`, `SoundsPage`) ;
+  - `alwaysRunToEnd` sur les `RotationAnimator` (`CtrlPage`, `PcCard`).
+    Le pivot a été mesuré : il est centré ;
+  - cadre de sélection des jeux au-dessus de la jaquette ;
+  - `scale` sur `dragMa.pressed` (Launcher) ;
+  - `Scroller` : position et glisser sur la course restante.
+- **Mélangeur** : anneau de focus seulement au clavier (`kbd`), et
+  `tone()` (`Qt.darker` 2,2) en thème clair.
+- **Thème clair** : texte des cases chaudes de Tâches, et légende d'Usage
+  Claude redessinée sur `Theme.inkChanged`.
+- **Panneau et pilule** :
+  - glissement des pages avec un départ explicite (`Panel.qml`, animation
+    `slide`) ;
+  - pilule en survol jamais plus étroite que repliée (`Ilot.sizeFor`) ;
+  - anneaux de Quick Share masqués à l'arrêt.
+- **Assistant** : puces de prompts supprimées, à la demande de l'utilisateur.
+- **Abandonné** : la coche « copié » (A22). Depuis la 0.4.22, un clic copie
+  et ferme l'îlot.
+
+Vérifié :
+- `qt\build.cmd` passe, après la mise à niveau sur `origin/main` (0.4.22).
+  Un seul conflit, dans `ClipsPage`, résolu.
+- Relecture par `relecteur`. Ses 4 remarques ont été corrigées : largeur de
+  l'aperçu, clics d'un processus protégé renvoyés à la ligne, liste Wi-Fi
+  périmée, saut d'une page encore visible.
+- `qt\build\ilot.exe` a été lancé sur 11 onglets (home, media, ctrl, apps,
+  tasks, clips, cusage, walls, pc, mail, settings). `ILOT_QT_LOG` reste vide
+  (aucun avertissement QML), et les captures sont correctes.
+
+Non vérifié :
+- Aucun survol ni clic réel sur les correctifs : il faut les essayer à la
+  souris.
+- Les 4 retouches faites après la relecture n'ont pas été relues une
+  seconde fois.
+- Soundboard et Assistant n'ont pas été ouverts en vrai : leurs addons sont
+  désactivés sur le poste.
+
+À reprendre : voir `BACKLOG.md`, en tête de la partie Qt (plan des
+animations, Quick Share avec iPhone, saut des Réglages à confirmer).
+
 ### 2026-10-27 : Win+V, historique au clavier
 
 `ClipsPage.qml`, vue Historique : ↑/↓ choisissent un élément (contour

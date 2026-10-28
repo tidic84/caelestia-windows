@@ -354,6 +354,13 @@ Item {
             property var events: []
             property string key: ""
 
+            // bloque survol et clics vers le mois cache dessous
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.AllButtons
+                cursorShape: Qt.ArrowCursor
+            }
             Item {
                 id: dayHead
                 x: 14
@@ -645,6 +652,10 @@ Item {
                     icon: "skip_previous"
                     readonly property bool can: !Ilot.hasMedia || Ilot.media.can_prev !== false
                     opacity: can ? 1 : 0.35
+                    // grise : ni survol, ni appui, ni main
+                    cursor: can ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    color: can && hovered ? Theme.alpha(Theme.ink, 0.1) : "transparent"
+                    scale: can && pressed ? 0.9 : 1
                     tip: "Précédent"
                     // grise : le clic est pris quand meme (pas d'ouverture du panneau)
                     onClicked: if (can) Ilot.mediaAction("prev")
@@ -660,6 +671,10 @@ Item {
                     icon: "skip_next"
                     readonly property bool can: !Ilot.hasMedia || Ilot.media.can_next !== false
                     opacity: can ? 1 : 0.35
+                    // grise : ni survol, ni appui, ni main
+                    cursor: can ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    color: can && hovered ? Theme.alpha(Theme.ink, 0.1) : "transparent"
+                    scale: can && pressed ? 0.9 : 1
                     tip: "Suivant"
                     onClicked: if (can) Ilot.mediaAction("next")
                     onMiddleClicked: Ilot.mediaAction("toggle")

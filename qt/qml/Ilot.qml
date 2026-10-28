@@ -364,7 +364,10 @@ Item {
             // sans musique ni activite : le compagnon se montre a cote de l'heure
             const p = hasMedia ? { w: 460, h: 76 } : Watch.actShown ? { w: 380, h: 60 }
                 : { w: (weather ? 320 : 250) + (Watch.petShown ? 40 : 0), h: 50 }
-            return Watch.dcShown ? { w: p.w + 70, h: p.h } : p
+            // jamais plus etroite que repliee : la zone de survol retrecirait
+            // sous la souris (grandit / retrecit en boucle au bord)
+            const w = Watch.dcShown ? p.w + 70 : p.w
+            return { w: Math.max(w, sizeFor("collapsed").w), h: p.h }
         }
         if (act)
             return act.size

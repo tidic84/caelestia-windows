@@ -347,6 +347,8 @@ Item {
                         border.width: 2
                         border.color: Theme.primary
                         opacity: 0
+                        // arret : une animation arretee garde sa valeur, on masque l'anneau
+                        visible: page.st.discovering && !Theme.reduced
                         SequentialAnimation on scale {
                             running: page.visible && page.st.discovering && !Theme.reduced
                             loops: Animation.Infinite
@@ -356,6 +358,8 @@ Item {
                         SequentialAnimation on opacity {
                             running: page.visible && page.st.discovering && !Theme.reduced
                             loops: Animation.Infinite
+                            // reprise (reouverture) : invisible pendant la pause
+                            PropertyAction { value: 0 }
                             PauseAnimation { duration: index * 900 }
                             NumberAnimation { from: 0.7; to: 0; duration: 1800; easing.type: Easing.OutCubic }
                         }

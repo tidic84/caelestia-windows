@@ -356,8 +356,21 @@ Item {
                 readonly property bool allowed: Ilot.tabs.indexOf(modelData.id) >= 0
                 active: wanted && allowed
                 onAllowedChanged: if (!allowed) wanted = false
-                onOnChanged: if (on) wanted = true
-                Component.onCompleted: if (on) wanted = true
+                onOnChanged: {
+                    if (on)
+                        wanted = true
+                    // depart fixe : tabDir change avant currentTab
+                    slide.stop()
+                    // (une page encore visible repart de sa position)
+                    slide.from = on && opacity === 0 ? -Ilot.tabDir * 24 : dx
+                    slide.to = on ? 0 : -Ilot.tabDir * 24
+                    slide.start()
+                }
+                Component.onCompleted: {
+                    if (on)
+                        wanted = true
+                    dx = on ? 0 : -Ilot.tabDir * 24
+                }
                 width: pages.width
                 height: pages.height
                 source: modelData.page + ".qml"
@@ -366,10 +379,15 @@ Item {
                 enabled: shown
                 Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.std } }
                 // la page arrivante glisse du cote de l'onglet choisi
-                property real dx: on ? 0 : -Ilot.tabDir * 24
-                transform: Translate {
-                    x: page.dx
-                    Behavior on x { NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
+                property real dx: 0
+                transform: Translate { x: page.dx }
+                NumberAnimation {
+                    id: slide
+                    target: page
+                    property: "dx"
+                    duration: 400
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Theme.emph
                 }
             }
         }

@@ -9,7 +9,8 @@ Rectangle {
     width: 6
     radius: 3
     color: Theme.outlineVariant
-    y: flick ? flick.y + Math.max(0, flick.visibleArea.yPosition) * flick.height : 0
+    // course sur la hauteur restante (la poignee fait au moins 20 px)
+    y: flick ? flick.y + (flick.visibleArea.heightRatio < 1 ? Math.max(0, Math.min(1, flick.visibleArea.yPosition / (1 - flick.visibleArea.heightRatio))) * (flick.height - height) : 0) : 0
     height: flick ? Math.max(20, Math.min(1, flick.visibleArea.heightRatio) * flick.height) : 0
     MouseArea {
         anchors.fill: parent
@@ -21,7 +22,7 @@ Rectangle {
             if (!pressed)
                 return
             const f = s.flick
-            const dy = (m.y - grab) / f.height * f.contentHeight
+            const dy = (m.y - grab) * (f.contentHeight - f.height) / Math.max(1, f.height - s.height)
             f.contentY = Math.max(0, Math.min(f.contentHeight - f.height, f.contentY + dy))
         }
     }

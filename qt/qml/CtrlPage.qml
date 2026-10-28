@@ -102,9 +102,21 @@ Item {
     property bool scanning: false
     property bool wifiBusy: false
     property string wifiMsg: ""
+    // mot de passe en cours de saisie : la liste attend (sinon les lignes
+    // sont recreees et le champ s'efface)
+    property int wifiAsking: 0
+    property var wifiPending: null
+    onWifiAskingChanged: {
+        if (wifiAsking === 0 && wifiPending) {
+            const l = wifiPending
+            wifiPending = null
+            showWifi(l)
+        }
+    }
     function loadWifi(scan) {
         if (Ilot.net.radios.wifi === false) {
             wifi = []
+            wifiPending = null
             wifiMsg = "Le Wi-Fi est désactivé."
             return
         }
@@ -122,6 +134,10 @@ Item {
     function showWifi(l) {
         if (wifiBusy)
             return
+        if (wifiAsking > 0) {
+            wifiPending = l
+            return
+        }
         wifi = l
         wifiMsg = l.length ? "" : "Aucun réseau trouvé."
     }
@@ -399,6 +415,8 @@ Item {
                     to: 360
                     duration: 1000
                     loops: Animation.Infinite
+                    // finit le tour en cours : l'icone ne reste pas penchee
+                    alwaysRunToEnd: true
                 }
                 onClicked: page.loadWifi(true)
             }
@@ -741,8 +759,19 @@ Item {
                 id: mainBtn
                 width: parent.width - (tile.more ? 28 : 0)
                 height: parent.height
-                color: hovered ? Theme.alpha(tile.fg, 0.08) : "transparent"
                 onClicked: tile.main()
+                // voile de survol aux coins arrondis de la tuile
+                Item {
+                    anchors.fill: parent
+                    clip: true
+                    Rectangle {
+                        width: tbg.width
+                        height: parent.height
+                        radius: tbg.radius
+                        color: mainBtn.hovered ? Theme.alpha(tile.fg, 0.08) : "transparent"
+                        Behavior on color { ColorAnimation { duration: 200 } }
+                    }
+                }
                 Row {
                     x: 10
                     spacing: 8
@@ -777,13 +806,25 @@ Item {
                 }
             }
             Btn {
+                id: moreBtn
                 visible: tile.more
                 x: parent.width - 28
                 width: 28
                 height: parent.height
-                color: hovered ? Theme.alpha(tile.fg, 0.08) : "transparent"
                 tip: "Plus de réglages"
                 onClicked: tile.moreClicked()
+                Item {
+                    anchors.fill: parent
+                    clip: true
+                    Rectangle {
+                        x: -moreBtn.x
+                        width: tbg.width
+                        height: parent.height
+                        radius: tbg.radius
+                        color: moreBtn.hovered ? Theme.alpha(tile.fg, 0.08) : "transparent"
+                        Behavior on color { ColorAnimation { duration: 200 } }
+                    }
+                }
                 Rectangle {
                     width: 1
                     height: parent.height
@@ -1033,6 +1074,13 @@ Item {
         color: modelData.connected ? Theme.secondaryContainer : netBtn.hovered ? Theme.surfaceHigh : "transparent"
         opacity: busy ? 0.7 : 1
         readonly property color fg: modelData.connected ? Theme.inkSecondaryContainer : Theme.ink
+        onAskingChanged: page.wifiAsking += asking ? 1 : -1
+        Component.onDestruction: if (asking) page.wifiAsking--
+        // feuille fermee : le champ se referme, la liste peut changer
+        Connections {
+            target: page
+            function onSheetChanged() { if (page.sheet !== "wifi") net.asking = false }
+        }
         function connect(password) {
             busy = true
             page.wifiBusy = true
@@ -1043,6 +1091,8 @@ Item {
                     net.busy = false
                     Api.invoke("net_get").then(n => { Ilot.net = n })
                     page.loadWifi(false)
+                    // en dernier : peut recreer cette ligne
+                    net.asking = false
                 })
             }).catch(e => {
                 page.wifiBusy = false

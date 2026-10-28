@@ -298,6 +298,8 @@ Item {
                     width: nav.width
                     height: 36
                     radius: 18
+                    // fond leger au survol, sauf l'actif (le surligneur glissant suffit)
+                    color: hovered && !on ? Theme.alpha(Theme.ink, 0.08) : "transparent"
                     readonly property color fg: on ? Theme.inkSecondaryContainer : Theme.ink
                     onClicked: Ilot.settingsSection = modelData.id
                     Ms {
@@ -2373,7 +2375,7 @@ Item {
                                     width: parent.width
                                     height: 28
                                     radius: 10
-                                    color: "transparent"
+                                    color: hovered ? Theme.alpha(Theme.ink, 0.08) : "transparent"
                                     onClicked: rel.open = !rel.open
                                     Txt {
                                         id: relVer
@@ -2813,9 +2815,17 @@ Item {
         width: 30
         height: 30
         radius: 15
-        color: icon ? (on ? Theme.secondaryContainer : Theme.surfaceHigh) : fill
+        color: icon ? (on ? Theme.secondaryContainer : hovered ? Theme.surfaceHighest : Theme.surfaceHigh) : fill
         border.width: on ? 3 : 0
         border.color: Theme.ink
+        // survol d'une pastille de couleur : voile leger par-dessus la teinte
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            visible: !sw.icon && !sw.on
+            color: sw.hovered ? Theme.alpha(Theme.ink, 0.08) : "transparent"
+            Behavior on color { ColorAnimation { duration: 200 } }
+        }
         Ms {
             anchors.centerIn: parent
             visible: sw.icon !== ""
@@ -2902,7 +2912,9 @@ Item {
             width: Math.max(90, keyText.implicitWidth + 24)
             height: 28
             radius: 14
-            color: kr.rec ? Theme.primary : kr.combo ? Theme.secondaryContainer : Theme.surfaceHigh
+            color: kr.rec ? Theme.primary
+                : kr.combo ? (hovered ? Theme.mix(Theme.ink, Theme.secondaryContainer, 0.08) : Theme.secondaryContainer)
+                : hovered ? Theme.surfaceHighest : Theme.surfaceHigh
             border.width: kr.bad ? 2 : 0
             border.color: Theme.error
             tip: kr.bad ? "Déjà pris par une autre appli : choisis-en un autre" : "Clic puis appuie sur la combinaison · Échap : annuler · Retour arrière : effacer"

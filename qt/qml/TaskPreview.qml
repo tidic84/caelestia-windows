@@ -15,9 +15,13 @@ Item {
     x: {
         if (!anchorItem || !bar)
             return 8
+        // place par la Row apres sa creation (appli recreee)
+        anchorItem.x
         const a = anchorItem.mapToItem(bar, 0, 0)
-        return Math.max(8, Math.min(bar.width - width - 8, a.x + anchorItem.width / 2 - width / 2))
+        return Math.max(8, Math.min(maxR - width, a.x + anchorItem.width / 2 - width / 2))
     }
+    // bord droit : jamais sous l'ilot (un clic l'ouvrirait)
+    readonly property real maxR: !bar ? 800 : bar.hasIsland ? bar.sideMax : bar.width - 8
     onXChanged: rectChangedSig()
     onWidthChanged: rectChangedSig()
     onHeightChanged: rectChangedSig()
@@ -138,7 +142,7 @@ Item {
                     width: 232
                     height: 22 + 5 + 124 + 12
                     radius: 13
-                    color: on ? Theme.secondaryContainer : hovered ? Theme.surfaceHigh : "transparent"
+                    color: on ? Theme.secondaryContainer : (hovered || closeBtn.hovered) ? Theme.surfaceHigh : "transparent"
                     onClicked: {
                         pv.hideNow()
                         if (modelData.id !== Ilot.barWins.active)
@@ -171,6 +175,7 @@ Item {
                         }
                         // fermer la fenetre
                         Btn {
+                            id: closeBtn
                             width: 22
                             height: 22
                             radius: 11

@@ -206,8 +206,11 @@ Item {
                     Repeater {
                         model: tasks.groups
                         BarTask {
+                            id: task
                             required property var modelData
                             group: modelData
+                            // recreee pendant que l'apercu est ouvert : il la suit
+                            Component.onCompleted: if (preview.key === modelData.key) preview.anchorItem = task
                             anchors.verticalCenter: parent.verticalCenter
                             onHoveredChanged: if (hovered && !menu.visible) preview.soon(modelData.key, this)
                             onRightClicked: bar.taskMenu(modelData, this)

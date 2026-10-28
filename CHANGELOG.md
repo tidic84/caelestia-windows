@@ -4,6 +4,23 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.23 — à venir
+
+- **Survol et clics plus justes** :
+  - un clic sur le titre, la marge ou un séparateur d'un menu contextuel (Apps, Tâches) n'atteint plus ce qu'il y a dessous ;
+  - la vue du jour (Accueil) et le panneau Playlists (Média) ne laissent plus passer le survol ni les clics vers ce qu'ils couvrent ;
+  - le curseur reste une flèche sur les boutons, interrupteurs et curseurs désactivés ;
+  - une ligne garde son survol quand la souris passe sur son propre bouton (Presse-papiers, bloc-notes, aperçu des fenêtres de la barre) ;
+  - menu latéral des Réglages, pastilles de couleur, notes de version et boutons de raccourci : un léger fond au survol ;
+  - les boutons Précédent / Suivant grisés de l'Accueil ne réagissent plus ;
+  - les infobulles des boutons au bord de l'écran restent dans l'écran.
+- **Soundboard** : Renommer, Volume, Couleur et Supprimer (clic droit sur un son) fonctionnent de nouveau.
+- **Wi-Fi** : le mot de passe en cours de saisie ne s'efface plus quand la recherche des réseaux se termine.
+- **Aperçu des fenêtres** (barre) : il ne saute plus au bord gauche et ne se ferme plus quand le titre d'une fenêtre change, et il ne passe plus sous l'îlot.
+- **Détails visuels** : les tuiles de Contrôles et la progression des sons respectent les coins arrondis ; l'icône Actualiser finit son tour au lieu de rester penchée ; le cadre de sélection au clavier des jeux se voit ; les icônes du Launcher rétrécissent à l'appui ; la barre de défilement reste dans son cadre en bas des longues listes ; dans le mélangeur, le cadre de focus n'apparaît plus qu'au clavier ; la page arrivante glisse toujours du bon côté ; la pilule ne grandit plus en boucle quand la souris est sur son bord.
+- **Thème clair** : chiffres des cases chargées de l'onglet Tâches, couleurs des sorties du mélangeur et légende d'Usage Claude lisibles. L'infobulle « Processus Windows protégé » s'affiche.
+- **Assistant** : les puces de prompts rapides au-dessus de la saisie sont retirées.
+
 ## 0.4.22 — 2026-10-27
 
 - **Glisser des fichiers sur l'îlot** : la pilule s'agrandit et ne montre plus que des zones de dépôt (Convertir, Réduire pour les images, Zip, Discord, Quick Share, Applis), sans le panneau ni les onglets. Lâcher sur une zone lance l'action, et le résultat s'affiche dans la pilule (afficher dans l'Explorateur, ouvrir, envoyer sur Discord). Survoler « Applis » ouvre l'onglet Apps pour ranger les fichiers dans un dossier. Ressortir sans lâcher replie l'îlot.

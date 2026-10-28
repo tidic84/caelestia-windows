@@ -34,7 +34,8 @@ Card {
             to: 360
             duration: 900
             loops: Animation.Infinite
-            onRunningChanged: if (!running) parent.rotation = 0
+            // finit le tour en cours : l'icone ne reste pas penchee
+            alwaysRunToEnd: true
         }
     }
     Column {

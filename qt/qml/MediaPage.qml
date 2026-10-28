@@ -666,6 +666,13 @@ Rectangle {
         z: 3
         onVisibleChanged: if (visible) slideIn.restart()
         transform: Translate { id: slide; x: 0 }
+        // bloque survol et clics vers les paroles dessous
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.AllButtons
+            cursorShape: Qt.ArrowCursor
+        }
         ParallelAnimation {
             id: slideIn
             NumberAnimation { target: slide; property: "x"; from: 24; to: 0; duration: 250; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph }

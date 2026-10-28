@@ -325,6 +325,12 @@ Item {
                                     target: chart
                                     function onToneChanged() { lgc.requestPaint() }
                                 }
+                                // rythme regulier : trait couleur d'encre, suit le theme
+                                Connections {
+                                    target: Theme
+                                    enabled: lg.index === 2
+                                    function onInkChanged() { lgc.requestPaint() }
+                                }
                             }
                             Txt {
                                 text: lg.modelData[0]

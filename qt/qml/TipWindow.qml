@@ -21,8 +21,19 @@ Window {
             return
         }
         label.text = t.text
-        // reste centree si sa taille change pendant l'affichage
-        x = Qt.binding(() => Math.round(t.x - w.width / 2))
+        // ecran qui contient le point (pour ne pas en sortir)
+        let sc = null
+        const all = Qt.application.screens
+        for (let i = 0; i < all.length; i++) {
+            const s = all[i]
+            if (t.x >= s.virtualX && t.x < s.virtualX + s.width && t.y >= s.virtualY && t.y < s.virtualY + s.height)
+                sc = s
+        }
+        // reste centree si sa taille change pendant l'affichage, bornee a l'ecran
+        x = Qt.binding(() => {
+            const v = Math.round(t.x - w.width / 2)
+            return sc ? Math.max(sc.virtualX + 4, Math.min(v, sc.virtualX + sc.width - w.width - 4)) : v
+        })
         y = Math.round(t.y)
         visible = true
         raise()

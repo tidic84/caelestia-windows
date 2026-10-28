@@ -315,14 +315,6 @@ Item {
     property string clMode: "chat"
     property var clHist: []
     property string clNote: ""
-    readonly property var quick: [
-        ["summarize", "Résumer", "Résume ce texte en quelques points :"],
-        ["help", "Expliquer", "Explique-moi simplement :"],
-        ["spellcheck", "Corriger", "Corrige l’orthographe et la grammaire de ce texte, sans changer le sens :"],
-        ["translate", "En français", "Traduis en français :"],
-        ["reply", "Répondre", "Aide-moi à répondre à ce message :"],
-        ["code", "Code", "Explique ce code et signale les bugs éventuels :"]
-    ]
     function ask(text) {
         text = text.trim()
         if (!text)
@@ -349,7 +341,7 @@ Item {
                 id: clIn
                 anchors.fill: parent
                 anchors.margins: 10
-                anchors.bottomMargin: 96
+                anchors.bottomMargin: 50
                 color: "transparent"
                 border.width: 0
                 fontSize: 14
@@ -365,49 +357,6 @@ Item {
                     if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && !(e.modifiers & Qt.ShiftModifier)) {
                         e.accepted = true
                         page.ask(clIn.text)
-                    }
-                }
-            }
-            // le prompt + le dernier texte copie
-            Flow {
-                x: 12
-                width: parent.width - 24
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 50
-                spacing: 6
-                Repeater {
-                    model: page.quick
-                    Btn {
-                        required property var modelData
-                        width: qRow.implicitWidth + 20
-                        height: 28
-                        radius: 14
-                        color: hovered ? Theme.surfaceHighest : Theme.surfaceHigh
-                        tip: modelData[2] + " + dernier texte copié"
-                        onClicked: {
-                            const last = Ilot.clips.find(c => c.text)
-                            if (!last) {
-                                page.clNote = "Copie d’abord un texte (Ctrl+C)"
-                                return
-                            }
-                            clIn.text = (modelData[2] + "\n\n" + last.text).slice(0, 6000)
-                            clIn.edit.forceActiveFocus()
-                        }
-                        Row {
-                            id: qRow
-                            anchors.centerIn: parent
-                            spacing: 4
-                            Ms {
-                                name: parent.parent.modelData[0]
-                                size: 16
-                                color: Theme.primary
-                            }
-                            Txt {
-                                text: parent.parent.modelData[1]
-                                px: 12
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                        }
                     }
                 }
             }

@@ -42,6 +42,8 @@ Item {
     property string dropId: ""
     property var targets: []
     property bool sliding: false
+    // anneau de focus des pastilles : clavier seulement (pas apres un clic)
+    property bool kbd: true
     readonly property bool busy: drag !== null || sliding
 
     function refresh() {
@@ -92,6 +94,10 @@ Item {
         if (!c.sonar)
             c.col = neutral[n % neutral.length]
         return c
+    }
+    // couleurs des sorties (pastels du theme sombre) : assombries en theme clair
+    function tone(c) {
+        return Theme.light ? Qt.darker(c, 2.2) : c
     }
     // met a jour un ListModel sur place (les delegues survivent au sondage)
     function sync(model, arr) {
@@ -391,7 +397,7 @@ Item {
                 required property int count
                 // masquee dans Reglages > Son, montree par « +N »
                 required property bool extra
-                readonly property color cc: col
+                readonly property color cc: mx.tone(col)
                 readonly property bool sel: mx.filter.includes(key)
                 readonly property bool target: mx.drag !== null && mx.drag.from !== key
                 readonly property bool hot: target && mx.dropId === key
@@ -533,7 +539,7 @@ Item {
                     color: "transparent"
                     border.width: 2
                     border.color: Theme.primary
-                    visible: pill.activeFocus
+                    visible: pill.activeFocus && mx.kbd
                 }
                 MouseArea {
                     id: pma
@@ -551,6 +557,7 @@ Item {
                         l0 = pill.pct
                         moved = false
                         mx.sliding = true
+                        mx.kbd = false
                     }
                     onPositionChanged: m => {
                         if (!pressed)
@@ -565,13 +572,18 @@ Item {
                         mx.sliding = false
                         if (!moved) {
                             pill.forceActiveFocus()
+                            // apres le changement de focus (qui remet kbd)
+                            mx.kbd = false
                             mx.toggleFilter(pill.key)
                         }
                     }
                     onCanceled: mx.sliding = false
                     onWheel: w => mx.setChanLevel(pill.index, pill.pct + (w.angleDelta.y > 0 ? 5 : -5))
                 }
+                // focus perdu : la prochaine pastille atteinte au clavier a son anneau
+                onActiveFocusChanged: if (!activeFocus) mx.kbd = true
                 Keys.onPressed: e => {
+                    mx.kbd = true
                     if (e.key === Qt.Key_Up || e.key === Qt.Key_Right)
                         mx.setChanLevel(index, pct + 5)
                     else if (e.key === Qt.Key_Down || e.key === Qt.Key_Left)
@@ -653,7 +665,7 @@ Item {
             id: sec
             required property string section
             readonly property var info: mx.chanMap[section] || null
-            readonly property color cc: info ? info.col : Theme.outline
+            readonly property color cc: info ? mx.tone(info.col) : Theme.outline
             readonly property bool shut: !!mx.closed[section]
             readonly property string tid: section
             readonly property bool target: mx.drag !== null && mx.drag.from !== section
@@ -775,7 +787,7 @@ Item {
             required property real level
             required property bool muted
             readonly property var info: mx.chanMap[chan] || null
-            readonly property color cc: info ? info.col : Theme.outline
+            readonly property color cc: info ? mx.tone(info.col) : Theme.outline
             readonly property bool movable: mx.multi && kind === "app"
             readonly property bool open: mx.openKey === key && movable
             readonly property bool hov: rowHover.hovered || slider.activeFocus || dot.activeFocus
@@ -1080,7 +1092,7 @@ Item {
                                 required property string shortName
                                 required property string icon
                                 required property string col
-                                readonly property color cc: col
+                                readonly property color cc: mx.tone(col)
                                 readonly property bool cur: key === row.chan
                                 width: (row.width - 46 - 6 - 2 * (chanModel.count - 1)) / chanModel.count
                                 height: 30

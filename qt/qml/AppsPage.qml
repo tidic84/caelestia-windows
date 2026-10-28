@@ -787,7 +787,7 @@ Item {
             radius: 18
             color: selected ? Theme.secondaryContainer : hovered ? Theme.surfaceHigh : "transparent"
             opacity: dragging ? 0.35 : modelData.missing ? 0.45 : 1
-            scale: pressed && !dragging ? 0.94 : 1
+            scale: dragMa.pressed && !dragging ? 0.94 : 1
             Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
             tip: (modelData.file ? modelData.file : modelData.name) + (modelData.added ? "\nAjoutée le " + page.fmtAdded(modelData.added) : "")
             Column {
@@ -830,6 +830,7 @@ Item {
                 }
             }
             MouseArea {
+                id: dragMa
                 anchors.fill: parent
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 hoverEnabled: false
@@ -880,8 +881,6 @@ Item {
             radius: hovered ? 22 : 16
             Behavior on radius { NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
             color: Theme.surfaceHigh
-            border.width: selected ? 3 : 0
-            border.color: Theme.primary
             transform: Translate {
                 y: game.hovered && !game.pressed ? -2 : 0
                 Behavior on y { NumberAnimation { duration: 250; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
@@ -1026,6 +1025,14 @@ Item {
                         }
                     }
                 }
+            }
+            // selection au clavier : cadre par-dessus la jaquette
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                color: "transparent"
+                border.width: game.selected ? 3 : 0
+                border.color: Theme.primary
             }
         }
     }
