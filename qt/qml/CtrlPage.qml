@@ -813,6 +813,7 @@ Item {
                 height: parent.height
                 tip: "Plus de réglages"
                 onClicked: tile.moreClicked()
+                // survol : epouse la forme de la tuile (coins arrondis a droite)
                 Item {
                     anchors.fill: parent
                     clip: true

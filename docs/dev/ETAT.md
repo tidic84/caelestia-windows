@@ -101,6 +101,17 @@ Non vérifié :
 - Soundboard et Assistant n'ont pas été ouverts en vrai : leurs addons sont
   désactivés sur le poste.
 
+Suite (2026-10-28) :
+- Captures réelles avant / après (7 paires) : https://claude.ai/artifact/T6hQsyFuBhf7pSGj35FRmd
+- Chevron des tuiles de Contrôles : le survol épouse la forme de la tuile
+  (coins arrondis à droite). Validé à l'écran par l'utilisateur.
+- Quick Share : `parse_endpoint_info` garde un appareil visible sans nom
+  (17 octets, cas de rquickshare #431), qui prend son nom d'hôte mDNS.
+  Test unitaire `quickshare::inbound::tests::endpoint_info` (passe).
+  Relu par `relecteur`. Pas testé avec un vrai téléphone.
+- Publier : les mises à jour sont signées avec la clé de Tidic, absente de
+  ce poste. Seul Tidic peut publier la 0.4.23.
+
 À reprendre : voir `BACKLOG.md`, en tête de la partie Qt (plan des
 animations, Quick Share avec iPhone, saut des Réglages à confirmer).
 

@@ -405,7 +405,14 @@ fn on_resolved(q: &Qs, info: &ServiceInfo) {
                 }
             }
         }
-        let name = name?;
+        let mut name = name?;
+        // visible mais sans nom : nom d'hote mDNS
+        if name.is_empty() {
+            name = info.get_hostname().trim_end_matches('.').trim_end_matches(".local").to_string();
+            if name.is_empty() {
+                name = "Appareil Android".into();
+            }
+        }
         g.devices.retain(|d| d.id != eid);
         g.devices.push(Device { id: eid.clone(), name, kind, addr, fullname: full });
         (via_qr && !g.pending.is_empty() && g.qr_started.insert(eid.clone())).then(|| (eid.clone(), g.pending.clone()))

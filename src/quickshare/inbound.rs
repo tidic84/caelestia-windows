@@ -26,10 +26,17 @@ pub fn parse_endpoint_info(info: &[u8]) -> Option<(Option<String>, u8, Vec<(u8, 
     let visible = info[0] & 0x10 == 0;
     let mut off = 17;
     let name = if visible {
-        let n = *info.get(17)? as usize;
-        let s = String::from_utf8_lossy(info.get(18..18 + n)?).to_string();
-        off = 18 + n;
-        Some(s)
+        // certains telephones (2026) se disent visibles sans envoyer de nom :
+        // nom vide, l'appelant prend un nom de repli
+        match info.get(17) {
+            None => Some(String::new()),
+            Some(&n) => {
+                let n = n as usize;
+                let s = String::from_utf8_lossy(info.get(18..18 + n)?).to_string();
+                off = 18 + n;
+                Some(s)
+            }
+        }
     } else {
         None
     };
@@ -79,7 +86,7 @@ fn run(c: &mut Conn, q: &Qs, id: &mut u64, tx: mpsc::Sender<conn::Ev>) -> Result
     let f = OfflineFrame::decode(c.recv_raw(short)?.as_slice()).map_err(|e| e.to_string())?;
     let req = f.v1.and_then(|v| v.connection_request).ok_or("demande de connexion attendue")?;
     let (name, kind, _) = parse_endpoint_info(&req.endpoint_info.unwrap_or_default()).ok_or("appareil inconnu")?;
-    let peer = name.or(req.endpoint_name).unwrap_or_else(|| "Appareil inconnu".into());
+    let peer = name.filter(|s| !s.is_empty()).or(req.endpoint_name).unwrap_or_else(|| "Appareil inconnu".into());
 
     // 2. UKEY2 : ClientInit -> ServerInit -> ClientFinish
     let ci_raw = c.recv_raw(short)?;
@@ -335,4 +342,26 @@ fn run(c: &mut Conn, q: &Qs, id: &mut u64, tx: mpsc::Sender<conn::Ev>) -> Result
     });
     c.disconnect();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_endpoint_info;
+
+    #[test]
+    fn endpoint_info() {
+        // visible (bit 0x10 a 0), telephone (type 1), nom "Pixel"
+        let mut v = vec![1 << 1];
+        v.extend([0u8; 16]);
+        v.push(5);
+        v.extend(b"Pixel");
+        assert_eq!(parse_endpoint_info(&v).map(|r| r.0), Some(Some("Pixel".into())));
+        // visible mais sans nom (17 octets) : garde, nom vide
+        assert_eq!(parse_endpoint_info(&v[..17]).map(|r| r.0), Some(Some(String::new())));
+        // masque : pas de nom
+        v[0] |= 0x10;
+        assert_eq!(parse_endpoint_info(&v[..17]).map(|r| r.0), Some(None));
+        // trop court
+        assert!(parse_endpoint_info(&v[..10]).is_none());
+    }
 }

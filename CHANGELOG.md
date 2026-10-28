@@ -20,6 +20,7 @@ description à chaque version publiée sur GitHub.
 - **Détails visuels** : les tuiles de Contrôles et la progression des sons respectent les coins arrondis ; l'icône Actualiser finit son tour au lieu de rester penchée ; le cadre de sélection au clavier des jeux se voit ; les icônes du Launcher rétrécissent à l'appui ; la barre de défilement reste dans son cadre en bas des longues listes ; dans le mélangeur, le cadre de focus n'apparaît plus qu'au clavier ; la page arrivante glisse toujours du bon côté ; la pilule ne grandit plus en boucle quand la souris est sur son bord.
 - **Thème clair** : chiffres des cases chargées de l'onglet Tâches, couleurs des sorties du mélangeur et légende d'Usage Claude lisibles. L'infobulle « Processus Windows protégé » s'affiche.
 - **Assistant** : les puces de prompts rapides au-dessus de la saisie sont retirées.
+- **Quick Share** : les téléphones récents qui se disent visibles sans envoyer leur nom apparaissent de nouveau (sous leur nom réseau).
 
 ## 0.4.22 — 2026-10-27
 
