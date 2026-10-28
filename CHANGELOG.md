@@ -4,7 +4,7 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
-## 0.4.23 — à venir
+## 0.4.23 — 2026-10-28
 
 - **Survol et clics plus justes** :
   - un clic sur le titre, la marge ou un séparateur d'un menu contextuel (Apps, Tâches) n'atteint plus ce qu'il y a dessous ;
