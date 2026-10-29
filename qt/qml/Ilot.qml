@@ -268,9 +268,14 @@ Item {
     // un addon desactive alors que son onglet est ouvert : retour a l'accueil
     onTabsChanged: if (!hasTab(currentTab)) currentTab = "home"
 
-    // section ouverte dans Reglages (general, bar, look, pill, sound, pet, game, access,
-    // weather, keys, addons, updates)
-    property string settingsSection: "general"
+    // section ouverte dans Reglages (theme, island, player, pet, alerts, bar,
+    // game, sound, keys, weather, access, addons, updates ; general, look et
+    // pill, les anciens noms, menent a updates, theme et island)
+    property string settingsSection: "theme"
+    // Reglages : modifications pas encore enregistrees (SettingsPage) ; on ne
+    // quitte l'onglet qu'apres Enregistrer ou Annuler
+    property bool settingsDirty: false
+    signal settingsLeaveBlocked()
     function openSettings(section) {
         if (section)
             settingsSection = section
@@ -446,6 +451,8 @@ Item {
         // onglet d'un addon desactive (raccourci, notification...) : accueil
         if (!hasTab(tab))
             tab = "home"
+        if (settingsDirty && currentTab === "settings" && tab !== "settings")
+            return settingsLeaveBlocked()
         tabDir = tabs.indexOf(tab) > tabs.indexOf(currentTab) ? 1 : -1
         if (tab !== currentTab)
             closeSheets()
@@ -1263,12 +1270,14 @@ Item {
         const p = String(s || "0:0").split(":").map(Number)
         return p[0] * 60 + (p[1] || 0)
     }
-    readonly property bool dark: {
-        const m = cfg.mode
+    readonly property bool dark: darkFor(cfg)
+    // mode sombre selon les reglages c (aussi pour l'apercu de Reglages)
+    function darkFor(c) {
+        const m = c.mode
         if (m === "auto")
             return !winLight
         if (m === "time" || m === "sun") {
-            const ab = m === "sun" && sunTimes ? sunTimes : [hmMin(cfg.day), hmMin(cfg.night)]
+            const ab = m === "sun" && sunTimes ? sunTimes : [hmMin(c.day), hmMin(c.night)]
             const a = ab[0], b = ab[1], n = nowMin
             return a <= b ? !(n >= a && n < b) : (n >= b && n < a)
         }
@@ -1294,6 +1303,8 @@ Item {
             return
         const s = Theme.scheme(src, cfg.variant, dark)
         const p = Theme.paletteOf(s)
+        if (dark && cfg.oled)
+            Theme.oled(p, s)
         Theme.applyPalette(p)
         Theme.applyLook(cfg)
         saveUi({ palette: p, light: !dark })

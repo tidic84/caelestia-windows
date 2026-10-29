@@ -1,0 +1,1059 @@
+<title>Réglages repensés</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&family=Silkscreen&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,1,0&display=block">
+<style>
+/* Maquette : Réglages repensés (qt/qml/SettingsPage.qml).
+   Mise en page : en haut, ce qui change ; au centre, le panneau Réglages
+   cliquable (onglets groupés + recherche à gauche, aperçu animé collé en haut
+   des onglets qui en ont un) ; en bas, « où est passé… » et le gel au clic.
+   Palette de Theme.qml (sombre, comme l'îlot) ; l'accent se recalcule quand
+   on choisit une couleur dans Thème. */
+:root{
+  color-scheme:dark;
+  --page:#0e0d11; --surface:#141218; --surfaceC:#211f26; --surfaceHigh:#2b2930; --surfaceHighest:#36343b;
+  --ink:#e6e0e9; --inkVar:#cac4d0; --outline:#938f99; --outlineVar:#49454f;
+  --primary:#cfbdfe; --inkPrimary:#36265d; --primaryC:#4d3d75; --inkPrimaryC:#e9ddff;
+  --secC:#4a4458; --inkSecC:#e8def8;
+  --mark:#ffb68a; --good:#9ad7a4; --warn:#f6c26b; --bad:#ffb4ab;
+  --ui:Rubik,"Segoe UI",system-ui,sans-serif;
+  --pixel:Silkscreen,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 var(--ui);
+  padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
+.ms{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;white-space:nowrap;user-select:none;font-feature-settings:"liga";font-size:20px}
+h1{font-size:26px;font-weight:500;margin:0;text-wrap:balance}
+h2{font-size:18px;font-weight:500;margin:0 0 12px;text-wrap:balance}
+.lead{color:var(--inkVar);margin:6px 0 0;max-width:75ch}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* ce qui change */
+.changes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.chg{background:var(--surface);border-radius:20px;padding:14px 16px;display:flex;gap:12px;min-width:0}
+.chg .ms{color:var(--primary);font-size:22px;margin-top:2px}
+.chg b{font-weight:500;display:block}
+.chg span{color:var(--inkVar);font-size:13px}
+
+/* panneau */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.tgl{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px 0 10px;border-radius:17px;background:var(--surfaceHigh);border:0;cursor:pointer}
+.tgl .sw{width:30px;height:18px;border-radius:9px;background:var(--surfaceHighest);border:1.5px solid var(--outline);position:relative}
+.tgl .sw::after{content:"";position:absolute;left:2px;top:2px;width:11px;height:11px;border-radius:50%;background:var(--outline);transition:transform .25s cubic-bezier(.34,1.36,.5,1)}
+.tgl[aria-pressed="true"] .sw{background:var(--primary);border-color:var(--primary)}
+.tgl[aria-pressed="true"] .sw::after{transform:translateX(12px);background:var(--inkPrimary)}
+.hint{color:var(--inkVar);font-size:12.5px}
+.panel{background:#000;border-radius:34px;padding:16px;display:flex;gap:12px;height:640px;max-width:100%;position:relative;overflow:hidden}
+.content{padding-bottom:76px}
+
+/* brouillon : barre du bas, points « modifié », îlot réel */
+.savebar{position:absolute;left:50%;bottom:16px;z-index:10;width:min(620px,calc(100% - 32px));transform:translate(-50%,140%);opacity:0;
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 8px 8px 18px;border-radius:24px;background:var(--surfaceHighest);
+  box-shadow:0 10px 30px -8px #000;transition:transform .45s cubic-bezier(.34,1.3,.5,1),opacity .2s,background .3s;pointer-events:none}
+.savebar.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+.savebar.alert{background:color-mix(in srgb,var(--bad) 30%,var(--surfaceHighest))}
+.savebar.shake{animation:shake .5s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shake{10%,90%{translate:-2px}20%,80%{translate:4px}30%,50%,70%{translate:-7px}40%,60%{translate:7px}}
+.sbmsg{font-size:13.5px;font-weight:500;flex:1;min-width:180px}
+.sbcount{border:0;background:none;color:var(--primary);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:2px;padding:0}
+.sbbtns{display:flex;gap:6px;margin-left:auto}
+.sbpop{flex-basis:100%;display:flex;flex-direction:column;gap:2px;max-height:180px;overflow-y:auto;padding:4px 0 2px;margin-left:-10px}
+.chgl{border:0;background:none;text-align:left;cursor:pointer;border-radius:12px;padding:5px 10px;display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
+.chgl:hover{background:#ffffff10}
+.chgl span{font-size:13px}
+.chgl small{color:var(--inkVar);font-size:12px;display:flex;align-items:center;gap:4px}
+.chgl small .ms{font-size:14px}
+.chgl b{color:var(--ink);font-weight:500}
+.mdot{display:inline-block;width:7px;height:7px;border-radius:4px;background:var(--mark);margin-left:7px;vertical-align:1px}
+.mdot.nav{margin-left:auto}
+.real{display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:20px;padding:6px 14px 6px 6px;font-size:12px;color:var(--inkVar)}
+.real b{color:var(--ink);font-weight:500;font-size:12.5px}
+.realwall{position:relative;width:232px;height:52px;border-radius:14px;overflow:hidden;background:radial-gradient(120% 140% at 20% 0%,#3a2f5e 0%,#1b1730 60%,#0d0b16 100%)}
+.realwall .isl{top:9px}
+.nav{width:206px;flex:none;display:flex;flex-direction:column;gap:8px;min-height:0}
+.search{display:flex;align-items:center;gap:8px;height:38px;border-radius:19px;background:var(--surfaceC);padding:0 12px;flex:none}
+.search .ms{font-size:19px;color:var(--inkVar)}
+.search input{flex:1;min-width:0;background:none;border:0;color:var(--ink);font:inherit;font-size:13.5px;outline:none}
+.navlist{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:2px;padding-bottom:6px;scrollbar-width:thin}
+.grp{font-size:11px;font-weight:500;letter-spacing:1.2px;text-transform:uppercase;color:var(--outline);padding:12px 12px 4px}
+.grp:first-child{padding-top:4px}
+.nb{display:flex;align-items:center;gap:10px;height:36px;border-radius:18px;padding:0 12px;border:0;background:none;cursor:pointer;text-align:left;color:var(--ink);flex:none}
+.nb .ms{font-size:19px;color:var(--inkVar)}
+.nb:hover{background:var(--surfaceC)}
+.nb.on{background:var(--secC);color:var(--inkSecC);font-weight:500}
+.nb.on .ms{color:var(--inkSecC)}
+.nb .dot{width:8px;height:8px;border-radius:4px;background:var(--bad);margin-left:auto}
+.res{display:flex;flex-direction:column;gap:1px;border-radius:14px;padding:8px 12px;border:0;background:none;text-align:left;cursor:pointer}
+.res:hover{background:var(--surfaceC)}
+.res small{color:var(--outline);font-size:11.5px}
+.res mark{background:none;color:var(--primary)}
+.nores{color:var(--inkVar);font-size:13px;padding:8px 12px}
+
+.content{flex:1;min-width:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin;scroll-behavior:smooth;position:relative}
+.secHead{display:flex;align-items:baseline;gap:10px;padding:2px 4px 0}
+.secHead h3{margin:0;font-size:20px;font-weight:500}
+.secHead span{color:var(--inkVar);font-size:13px}
+
+/* aperçu collé en haut */
+.stage{position:sticky;top:0;z-index:3;border-radius:22px;overflow:hidden;height:190px;flex:none;
+  background:radial-gradient(120% 140% at 20% 0%,#3a2f5e 0%,#1b1730 45%,#0d0b16 100%);box-shadow:0 10px 18px -12px #000}
+.stage.short{height:150px}
+.stage .lbl{position:absolute;left:14px;bottom:10px;font-size:11.5px;color:#ffffffa0;display:flex;align-items:center;gap:6px}
+.stage .lbl .ms{font-size:15px}
+.stage .replay{position:absolute;right:10px;bottom:8px;height:30px;border-radius:15px;border:0;background:#ffffff1c;color:#fff;display:flex;align-items:center;gap:4px;padding:0 12px 0 8px;cursor:pointer;font-size:12.5px}
+.stage .replay .ms{font-size:18px}
+.stage .wallblob{position:absolute;border-radius:50%;filter:blur(30px);opacity:.55}
+
+/* cartes */
+.card{background:var(--surfaceC);border-radius:22px;padding:14px;display:flex;flex-direction:column;flex:none}
+.hd{display:flex;align-items:center;gap:14px;min-height:40px}
+.hd .ic{width:40px;height:40px;border-radius:14px;background:var(--secC);color:var(--inkSecC);display:grid;place-items:center;flex:none}
+.t{font-size:14px;font-weight:500}
+.s{font-size:12px;color:var(--inkVar);line-height:1.35;margin-top:1px}
+.row{border-radius:12px;transition:background .6s}
+.row.flash{background:color-mix(in srgb,var(--primary) 22%,transparent)}
+.tg{display:flex;align-items:center;gap:12px;min-height:44px;padding:8px 0 0 54px}
+.tg>div:first-child{flex:1;min-width:0}
+.tg.off{opacity:.45;pointer-events:none}
+.swi{width:52px;height:32px;border-radius:16px;background:var(--surfaceHighest);border:2px solid var(--outline);position:relative;flex:none;cursor:pointer;padding:0}
+.swi::after{content:"";position:absolute;left:6px;top:6px;width:16px;height:16px;border-radius:8px;background:var(--outline);transition:all .3s cubic-bezier(.34,1.36,.5,1)}
+.swi[aria-checked="true"]{background:var(--primary);border-color:var(--primary)}
+.swi[aria-checked="true"]::after{left:22px;top:2px;width:24px;height:24px;border-radius:12px;background:var(--inkPrimary)}
+.pv{width:32px;height:32px;border-radius:16px;border:0;background:var(--surfaceHigh);color:var(--primary);display:grid;place-items:center;cursor:pointer;flex:none}
+.pv .ms{font-size:18px}
+.pv:hover{background:var(--surfaceHighest)}
+.sub{font-size:12px;font-weight:500;color:var(--inkVar);padding:14px 0 0 54px;display:flex;align-items:center;gap:8px}
+.flow{display:flex;flex-wrap:wrap;gap:6px;padding:8px 0 0 54px}
+.chip{height:30px;border-radius:15px;padding:0 12px;background:var(--surfaceHigh);font-size:12.5px;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip:hover{background:var(--surfaceHighest)}
+.chip.on{background:var(--secC);color:var(--inkSecC)}
+.chip.on::before{content:"check";font-family:"Material Symbols Rounded";font-size:16px;font-feature-settings:"liga"}
+.swatch{width:30px;height:30px;border-radius:15px;border:0;cursor:pointer;padding:0}
+.swatch.on{box-shadow:0 0 0 2px var(--surfaceC),0 0 0 4px var(--primary)}
+.note{font-size:12.5px;color:var(--inkVar);padding:10px 0 0 54px;display:flex;gap:8px;align-items:flex-start}
+.note .ms{font-size:17px;color:var(--primary);margin-top:1px}
+.note a{color:var(--primary);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;padding:10px 0 0 54px}
+.btn{height:34px;border-radius:17px;border:0;padding:0 16px;background:var(--primaryC);color:var(--inkPrimaryC);cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.btn.ghost{background:var(--surfaceHigh);color:var(--ink)}
+.btn .ms{font-size:18px}
+.line{display:flex;align-items:center;gap:10px;padding:8px 0 0 54px;font-size:13px}
+.line .k{margin-left:auto;font-size:12px;background:var(--surfaceHigh);border-radius:8px;padding:3px 8px;color:var(--inkVar);font-variant-numeric:tabular-nums}
+.field{margin:8px 0 0 54px;height:38px;border-radius:12px;background:var(--surfaceHigh);display:flex;align-items:center;padding:0 12px;color:var(--outline);font-size:13px;gap:8px}
+.moved{display:none;font-size:10.5px;font-weight:500;letter-spacing:.3px;color:var(--mark);border:1px solid color-mix(in srgb,var(--mark) 45%,transparent);border-radius:8px;padding:0 6px;white-space:nowrap;line-height:17px}
+.showMoved .moved{display:inline-block}
+.showMoved .hd .moved{margin-left:auto}
+
+/* ---------- îlot d'aperçu ---------- */
+.isl{position:absolute;left:50%;top:16px;transform:translateX(-50%);width:180px;height:34px;border-radius:17px;
+  transition:width var(--dur,.5s) var(--ease,ease),height var(--dur,.5s) var(--ease,ease),border-radius var(--dur,.5s) var(--ease,ease);
+  --pc:#211f26;color:#fff}
+.isl .bgl{position:absolute;inset:0;border-radius:inherit;background:var(--pc);overflow:hidden}
+.isl.bg-black{--pc:#000}
+.isl.bg-glass .bgl{background:#1d1b2399;backdrop-filter:blur(14px)}
+.isl.bg-clear .bgl{background:#ffffff14;backdrop-filter:blur(4px)}
+.isl.bg-wall .bgl{background:linear-gradient(135deg,#4a3f6bcc,#2b2540cc);backdrop-filter:blur(18px) saturate(1.6)}
+.isl.bg-aurora .bgl{background:#0b0a12}
+.isl.bg-aurora .bgl::before,.isl.bg-aurora .bgl::after{content:"";position:absolute;width:70%;height:160%;top:-30%;border-radius:50%;filter:blur(16px);opacity:.75;animation:aur 7s ease-in-out infinite alternate}
+.isl.bg-aurora .bgl::before{left:-10%;background:#3ad6a2}
+.isl.bg-aurora .bgl::after{right:-10%;background:var(--primaryC);animation-delay:-3s}
+@keyframes aur{to{transform:translateX(35%) scaleY(.7)}}
+.isl.bd-line .bgl{box-shadow:inset 0 0 0 1px #ffffff40}
+.isl.bd-glow{box-shadow:0 0 16px 2px color-mix(in srgb,var(--primary) 60%,transparent)}
+.isl.bd-pulse{animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 18px 4px color-mix(in srgb,var(--primary) 70%,transparent)}}
+@property --a{syntax:"<angle>";inherits:false;initial-value:0deg}
+.isl.bd-rgb::before{content:"";position:absolute;inset:-2px;border-radius:inherit;padding:2px;
+  background:conic-gradient(from var(--a),#ff5f6d,#ffc371,#47e891,#3ab0ff,#b06bff,#ff5f6d);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:spin 3s linear infinite}
+@keyframes spin{to{--a:360deg}}
+.isl .closed{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 12px;transition:opacity .2s}
+.isl .closed .ms{font-size:16px;opacity:.8}
+.isl.open .closed{opacity:0}
+.isl .opened{position:absolute;inset:0;padding:16px;display:flex;gap:14px;align-items:center;opacity:0;transition:opacity .15s}
+.isl.open .opened{opacity:1;transition-delay:calc(var(--dur,.5s)*.45)}
+.isl .art{width:88px;height:88px;border-radius:22px;flex:none;background:linear-gradient(135deg,#ff9a8b,#a855f7 60%,#3b2a73)}
+.isl .meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.isl .meta b{font-weight:500;font-size:15px}
+.isl .meta i{font-style:normal;font-size:12px;opacity:.7}
+.isl .meta .bar{height:4px;border-radius:2px;background:#ffffff30;margin-top:10px;overflow:hidden}
+.isl .meta .bar::after{content:"";display:block;width:42%;height:100%;background:var(--primary)}
+.clk{font-weight:600;font-size:14px;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:1px}
+.clk.neon{color:var(--primary);text-shadow:0 0 6px var(--primary),0 0 14px var(--primary);animation:flick 4s infinite}
+@keyframes flick{0%,92%,100%{opacity:1}93%{opacity:.5}95%{opacity:1}96%{opacity:.6}}
+.clk.pixel{font-family:var(--pixel);font-weight:400;font-size:13px;letter-spacing:1px}
+.flp{display:inline-grid;place-items:center;width:13px;height:20px;border-radius:4px;background:#ffffff1f;font-size:13px;margin:0 1px;position:relative}
+.flp.go{animation:flip .5s cubic-bezier(.4,0,.2,1)}
+@keyframes flip{0%{transform:rotateX(0)}50%{transform:rotateX(90deg)}100%{transform:rotateX(0)}}
+.ana{width:22px;height:22px}
+.ana .mh{transform-origin:11px 11px;animation:rot 6s linear infinite}
+.ana .hh{transform-origin:11px 11px;animation:rot 72s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.isl.size-s{width:150px;height:30px}
+.isl.size-l{width:212px;height:40px}
+.isl.shape-pill{border-radius:20px}
+.isl.shape-square{border-radius:9px}
+.isl.open{width:340px!important;height:124px!important;border-radius:28px}
+.isl.open.shape-pill{border-radius:44px}
+.isl.open.shape-square{border-radius:14px}
+
+/* démos des alertes */
+.isl .demo{position:absolute;inset:0;display:flex;align-items:center;gap:10px;padding:0 12px;opacity:0;transition:opacity .2s;font-size:13px}
+.isl.demoing .closed{opacity:0}
+.isl .demo.show{opacity:1;transition-delay:calc(var(--dur,.5s)*.4)}
+.isl .demo .av{width:28px;height:28px;border-radius:14px;background:#5865f2;display:grid;place-items:center;flex:none}
+.isl .demo .av .ms{font-size:16px}
+.osdbar{flex:1;height:8px;border-radius:4px;background:#ffffff30;overflow:hidden}
+.osdbar i{display:block;height:100%;width:30%;background:var(--primary);transition:width .9s cubic-bezier(.2,0,0,1)}
+.privdot{position:absolute;right:-12px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:4px;background:var(--good);opacity:0;transition:opacity .3s}
+.privdot.cam{background:var(--good);opacity:1}
+.privdot.mic{background:var(--warn);opacity:1}
+.rain{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .4s}
+.rain.on{opacity:1}
+.rain i{position:absolute;top:-8px;width:1.5px;height:7px;border-radius:1px;background:#9fd3ff;animation:drop 1s linear infinite}
+@keyframes drop{to{transform:translateY(48px)}}
+
+/* thèmes prêts */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:10px 0 0 54px}
+.pcard{border:0;border-radius:18px;background:var(--surfaceHigh);padding:6px 6px 10px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:4px;min-width:0;transition:background .2s}
+.pcard:hover{background:var(--surfaceHighest)}
+.pcard.on{box-shadow:inset 0 0 0 2px var(--primary)}
+.pwall{position:relative;height:64px;border-radius:13px;overflow:hidden;display:block;margin-bottom:4px}
+.pwall .isl.pmini{top:10px;width:116px;height:26px;transition:width .5s cubic-bezier(.34,1.45,.5,1),height .5s cubic-bezier(.34,1.45,.5,1)}
+.pcard:hover .isl.pmini{width:138px;height:42px}
+.pwall .isl.pmini .closed{padding:0 9px}
+.pwall .isl.pmini .clk{font-size:11.5px}
+.pwall .isl.pmini .clk.pixel{font-size:10px}
+.pwall .isl.pmini .flp{width:10px;height:16px;font-size:10.5px}
+.pwall .isl.pmini .ana{width:17px;height:17px}
+.pname{font-size:13px;font-weight:500;padding:0 6px;display:flex;align-items:center;gap:4px}
+.pname .ms{font-size:16px;color:var(--primary)}
+.pdesc{font-size:11.5px;color:var(--inkVar);padding:0 6px;line-height:1.3}
+.pdots{display:flex;align-items:center;gap:3px;padding:2px 6px 0}
+.pdots i{width:10px;height:10px;border-radius:5px}
+.pdots small{margin-left:5px;font-size:10.5px;color:var(--outline);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:760px){.pgrid{padding-left:0}}
+
+/* lecteur */
+.pl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:28px;padding:16px;flex-wrap:wrap}
+.mini{width:216px;height:38px;border-radius:19px;background:#000;display:flex;align-items:center;gap:8px;padding:0 6px;position:relative}
+.disc{width:28px;height:28px;border-radius:14px;flex:none;position:relative;display:grid;place-items:center}
+.disc .d{width:22px;height:22px;border-radius:11px;background:conic-gradient(#ff9a8b,#a855f7,#3b2a73,#ff9a8b)}
+.disc .d.spin{animation:rot 4s linear infinite}
+.disc svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.mini .tx{flex:1;min-width:0;font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini .tx.ly{color:var(--primary);animation:lyr .5s ease}
+@keyframes lyr{from{opacity:0;transform:translateY(6px)}}
+.mini .eq{display:flex;gap:2px;align-items:flex-end;height:14px}
+.mini .eq i{width:3px;background:var(--primary);border-radius:2px;animation:eq .9s ease-in-out infinite alternate}
+@keyframes eq{from{height:3px}to{height:14px}}
+.bigp{display:flex;flex-direction:column;align-items:center;gap:12px;width:280px;max-width:100%}
+.pbtn{width:76px;height:76px;position:relative;display:grid;place-items:center;border:0;background:none;cursor:pointer;padding:0}
+.pbtn svg{position:absolute;inset:0;width:100%;height:100%;transition:filter .3s}
+.pbtn .shape{transform-origin:50% 50%;transition:d .45s cubic-bezier(.34,1.3,.5,1)}
+.pbtn.spin .shape{animation:rot 9s linear infinite}
+.pbtn .ms{position:relative;font-size:34px;transition:color .2s}
+.pbtn .ms.pop{animation:pop .35s cubic-bezier(.34,1.8,.5,1)}
+@keyframes pop{40%{transform:scale(.75)}}
+.wave{width:100%;height:26px;overflow:visible}
+
+/* compagnon */
+.petStage{position:absolute;inset:0}
+.ground{position:absolute;left:0;right:0;bottom:34px;height:2px;background:#ffffff18}
+.pet{position:absolute;bottom:36px;left:50%;width:54px;height:46px;margin-left:-27px}
+.pet.walk{animation:walk 7s ease-in-out infinite}
+@keyframes walk{0%,100%{transform:translateX(-140px)}50%{transform:translateX(140px)}}
+.pet .body{position:absolute;inset:0;border-radius:50% 50% 44% 44%/62% 62% 38% 38%;background:var(--petc,#8fd18f);animation:bob 1.2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-4px) scaleY(1.04)}}
+.pet .eye{position:absolute;top:16px;width:6px;height:8px;border-radius:3px;background:#1a1a1a;animation:blink 4s infinite}
+.pet .eye.l{left:15px}.pet .eye.r{right:15px}
+.pet.eyes-big .eye{width:9px;height:11px;top:14px}
+.pet.eyes-sleepy .eye{height:2px;top:20px;animation:none}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+.pet .hat{position:absolute;left:50%;top:-14px;transform:translateX(-50%);display:none}
+.pet.hat-party .hat.party{display:block;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-bottom:18px solid #ff8fb1}
+.pet.hat-crown .hat.crown{display:block;width:22px;height:12px;top:-8px;background:#f6c26b;clip-path:polygon(0 100%,0 20%,25% 60%,50% 0,75% 60%,100% 20%,100% 100%)}
+.pet.hat-cap .hat.cap{display:block;width:30px;height:10px;top:-6px;border-radius:12px 12px 2px 2px;background:#5b8def}
+.trail{position:absolute;bottom:40px;width:5px;height:5px;border-radius:50%;background:#fff;opacity:0;animation:spark 1s ease-out forwards}
+@keyframes spark{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:translateY(-14px) scale(.3)}}
+
+/* thème */
+.th{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:16px;padding:16px}
+.mp{width:300px;max-width:100%;border-radius:22px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--mpBg);color:var(--mpInk);transition:background .4s,color .4s}
+.mp .tabs{display:flex;gap:4px}
+.mp .tabs i{height:24px;flex:1;border-radius:12px;background:var(--mpC)}
+.mp .tabs i.on{background:var(--mpSec)}
+.mp .rw{display:flex;align-items:center;gap:10px;background:var(--mpC);border-radius:14px;padding:8px 10px;font-size:12.5px}
+.mp .rw .sw2{margin-left:auto;width:36px;height:22px;border-radius:11px;background:var(--mpPri);position:relative}
+.mp .rw .sw2::after{content:"";position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:8px;background:var(--mpOnPri)}
+.mp .sl{height:6px;border-radius:3px;background:var(--mpC2);position:relative}
+.mp .sl::before{content:"";position:absolute;left:0;top:0;bottom:0;width:62%;border-radius:3px;background:var(--mpPri)}
+
+/* tableau « où est passé » et gel */
+.tblwrap{overflow-x:auto;background:var(--surface);border-radius:20px}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:13.5px}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--outlineVar)}
+th{font-size:11.5px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--outline)}
+tr:last-child td{border-bottom:0}
+td .ms{font-size:16px;vertical-align:-3px;color:var(--outline)}
+.freeze{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.fz{background:var(--surface);border-radius:20px;padding:16px 18px;min-width:0}
+.fz h3{margin:0 0 8px;font-size:15px;font-weight:500;display:flex;gap:8px;align-items:center}
+.fz h3 .ms{color:var(--primary)}
+.fz ul,.fz ol{margin:0;padding-left:20px;color:var(--inkVar);font-size:13.5px;display:flex;flex-direction:column;gap:6px}
+.fz code{font-size:12.5px;background:var(--surfaceHigh);border-radius:6px;padding:1px 5px;color:var(--ink)}
+
+@media (max-width:760px){
+  .panel{flex-direction:column;height:auto;padding:10px;border-radius:26px}
+  .nav{width:auto}
+  .navlist{flex-direction:row;overflow-x:auto;overflow-y:hidden;flex:none}
+  .grp{display:none}
+  .nb{white-space:nowrap}
+  .content{max-height:640px}
+  .tg,.flow,.sub,.note,.btns,.line{padding-left:0}
+  .field{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:0s!important;animation-iteration-count:1!important}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Réglages repensés</h1>
+    <p class="lead">Maquette cliquable du panneau Réglages. Les onglets sont rangés en trois groupes, une recherche couvre tous les réglages, et les choix visuels ont un aperçu animé qui suit ce que tu cliques. Les étiquettes orange montrent ce qui a changé de place.</p>
+  </header>
+
+  <section class="changes" aria-label="Ce qui change">
+    <div class="chg"><span class="ms">folder_open</span><div><b>3 groupes au lieu d'une liste</b><span>Personnaliser, Comportement, Système. Chaque onglet dit à quoi il sert.</span></div></div>
+    <div class="chg"><span class="ms">search</span><div><b>Recherche</b><span>Tape « horloge », « Discord » ou « plein écran » : on saute au bon réglage, surligné.</span></div></div>
+    <div class="chg"><span class="ms">animation</span><div><b>Aperçus animés</b><span>Îlot et pilule, Lecteur, Thème, Compagnon, Alertes. L'aperçu reste collé en haut pendant qu'on défile.</span></div></div>
+    <div class="chg"><span class="ms">save</span><div><b>Enregistrer ou annuler</b><span>Comme sur Discord : les changements attendent dans une barre en bas. Rien ne bouge avant Enregistrer.</span></div></div>
+    <div class="chg"><span class="ms">auto_awesome</span><div><b>Thèmes prêts refaits</b><span>13 thèmes en cartes, chacun avec sa pilule en aperçu. Ils règlent aussi l'horloge et les animations.</span></div></div>
+    <div class="chg"><span class="ms">call_split</span><div><b>Apparence éclatée</b><span>Ses 8 cartes vont dans Thème, Îlot et pilule, et Lecteur. L'onglet Pilule disparaît, ses réglages rejoignent Îlot et pilule ou Alertes.</span></div></div>
+  </section>
+
+  <section>
+    <div class="toolbar">
+      <div class="real" id="real"><div class="realwall"><div class="isl" id="realIsl"></div></div><div><b>Ton îlot</b><br><span id="realNote">Réglages enregistrés</span></div></div>
+      <button class="tgl" id="tMoved" aria-pressed="true"><span class="sw"></span>Montrer ce qui a bougé</button>
+      <button class="tgl" id="quit" style="padding-left:12px"><span class="ms" style="font-size:18px">logout</span>Essayer de quitter Réglages</button>
+      <span class="hint">Clique les puces : l'aperçu change, pas ton îlot. Enregistre pour l'appliquer, ou Ctrl+S.</span>
+    </div>
+    <div class="panel showMoved" id="panel">
+      <div class="savebar" id="savebar" role="status">
+        <span class="sbmsg">Des modifications ne sont pas enregistrées.</span>
+        <button class="sbcount" id="sbCount" aria-expanded="false">0 changement</button>
+        <span class="sbbtns"><button class="btn ghost" id="sbCancel">Annuler</button><button class="btn" id="sbSave">Enregistrer</button></span>
+        <div class="sbpop" id="sbPop" hidden></div>
+      </div>
+      <nav class="nav" aria-label="Onglets des réglages">
+        <label class="search"><span class="ms">search</span><input id="q" type="search" placeholder="Rechercher un réglage" autocomplete="off"></label>
+        <div class="navlist" id="navlist"></div>
+      </nav>
+      <div class="content" id="content"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Enregistrer ou annuler</h2>
+    <div class="freeze">
+      <div class="fz">
+        <h3><span class="ms">edit_note</span>Comment ça marche</h3>
+        <ul>
+          <li>Chaque choix (puce, interrupteur, couleur, thème prêt) va dans un brouillon. Les aperçus le montrent, l'îlot sur ton écran ne change pas.</li>
+          <li>Une barre en bas compte les changements. Un clic sur le nombre les liste (avant → après) et mène à l'onglet de chacun.</li>
+          <li>Un point orange marque les réglages modifiés, et les onglets qui en contiennent.</li>
+          <li><b>Enregistrer</b> (ou Ctrl+S) applique tout d'un coup. <b>Annuler</b> remet les valeurs enregistrées.</li>
+        </ul>
+      </div>
+      <div class="fz">
+        <h3><span class="ms">rule</span>Cas particuliers</h3>
+        <ul>
+          <li>Changer d'onglet dans Réglages garde le brouillon.</li>
+          <li>Aller sur un autre onglet de l'îlot avec un brouillon : la barre tremble et passe au rouge, comme sur Discord. Il faut enregistrer ou annuler.</li>
+          <li>Fermer l'îlot (clic ailleurs) garde le brouillon : la barre est là à la réouverture.</li>
+          <li>Les actions restent immédiates : Exporter, Importer, Rechercher une mise à jour, Tester le son, Voir une scène, Installer les hooks.</li>
+          <li>Touche Windows : l'invite administrateur s'ouvre au moment d'enregistrer.</li>
+        </ul>
+      </div>
+      <div class="fz">
+        <h3><span class="ms">code</span>Dans le code</h3>
+        <ul>
+          <li>Aujourd'hui, chaque clic appelle <code>Ilot.setCfg</code>. Demain, la page lit et écrit un objet <code>draft</code> (<code>Ilot.cfg</code> + changements).</li>
+          <li><code>Enregistrer</code> envoie les changements en un seul <code>Ilot.setCfg(patch)</code>.</li>
+          <li>Les aperçus lisent <code>draft</code> et calculent leurs couleurs avec <code>Theme.scheme</code>, sans toucher au thème de l'appli.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Où est passé…</h2>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Réglage</th><th>Avant</th><th>Maintenant</th></tr></thead>
+      <tbody id="moves"></tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Le petit gel au clic sur Réglages</h2>
+    <div class="freeze">
+      <div class="fz">
+        <h3><span class="ms">troubleshoot</span>Cause probable (à mesurer)</h3>
+        <ul>
+          <li>Le <code>Loader</code> de <code>Panel.qml</code> crée la page à la première ouverture, de façon synchrone.</li>
+          <li><code>SettingsPage.qml</code> fait 3 068 lignes et construit d'un coup les ≈ 30 cartes des 12 onglets, l'aperçu du compagnon compris. Chaque <code>Block</code> est seulement masqué (<code>visible: sec === page.section</code>).</li>
+          <li>À l'affichage, <code>load()</code> lance aussi 5 appels Rust : <code>settings_get</code>, <code>winkey_status</code>, <code>changelog</code>, <code>update_get</code>, <code>cc_hooks_status</code>.</li>
+        </ul>
+      </div>
+      <div class="fz">
+        <h3><span class="ms">bolt</span>Correctif proposé</h3>
+        <ol>
+          <li>Un fichier par onglet (<code>qt/qml/settings/Theme.qml</code>…) chargé par un <code>Loader</code> à la première visite, puis gardé. Ça va avec la nouvelle organisation.</li>
+          <li><code>asynchronous: true</code> sur ces Loaders, avec un fond vide le temps d'un cadre.</li>
+          <li>Chaque appel Rust part avec son onglet : <code>changelog</code> et <code>update_get</code> dans Démarrage et mises à jour, <code>winkey_status</code> dans Clavier, <code>cc_hooks_status</code> dans Addons.</li>
+          <li>Les aperçus n'animent que s'ils sont visibles (<code>running: visible</code>).</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+
+// état des réglages (valeurs par défaut de SettingsPage.qml)
+const st = {
+  color: "auto", variant: "tonalspot", mode: "auto", win_accent: false, win_mode: false, rotate_min: 0, oled: false,
+  shape: "round", island_bg: "solid", border: "none", pill_size: "m", clock: "digital", anim: "normal",
+  player_color: "art", player_btn: "cookie", player_btn_color: "auto", player_btn_ink: "auto",
+  player_btn_spin: true, player_btn_morph: true, player_btn_pop: true, player_btn_glow: true,
+  player_bar: "wave", player_bar_size: "normal", player_bar_amp: "normal",
+  player_mini_ring: true, player_mini_spin: true, player_mini_lyrics: false, player_swipe: false, player_wheel: false,
+  player_layout: "col", player_art: "scallop", player_spectrum: true, media_bg: "art", media_blur: "medium", media_drift: true, media_dim: "normal",
+  pet: "blob", pet_color: "nature", pet_eyes: "dot", pet_hat: "none", pet_walk: true, pet_afk: 90, pet_size: "m", pet_trail: "sparkle",
+  notif_popups: true, osd: true, activity: true, dc_pill: true, privacy: true, wxfx: true,
+  bar: true, hide_taskbar: true, bar_islands: false, bar_tasks: true, bar_titles: true, bar_autohide: false, monitor: "auto", fs_hide: "normal",
+  game_mode: true, game_perf: false, game_notif: false, match_alert: true, valorant: true, away: "on",
+  autostart: true, update_mode: "notify", win_key: true,
+  text_size: 100, contrast: "normal", motion: "system", cvd: "off", cc_on: true, cc_sound: true
+};
+const swatches = ["#6750a4","#3f51b5","#1e88e5","#00bcd4","#00897b","#43a047","#c0ca33","#fbc02d","#fb8c00","#e53935","#d81b60","#8e24aa","#795548","#607d8b"];
+// thèmes prêts : en plus de la couleur, du style, du mode, du fond, du
+// contour et de la forme, ils règlent l'horloge et les animations. Ils ne
+// touchent ni au lecteur, ni au compagnon, ni à la taille de la pilule.
+// 4e champ facultatif : fond d'écran de la carte (OLED : noir)
+const presets = [
+  ["Ardoise", { color: "#78909c", variant: "tonalspot", mode: "dark", island_bg: "solid", border: "none", shape: "round", clock: "digital", anim: "normal" }, "Gris-bleu opaque, horloge classique"],
+  ["Brume", { color: "#78909c", variant: "neutral", mode: "dark", island_bg: "wall", border: "line", shape: "round", clock: "digital", anim: "calm" }, "Gris-bleu sur acrylique"],
+  ["OLED", { color: "#78909c", variant: "neutral", mode: "dark", island_bg: "black", oled: true, border: "none", shape: "round", clock: "digital", anim: "normal" }, "Noir 100 %, cartes noires, pour écran OLED", "#000"],
+  ["Minuit", { color: "#3949ab", variant: "tonalspot", mode: "dark", island_bg: "black", border: "line", shape: "round", clock: "digital", anim: "normal" }, "Bleu nuit, noir pur"],
+  ["Aurore", { color: "#26a69a", variant: "expressive", mode: "dark", island_bg: "aurora", border: "glow", shape: "pill", clock: "digital", anim: "soft" }, "Fond animé, lueur"],
+  ["Néon", { color: "#ff2d95", variant: "vibrant", mode: "dark", island_bg: "black", border: "rgb", shape: "pill", clock: "neon", anim: "fast" }, "Arc-en-ciel, horloge néon"],
+  ["Coucher de soleil", { color: "#ff7043", variant: "expressive", mode: "dark", island_bg: "wall", border: "glow", shape: "round", clock: "flip", anim: "normal" }, "Acrylique chaud, volets"],
+  ["Forêt", { color: "#2e7d32", variant: "tonalspot", mode: "dark", island_bg: "solid", border: "none", shape: "round", clock: "analog", anim: "soft" }, "Vert profond, aiguilles"],
+  ["Glace", { color: "#4fc3f7", variant: "tonalspot", mode: "light", island_bg: "clear", border: "line", shape: "pill", clock: "digital", anim: "calm" }, "Clair et transparent"],
+  ["Papier", { color: "#8d6e63", variant: "neutral", mode: "light", island_bg: "solid", border: "line", shape: "square", clock: "analog", anim: "calm" }, "Clair, carré, sans rebond"],
+  ["Bonbon", { color: "#f48fb1", variant: "rainbow", mode: "light", island_bg: "glass", border: "glow", shape: "pill", clock: "flip", anim: "soft" }, "Pastel, tout en douceur"],
+  ["Rétro", { color: "#c0ca33", variant: "fruitsalad", mode: "dark", island_bg: "solid", border: "pulse", shape: "square", clock: "pixel", anim: "fast" }, "Pixel, pulsation"],
+  ["Monochrome", { color: "#9e9e9e", variant: "monochrome", mode: "dark", island_bg: "black", border: "none", shape: "pill", clock: "digital", anim: "calm" }, "Gris, sans couleur"]
+];
+// thème prêt dont tous les réglages correspondent ; sinon le dernier appliqué
+let lastPreset = -1;
+const presetOn = () => presets.findIndex(p => Object.keys(p[1]).every(k => String(st[k]) === String(p[1][k])));
+const MODE_L = { auto: "Comme Windows", dark: "Sombre", light: "Clair" };
+const BG_L = { solid: "Opaque", black: "Noir pur", glass: "Translucide", clear: "Transparent", wall: "Acrylique", aurora: "Aurore" };
+
+// ---------------------------------------------------------- contenu
+// row : tg (interrupteur), ch (puces), sw (couleurs), note, btns, line, field, pre (puces de préréglages)
+// mv : ancien onglet (étiquette orange) ; demo : démo jouée dans l'aperçu
+const S = [
+ { group: "Personnaliser", items: [
+  { id: "theme", icon: "palette", label: "Thème", sub: "Couleurs, clair ou sombre, fond d'écran", stage: "theme", cards: [
+    { icon: "auto_awesome", title: "Thèmes prêts", s: "Tout l'aspect de l'îlot en un clic. Survole un thème pour voir sa pilule s'ouvrir", rows: [{ t: "pre" }] },
+    { icon: "colorize", title: "Couleurs", mv: "Apparence", rows: [
+      { t: "sw", title: "Couleur d'accent" },
+      { t: "ch", k: "variant", title: "Style de la palette", o: [["neutral","Neutre"],["tonalspot","Tonal"],["vibrant","Vif"],["expressive","Expressif"],["fruitsalad","Salade de fruits"],["monochrome","Monochrome"]] },
+      { t: "ch", k: "mode", title: "Clair ou sombre", o: [["auto","Comme Windows"],["dark","Sombre"],["light","Clair"],["time","Selon l'heure"],["sun","Lever / coucher du soleil"]] } ] },
+    { icon: "desktop_windows", title: "Windows", s: "Appliquer l'îlot au reste du système", rows: [
+      { t: "tg", k: "win_accent", title: "Appliquer la couleur d'accent à Windows" },
+      { t: "tg", k: "win_mode", title: "Appliquer le mode clair / sombre à Windows" } ] },
+    { icon: "wallpaper", title: "Fond d'écran", mv: "Apparence", rows: [
+      { t: "ch", k: "rotate_min", title: "Changer de fond automatiquement", o: [[0,"Jamais"],[15,"15 min"],[30,"30 min"],[60,"1 h"],[180,"3 h"],[1440,"1 jour"]] } ] } ] },
+  { id: "island", icon: "pill", label: "Îlot et pilule", sub: "Forme, matière, horloge, animations", stage: "island", cards: [
+    { icon: "rounded_corner", title: "Forme et matière", mv: "Apparence", rows: [
+      { t: "ch", k: "shape", title: "Forme", o: [["round","Arrondie"],["pill","Pilule"],["square","Carrée"]] },
+      { t: "ch", k: "island_bg", title: "Fond", o: [["solid","Opaque"],["black","Noir pur"],["glass","Translucide"],["clear","Très transparent"],["wall","Acrylique"],["aurora","Aurore boréale"]] },
+      { t: "tg", k: "oled", title: "Cartes noires (OLED)" },
+      { t: "ch", k: "border", title: "Contour", o: [["none","Aucun"],["line","Liseré"],["glow","Lueur"],["rgb","Arc-en-ciel"],["pulse","Pulsation"]] } ] },
+    { icon: "schedule", title: "Pilule repliée", mv: "Pilule", rows: [
+      { t: "ch", k: "pill_size", title: "Taille", o: [["s","Petite"],["m","Moyenne"],["l","Grande"]] },
+      { t: "ch", k: "clock", title: "Horloge", o: [["digital","Classique"],["flip","À volets"],["analog","À aiguilles"],["neon","Néon"],["pixel","Pixel"]] } ] },
+    { icon: "animation", title: "Animations", s: "L'aperçu ouvre et ferme l'îlot en boucle", mv: "Apparence", rows: [
+      { t: "ch", k: "anim", title: "Vitesse et rebond", o: [["normal","Normale"],["fast","Rapide"],["soft","Douce"],["calm","Sans rebond"],["off","Instantanée"]] },
+      { t: "note", motion: true } ] } ] },
+  { id: "player", icon: "music_note", label: "Lecteur", sub: "Bouton, barre, pilule, onglet Média", stage: "player", cards: [
+    { icon: "palette", title: "Couleur du lecteur", mv: "Apparence", rows: [
+      { t: "ch", k: "player_color", title: "", o: [["art","Pochette"],["theme","Thème"]] } ] },
+    { icon: "play_circle", title: "Bouton lecture", s: "Clique le bouton de l'aperçu pour l'essayer", mv: "Apparence", rows: [
+      { t: "ch", k: "player_btn", title: "Forme", o: [["cookie","Festonné"],["round","Rond"],["none","Icône seule"]] },
+      { t: "ch", k: "player_btn_color", title: "Couleur", o: [["auto","Auto"],["player","Couleur du lecteur"],["white","Blanc"],["fixed","Couleur fixe"]] },
+      { t: "ch", k: "player_btn_ink", title: "Couleur de l'icône", o: [["auto","Auto"],["white","Blanche"],["black","Noire"]] },
+      { t: "tg", k: "player_btn_spin", title: "Rotation pendant la lecture", dis: () => st.player_btn !== "cookie" },
+      { t: "tg", k: "player_btn_morph", title: "Change de forme entre pause et lecture", dis: () => st.player_btn !== "cookie" },
+      { t: "tg", k: "player_btn_pop", title: "Petit rebond de l'icône au clic" },
+      { t: "tg", k: "player_btn_glow", title: "Ombre colorée", dis: () => st.player_btn === "none" } ] },
+    { icon: "linear_scale", title: "Barre de progression", mv: "Apparence", rows: [
+      { t: "ch", k: "player_bar", title: "Style", o: [["wave","Ondulée"],["flat","Plate"]] },
+      { t: "ch", k: "player_bar_size", title: "Épaisseur", o: [["thin","Fine"],["normal","Normale"],["thick","Épaisse"]] },
+      { t: "ch", k: "player_bar_amp", title: "Amplitude de l'onde", o: [["low","Faible"],["normal","Normale"],["high","Forte"]], dis: () => st.player_bar === "flat" } ] },
+    { icon: "album", title: "Dans la pilule", mv: "Apparence", rows: [
+      { t: "tg", k: "player_mini_ring", title: "Anneau de progression autour du disque" },
+      { t: "tg", k: "player_mini_spin", title: "Le disque tourne pendant la lecture" },
+      { t: "tg", k: "player_mini_lyrics", title: "Paroles synchronisées dans la pilule" },
+      { t: "tg", k: "player_swipe", title: "Glisser la pochette pour changer de titre" },
+      { t: "tg", k: "player_wheel", title: "Molette : volume de l'appli qui joue" } ] },
+    { icon: "queue_music", title: "Onglet Média", mv: "Apparence", rows: [
+      { t: "ch", k: "player_layout", title: "Disposition", o: [["col","Colonne (paroles à droite)"],["side","Côte à côte (paroles en bas)"]] },
+      { t: "ch", k: "player_art", title: "Forme de la pochette", o: [["round","Arrondie"],["scallop","Festonnée"],["disc","Ronde"]] },
+      { t: "tg", k: "player_spectrum", title: "Spectre autour de la pochette" },
+      { t: "ch", k: "media_bg", title: "Type de fond", o: [["art","Pochette floutée"],["color","Couleur"],["gradient","Dégradé"],["none","Aucun"]] },
+      { t: "ch", k: "media_blur", title: "Flou", o: [["low","Léger"],["medium","Moyen"],["high","Fort"]], dis: () => st.media_bg !== "art" },
+      { t: "tg", k: "media_drift", title: "Le fond dérive lentement", dis: () => st.media_bg !== "art" },
+      { t: "ch", k: "media_dim", title: "Assombrissement en bas", o: [["light","Léger"],["normal","Normal"],["strong","Fort"]] } ] } ] },
+  { id: "pet", icon: "emoji_emotions", label: "Compagnon", sub: "Espèce, tenue, promenades", stage: "pet", cards: [
+    { icon: "pets", title: "Compagnon", rows: [
+      { t: "ch", k: "pet", title: "Espèce", o: [["blob","Blob"],["cat","Chat"],["ghost","Fantôme"],["bunny","Lapin"],["frog","Grenouille"],["penguin","Pingouin"],["off","Masqué"]] },
+      { t: "field", title: "Nom", ph: "Pixel" },
+      { t: "ch", k: "pet_color", title: "Couleur", o: [["nature","Naturelle"],["theme","Thème"],["pink","Rose"],["sky","Ciel"]] },
+      { t: "ch", k: "pet_eyes", title: "Yeux", o: [["dot","Points"],["big","Grands"],["sleepy","Endormis"]] },
+      { t: "ch", k: "pet_hat", title: "Chapeau", o: [["none","Aucun"],["party","Fête"],["crown","Couronne"],["cap","Casquette"]] } ] },
+    { icon: "directions_walk", title: "Promenades", rows: [
+      { t: "tg", k: "pet_walk", title: "Il se promène quand tu ne fais rien", s: "Au-dessus de la barre des tâches" },
+      { t: "ch", k: "pet_afk", title: "Au bout de", o: [[30,"30 s"],[90,"1 min 30"],[180,"3 min"],[300,"5 min"]], dis: () => !st.pet_walk },
+      { t: "ch", k: "pet_trail", title: "Traînée derrière lui", o: [["none","Aucune"],["sparkle","Étincelles"],["hearts","Cœurs"],["bubbles","Bulles"]], dis: () => !st.pet_walk } ] } ] } ] },
+ { group: "Comportement", items: [
+  { id: "alerts", icon: "notifications", label: "Alertes", sub: "Ce que l'îlot et la pilule affichent d'eux-mêmes", stage: "alerts", cards: [
+    { icon: "notifications_active", title: "Dans l'îlot", rows: [
+      { t: "tg", k: "notif_popups", title: "Notifications dans l'îlot", s: "Les notifications Windows s'ouvrent dans l'îlot", demo: "notif", mv: "Général" },
+      { t: "tg", k: "osd", title: "Indicateurs de volume et de luminosité", s: "À la place de ceux de Windows", demo: "osd", mv: "Général" } ] },
+    { icon: "pill", title: "Dans la pilule", rows: [
+      { t: "tg", k: "activity", title: "Activités en cours", s: "Minuteur, téléchargement, appel", demo: "activity", mv: "Pilule" },
+      { t: "tg", k: "dc_pill", title: "Raccourcis Discord", s: "Micro et casque pendant un appel vocal", demo: "discord", mv: "Pilule" },
+      { t: "tg", k: "privacy", title: "Voyant caméra / micro", s: "Point vert : caméra. Point orange : micro", demo: "privacy", mv: "Pilule" },
+      { t: "tg", k: "wxfx", title: "Météo animée", s: "Pluie, neige ou soleil dans la pilule", demo: "rain", mv: "Pilule" } ] } ] },
+  { id: "bar", icon: "dashboard", label: "Barre et écran", sub: "Barre du haut, écran, plein écran", cards: [
+    { icon: "dashboard", title: "Barre en haut de l'écran", toggle: "bar", rows: [
+      { t: "tg", k: "hide_taskbar", title: "Masquer la barre des tâches Windows", dis: () => !st.bar },
+      { t: "tg", k: "bar_islands", title: "Îlots séparés", dis: () => !st.bar },
+      { t: "tg", k: "bar_tasks", title: "Fenêtres ouvertes", dis: () => !st.bar },
+      { t: "tg", k: "bar_titles", title: "Titre de la fenêtre active", dis: () => !st.bar || !st.bar_tasks },
+      { t: "tg", k: "bar_autohide", title: "Masquer automatiquement", dis: () => !st.bar } ] },
+    { icon: "monitor", title: "Écran de l'îlot", mv: "Général", rows: [
+      { t: "ch", k: "monitor", title: "", o: [["auto","Automatique"],["1","Écran 1 (principal)"],["2","Écran 2"]] } ] },
+    { icon: "fullscreen", title: "Îlot en plein écran", s: "Quand un jeu ou une vidéo occupe tout l'écran", mv: "Jeu et absence", rows: [
+      { t: "ch", k: "fs_hide", title: "", o: [["normal","Normal"],["show","Toujours affiché"],["auto","Masquer auto"],["custom","Personnalisé"]] } ] } ] },
+  { id: "game", icon: "sports_esports", label: "Jeu et absence", sub: "Mode jeu, alertes de partie, absence", cards: [
+    { icon: "sports_esports", title: "Mode jeu", toggle: "game_mode", rows: [
+      { t: "tg", k: "game_perf", title: "Passer en mode Performances", dis: () => !st.game_mode },
+      { t: "tg", k: "game_notif", title: "Garder les notifications", dis: () => !st.game_mode } ] },
+    { icon: "campaign", title: "Alerte « partie trouvée »", toggle: "match_alert", rows: [
+      { t: "tg", k: "valorant", title: "Valorant" } ] },
+    { icon: "bedtime", title: "Mode absent", s: "10 min sans clavier ni souris : les notifications attendent ton retour", rows: [
+      { t: "ch", k: "away", title: "", o: [["on","Pause musique + récap"],["recap","Récap seulement"],["off","Désactivé"]] } ] } ] },
+  { id: "sound", icon: "volume_up", label: "Son", sub: "Sorties affichées dans le mélangeur", cards: [
+    { icon: "speaker", title: "Sorties affichées", s: "Inchangé (maquette sorties.html)", rows: [
+      { t: "line", title: "Sonar Game", k2: "par défaut" }, { t: "line", title: "Sonar Chat" }, { t: "line", title: "Casque Shure" },
+      { t: "line", title: "HDMI 2", k2: "masquée" },
+      { t: "btns", b: [["Tout afficher", 1], ["Revenir au tri automatique", 1]] } ] } ] } ] },
+ { group: "Système", items: [
+  { id: "keys", icon: "keyboard", label: "Clavier", sub: "Touche Windows et raccourcis", cards: [
+    { icon: "keyboard_command_key", title: "Touche Windows", s: "Ouvre l'îlot au lieu du menu Démarrer", toggle: "win_key", mv: "Général", rows: [] },
+    { icon: "keyboard", title: "Raccourcis clavier", mv: "Raccourcis", rows: [
+      { t: "line", title: "Ouvrir l'îlot", k2: "Win" }, { t: "line", title: "Presse-papiers", k2: "Win + V" }, { t: "line", title: "Mélangeur", k2: "Win + Alt + M" } ] },
+    { icon: "apps", title: "Raccourcis d'applications", mv: "Raccourcis", rows: [
+      { t: "line", title: "Spotify", k2: "Win + Alt + S" }, { t: "btns", b: [["Ajouter une application", 0]] } ] } ] },
+  { id: "weather", icon: "partly_cloudy_day", label: "Météo et agenda", sub: "Ville et calendriers", cards: [
+    { icon: "location_on", title: "Météo", s: "Lyon", rows: [{ t: "field", title: "", ph: "Chercher une ville" }] },
+    { icon: "event", title: "Agenda", rows: [{ t: "line", title: "Perso (iCal)" }, { t: "btns", b: [["Ajouter", 0]] }] } ] },
+  { id: "access", icon: "accessibility_new", label: "Accessibilité", sub: "Texte, contraste, mouvements", cards: [
+    { icon: "accessibility_new", title: "Accessibilité", rows: [
+      { t: "ch", k: "text_size", title: "Taille du texte du panneau", o: [[100,"Normale"],[112,"Grande"],[125,"Très grande"]] },
+      { t: "ch", k: "contrast", title: "Contraste", o: [["normal","Normal"],["high","Élevé"]] },
+      { t: "ch", k: "motion", title: "Mouvements et animations", o: [["system","Comme Windows"],["full","Toutes"],["reduced","Réduites"]] },
+      { t: "note", text: "« Réduites » l'emporte sur Îlot et pilule › Animations. Essaie : l'aperçu de l'îlot passe en sans rebond.", link: ["island", "Voir l'aperçu"] },
+      { t: "ch", k: "cvd", title: "Couleurs des voyants (vert / orange / rouge)", o: [["off","Standard"],["rg","Daltonien rouge-vert"],["by","Daltonien bleu-jaune"]] } ] } ] },
+  { id: "addons", icon: "grid_view", label: "Addons", sub: "Onglets facultatifs et Claude Code", cards: [
+    { icon: "grid_view", title: "Addons", s: "6 sur 14 activés", rows: [{ t: "btns", b: [["Tout activer", 1], ["Essentiels seulement", 1]] }] },
+    { icon: "smart_toy", title: "Claude Code dans l'îlot", toggle: "cc_on", rows: [
+      { t: "tg", k: "cc_sound", title: "Son à la fin", dis: () => !st.cc_on }, { t: "btns", b: [["Installer les hooks", 0]] } ] } ] },
+  { id: "system", icon: "system_update", label: "Démarrage et mises à jour", sub: "Lancement, version, sauvegarde", dot: true, cards: [
+    { icon: "rocket_launch", title: "Lancer au démarrage de Windows", toggle: "autostart", mv: "Général", rows: [] },
+    { icon: "system_update", title: "Îlot 0.4.22", s: "La 0.4.23 est disponible", rows: [
+      { t: "btns", b: [["Télécharger 0.4.23", 0], ["Sur GitHub", 1]] },
+      { t: "ch", k: "update_mode", title: "Mises à jour automatiques", o: [["auto","Télécharger et installer"],["notify","Prévenir seulement"],["off","Ne pas vérifier"]] } ] },
+    { icon: "save", title: "Sauvegarde des réglages", mv: "Général", rows: [{ t: "btns", b: [["Exporter", 1], ["Importer", 1]] }] },
+    { icon: "description", title: "Notes de version", rows: [{ t: "line", title: "0.4.22 · Presse-papiers au clavier (Win+V)" }] } ] } ] }
+];
+const SEC = {}; S.forEach(g => g.items.forEach(x => { SEC[x.id] = x }));
+
+// ---------------------------------------------------------- brouillon
+// st : ce qu'on voit dans Réglages (brouillon) ; saved : ce qu'applique l'îlot
+const saved = Object.assign({}, st);
+const mod = k => String(st[k]) !== String(saved[k]);
+const dirtyKeys = () => Object.keys(st).filter(mod);
+const mdot = k => mod(k) ? `<i class="mdot" title="Modifié, pas encore enregistré"></i>` : "";
+// nom et valeurs de chaque clé, et son onglet (pour la liste des changements)
+const KEYS = { color: { title: "Couleur d'accent", sec: "theme" } };
+S.forEach(g => g.items.forEach(x => x.cards.forEach(c => {
+  if (c.toggle) KEYS[c.toggle] = { title: c.title, sec: x.id };
+  c.rows.forEach(r => { if (r.k) KEYS[r.k] = { title: r.title || c.title, o: r.o, sec: x.id } });
+})));
+function valLabel(k, v) {
+  const d = KEYS[k];
+  if (d && d.o) { const o = d.o.find(o => String(o[0]) === String(v)); if (o) return o[1] }
+  if (typeof v === "boolean") return v ? "activé" : "coupé";
+  return k === "color" ? ({ auto: "Fond d'écran", art: "Pochette" }[v] || v) : String(v);
+}
+let cur = "theme";
+
+// ---------------------------------------------------------- couleurs
+function hexHsl(h) {
+  const n = parseInt(h.slice(1), 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  let hh = 0, s = 0;
+  if (d) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  }
+  return [(hh * 60 + 360) % 360, s * 100, l * 100];
+}
+const hsl = (h, s, l) => `hsl(${h.toFixed(0)} ${s.toFixed(0)}% ${l.toFixed(0)}%)`;
+// le panneau garde les couleurs enregistrées ; seuls les aperçus prennent
+// celles du brouillon
+function applyAccent(el = document.documentElement, c = saved) {
+  const base = /^#/.test(c.color) ? c.color : c.color === "art" ? "#a855f7" : "#6750a4";
+  let [h, s] = hexHsl(base);
+  const k = { neutral: .35, monochrome: 0, vibrant: 1.25, expressive: 1.1, fruitsalad: 1, tonalspot: .8 }[c.variant] ?? .8;
+  s = Math.min(90, s * k);
+  const p = el.style;
+  p.setProperty("--primary", hsl(h, s, 84));
+  p.setProperty("--inkPrimary", hsl(h, s, 22));
+  p.setProperty("--primaryC", hsl(h, s * .6, 34));
+  p.setProperty("--inkPrimaryC", hsl(h, s, 92));
+  p.setProperty("--secC", hsl(h, s * .25, 30));
+  p.setProperty("--inkSecC", hsl(h, s * .4, 90));
+  const light = c.mode === "light";
+  const exp = c.variant === "expressive" ? 60 : 0;
+  p.setProperty("--mpBg", light ? hsl(h, s * .2, 97) : hsl(h, s * .12, 9));
+  p.setProperty("--mpC", light ? hsl(h, s * .25, 91) : hsl(h, s * .14, 15));
+  p.setProperty("--mpC2", light ? hsl(h, s * .2, 84) : hsl(h, s * .14, 24));
+  p.setProperty("--mpSec", light ? hsl(h + exp, s * .5, 82) : hsl(h + exp, s * .3, 30));
+  p.setProperty("--mpPri", light ? hsl(h, s, 42) : hsl(h, s, 80));
+  p.setProperty("--mpOnPri", light ? "#fff" : hsl(h, s, 20));
+  p.setProperty("--mpInk", light ? hsl(h, 10, 12) : hsl(h, 10, 90));
+}
+
+// ---------------------------------------------------------- navigation
+function navHtml() {
+  return S.map(g => `<div class="grp">${g.group}</div>` + g.items.map(x =>
+    `<button class="nb${x.id === cur ? " on" : ""}" data-go="${x.id}"><span class="ms">${x.icon}</span><span>${x.label}</span>${dirtyKeys().some(k => KEYS[k] && KEYS[k].sec === x.id) ? '<i class="mdot nav" title="Modifications non enregistrées"></i>' : x.dot ? '<i class="dot" title="Mise à jour disponible"></i>' : ""}</button>`).join("")).join("");
+}
+function renderNav() {
+  const q = $("#q").value.trim().toLowerCase();
+  if (!q) { $("#navlist").innerHTML = navHtml(); return }
+  const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const nq = norm(q), hits = [];
+  S.forEach(g => g.items.forEach(x => x.cards.forEach((c, ci) => {
+    if (norm(c.title + " " + (c.s || "")).includes(nq)) hits.push([x, c.title, `c${ci}`, c.title]);
+    c.rows.forEach((r, ri) => {
+      const txt = (r.title || "") + " " + (r.s || "") + " " + (r.o || []).map(o => o[1]).join(" ");
+      if (r.title && norm(txt).includes(nq)) hits.push([x, r.title, `c${ci}r${ri}`, c.title]);
+    });
+  })));
+  const hl = s => { const i = norm(s).indexOf(nq); return i < 0 ? esc(s) : esc(s.slice(0, i)) + "<mark>" + esc(s.slice(i, i + q.length)) + "</mark>" + esc(s.slice(i + q.length)) };
+  $("#navlist").innerHTML = hits.length ? hits.slice(0, 30).map(([x, t, a, c]) =>
+    `<button class="res" data-go="${x.id}" data-at="${a}"><span>${hl(t)}</span><small>${esc(x.label)} › ${esc(c)}</small></button>`).join("")
+    : `<div class="nores">Aucun réglage ne contient « ${esc(q)} ».</div>`;
+}
+$("#navlist").addEventListener("click", e => {
+  const b = e.target.closest("[data-go]");
+  if (!b) return;
+  go(b.dataset.go, b.dataset.at);
+});
+$("#q").addEventListener("input", renderNav);
+$("#q").addEventListener("keydown", e => {
+  if (e.key === "Enter") { const f = $("#navlist [data-go]"); if (f) f.click() }
+  if (e.key === "Escape") { $("#q").value = ""; renderNav() }
+});
+function go(id, at) {
+  cur = id;
+  renderContent();
+  if (!$("#q").value.trim()) renderNav();
+  else document.querySelectorAll(".nb").forEach(b => b.classList.toggle("on", b.dataset.go === id));
+  const box = $("#content");
+  if (at) {
+    const el = box.querySelector(`[data-at="${at}"]`);
+    if (el) {
+      const stage = box.querySelector(".stage");
+      box.scrollTop = el.offsetTop - (stage ? stage.offsetHeight + 20 : 10);
+      el.classList.add("flash");
+      setTimeout(() => el.classList.remove("flash"), 1400);
+    }
+  } else box.scrollTop = 0;
+}
+
+// ---------------------------------------------------------- contenu
+const mv = m => m ? `<span class="moved">avant : ${esc(m)}</span>` : "";
+function rowHtml(r, at) {
+  const off = r.dis && r.dis() ? " off" : "";
+  switch (r.t) {
+  case "tg": return `<div class="row tg${off}" data-at="${at}"><div><div class="t" style="font-weight:400;font-size:13.5px">${esc(r.title)}${mdot(r.k)} ${mv(r.mv)}</div>${r.s ? `<div class="s">${esc(r.s)}</div>` : ""}</div>`
+    + (r.demo ? `<button class="pv" data-demo="${r.demo}" title="Voir la démo" aria-label="Voir la démo"><span class="ms">play_arrow</span></button>` : "")
+    + `<button class="swi" role="switch" aria-checked="${!!st[r.k]}" aria-label="${esc(r.title)}" data-tg="${r.k}"></button></div>`;
+  case "ch": return `<div class="row${off}" data-at="${at}" style="${off ? "opacity:.45;pointer-events:none" : ""}">${r.title ? `<div class="sub">${esc(r.title)}${mdot(r.k)}</div>` : ""}<div class="flow">`
+    + r.o.map(([v, l]) => `<button class="chip${String(st[r.k]) === String(v) ? " on" : ""}" data-k="${r.k}" data-v="${v}">${esc(l)}</button>`).join("") + "</div></div>";
+  case "sw": return `<div class="row" data-at="${at}"><div class="sub">${esc(r.title)}${mdot("color")}</div><div class="flow">`
+    + `<button class="chip${st.color === "auto" ? " on" : ""}" data-k="color" data-v="auto">Fond d'écran</button>`
+    + `<button class="chip${st.color === "art" ? " on" : ""}" data-k="color" data-v="art">Pochette</button>`
+    + swatches.map(c => `<button class="swatch${st.color === c ? " on" : ""}" style="background:${c}" data-k="color" data-v="${c}" aria-label="${c}"></button>`).join("") + "</div></div>";
+  case "pre": {
+    const on = presetOn();
+    const perso = on < 0 && lastPreset >= 0
+      ? `<div class="note"><span class="ms">edit</span><span>Thème perso, d'après ${esc(presets[lastPreset][0])}. <a data-pre="${lastPreset}">Revenir à ${esc(presets[lastPreset][0])}</a></span></div>` : "";
+    return `<div class="row" data-at="${at}"><div class="pgrid">` + presets.map((p, i) => {
+      const v = p[1], [h, s] = hexHsl(v.color), sat = Math.min(80, s * .9), light = v.mode === "light";
+      const wall = p[3] || light ? p[3] || `linear-gradient(140deg,${hsl(h, sat * .6, 88)},${hsl(h + 30, sat * .5, 72)})` : `linear-gradient(140deg,${hsl(h, sat, 34)},${hsl(h + 25, sat * .7, 12)})`;
+      const dots = [hsl(h, sat, light ? 45 : 78), hsl(h + 15, sat * .4, light ? 60 : 55), hsl(h + 60, sat * .7, light ? 55 : 72)];
+      return `<button class="pcard${i === on ? " on" : ""}" data-pre="${i}" style="--primary:${dots[0]}">
+        <span class="pwall" style="background:${wall}"><span class="isl pmini shape-${v.shape} bg-${v.island_bg} bd-${v.border}"><span class="bgl"></span><span class="closed">${clockHtml(v.clock, true)}<span class="ms">wifi</span></span></span></span>
+        <span class="pname">${esc(p[0])}${i === on ? '<span class="ms">check_circle</span>' : ""}</span>
+        <span class="pdesc">${esc(p[2])}</span>
+        <span class="pdots">${dots.map(c => `<i style="background:${c}"></i>`).join("")}<small>${MODE_L[v.mode]} · ${BG_L[v.island_bg]}</small></span>
+      </button>`;
+    }).join("") + `</div>${perso}<div class="note"><span class="ms">info</span><span>Un thème règle la couleur, le style, clair ou sombre, le fond, le contour, la forme, l'horloge et les animations. Le lecteur, le compagnon et la taille de la pilule ne bougent pas.</span></div></div>`;
+  }
+  case "note":
+    if (r.motion) return st.motion === "reduced"
+      ? `<div class="note" data-at="${at}"><span class="ms">info</span><span>Mouvements réduits dans Accessibilité : l'îlot s'anime sans rebond, quel que soit ce choix. <a data-goto="access">Changer</a></span></div>`
+      : `<div class="note" data-at="${at}"><span class="ms">info</span><span>Accessibilité › Mouvements peut tout réduire. <a data-goto="access">Y aller</a></span></div>`;
+    return `<div class="note" data-at="${at}"><span class="ms">info</span><span>${esc(r.text)} ${r.link ? `<a data-goto="${r.link[0]}">${esc(r.link[1])}</a>` : ""}</span></div>`;
+  case "btns": return `<div class="btns" data-at="${at}">` + r.b.map(([l, g]) => `<button class="btn${g ? " ghost" : ""}">${esc(l)}</button>`).join("") + "</div>";
+  case "line": return `<div class="row line" data-at="${at}"><span>${esc(r.title)}</span>${r.k2 ? `<span class="k">${esc(r.k2)}</span>` : ""}</div>`;
+  case "field": return `<div class="row" data-at="${at}">${r.title ? `<div class="sub">${esc(r.title)}</div>` : ""}<div class="field"><span class="ms" style="font-size:17px">edit</span>${esc(r.ph)}</div></div>`;
+  }
+  return "";
+}
+function renderContent() {
+  const x = SEC[cur];
+  let h = `<div class="secHead"><h3>${esc(x.label)}</h3><span>${esc(x.sub)}</span></div>`;
+  if (x.stage) h += stageHtml(x.stage);
+  x.cards.forEach((c, ci) => {
+    h += `<div class="card"><div class="hd row" data-at="c${ci}"><div class="ic"><span class="ms">${c.icon}</span></div><div style="flex:1;min-width:0"><div class="t">${esc(c.title)}${c.toggle ? mdot(c.toggle) : ""}</div>${c.s ? `<div class="s">${esc(c.s)}</div>` : ""}</div>${mv(c.mv)}`
+      + (c.toggle ? `<button class="swi" role="switch" aria-checked="${!!st[c.toggle]}" aria-label="${esc(c.title)}" data-tg="${c.toggle}"></button>` : "") + "</div>";
+    c.rows.forEach((r, ri) => { h += rowHtml(r, `c${ci}r${ri}`) });
+    h += "</div>";
+  });
+  const box = $("#content"), y = box.scrollTop;
+  box.innerHTML = h;
+  box.scrollTop = y;
+  const sg = $("#stage");
+  if (sg) applyAccent(sg, st);
+  startStage(x.stage);
+}
+$("#content").addEventListener("click", e => {
+  const t = e.target.closest("button,a");
+  if (!t) return;
+  if (t.dataset.tg) { st[t.dataset.tg] = !st[t.dataset.tg]; refresh(); return }
+  if (t.dataset.k) {
+    const old = st[t.dataset.k];
+    st[t.dataset.k] = typeof old === "number" ? Number(t.dataset.v) : t.dataset.v;
+    refresh(); return;
+  }
+  if (t.dataset.pre) { lastPreset = Number(t.dataset.pre); Object.assign(st, presets[lastPreset][1]); refresh(); return }
+  if (t.dataset.demo) { playDemo(t.dataset.demo); return }
+  if (t.dataset.goto) { go(t.dataset.goto); return }
+  if (t.dataset.replay !== undefined) { replay(); return }
+  if (t.classList.contains("pbtn")) { togglePlay(t); return }
+});
+function refresh() { renderContent(); if (!$("#q").value.trim()) renderNav(); renderBar() }
+
+// barre « non enregistré » (comme Discord) et îlot réel
+let popOpen = false;
+function renderBar() {
+  const d = dirtyKeys(), bar = $("#savebar");
+  bar.classList.toggle("show", d.length > 0);
+  if (!d.length) { popOpen = false; bar.classList.remove("alert") }
+  $("#sbCount").textContent = d.length + (d.length > 1 ? " changements" : " changement");
+  $("#sbCount").setAttribute("aria-expanded", popOpen);
+  $("#sbPop").hidden = !popOpen;
+  $("#sbPop").innerHTML = d.map(k => {
+    const n = KEYS[k] || { title: k };
+    return `<button class="chgl" data-go="${n.sec || cur}"><span>${esc(n.title)}</span><small>${esc(valLabel(k, saved[k]))} <span class="ms">arrow_forward</span> <b>${esc(valLabel(k, st[k]))}</b></small></button>`;
+  }).join("");
+}
+function renderReal() {
+  const r = $("#realIsl");
+  r.className = `isl shape-${saved.shape} bg-${saved.island_bg} bd-${saved.border} size-${saved.pill_size}`;
+  r.innerHTML = `<div class="bgl"></div><div class="closed"><span class="ms">partly_cloudy_day</span>${clockHtml(saved.clock, true)}<span class="ms">wifi</span></div>`;
+  applyAccent($("#real"), saved);
+}
+function save() {
+  Object.assign(saved, st);
+  popOpen = false;
+  applyAccent();
+  renderReal();
+  refresh();
+  note("Enregistré : ton îlot a changé.");
+}
+function cancel() {
+  Object.assign(st, saved);
+  popOpen = false;
+  refresh();
+  note("Annulé : rien n'a changé.");
+}
+let noteT = 0;
+function note(t) { const n = $("#realNote"); n.textContent = t; clearTimeout(noteT); noteT = setTimeout(() => { n.textContent = "Réglages enregistrés" }, 2500) }
+$("#sbSave").addEventListener("click", save);
+$("#sbCancel").addEventListener("click", cancel);
+$("#sbCount").addEventListener("click", () => { popOpen = !popOpen; renderBar() });
+$("#sbPop").addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) { popOpen = false; go(b.dataset.go); renderBar() } });
+// quitter Réglages avec un brouillon : la barre tremble et passe en rouge
+$("#quit").addEventListener("click", () => {
+  if (!dirtyKeys().length) return note("Rien à enregistrer : Réglages se ferme.");
+  const bar = $("#savebar");
+  bar.classList.remove("shake");
+  void bar.offsetWidth;
+  bar.classList.add("shake", "alert");
+});
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && dirtyKeys().length) { e.preventDefault(); save() }
+});
+
+// ---------------------------------------------------------- aperçus
+let timers = [], raf = 0;
+function clearTimers() { timers.forEach(clearInterval); timers.forEach(clearTimeout); timers = []; cancelAnimationFrame(raf) }
+const ANIM = { normal: [.5, "cubic-bezier(.34,1.45,.5,1)"], fast: [.26, "cubic-bezier(.3,1.3,.5,1)"], soft: [.85, "cubic-bezier(.25,1.25,.4,1)"], calm: [.42, "cubic-bezier(.2,0,0,1)"], off: [0, "linear"] };
+function animKey() { return st.motion === "reduced" ? (st.anim === "off" ? "off" : "calm") : st.anim }
+function clockHtml(c = st.clock, card = false) {
+  switch (c) {
+  case "flip": return `<span class="clk"><span class="flp">1</span><span class="flp">4</span>:<span class="flp">3</span><span class="flp"${card ? "" : ' id="flp"'}>2</span></span>`;
+  case "analog": return `<svg class="ana" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1.5"/><line class="hh" x1="11" y1="11" x2="11" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line class="mh" x1="11" y1="11" x2="11" y2="3.5" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+  case "neon": return `<span class="clk neon">14:32</span>`;
+  case "pixel": return `<span class="clk pixel">14:32</span>`;
+  }
+  return `<span class="clk">14:32</span>`;
+}
+function islandHtml(extra) {
+  const [d, e] = ANIM[animKey()];
+  return `<div class="isl shape-${st.shape} bg-${st.island_bg} bd-${st.border} size-${st.pill_size}" id="isl" style="--dur:${d}s;--ease:${e}">
+    <div class="bgl"></div>
+    <div class="closed"><span class="ms">partly_cloudy_day</span>${clockHtml()}<span class="ms">wifi</span></div>
+    <div class="opened"><div class="art"></div><div class="meta"><b>Nuits blanches</b><i>Halo Maud</i><div class="bar"></div></div></div>
+    ${extra || ""}
+  </div>`;
+}
+const lbl = (ic, t) => `<div class="lbl"><span class="ms">${ic}</span>${t}</div>`;
+function stageHtml(kind) {
+  const blobs = `<div class="wallblob" style="width:180px;height:140px;left:-30px;top:40px;background:var(--primaryC)"></div><div class="wallblob" style="width:160px;height:120px;right:-20px;top:-30px;background:#3ad6a2;opacity:.25"></div>`;
+  if (kind === "island") return `<div class="stage" id="stage">${blobs}${islandHtml()}${lbl("visibility", "Aperçu : l'îlot s'ouvre et se ferme")}<button class="replay" data-replay><span class="ms">replay</span>Rejouer</button></div>`;
+  if (kind === "alerts") return `<div class="stage short" id="stage">${blobs}${islandHtml(`
+      <div class="demo" data-d="notif"><span class="av"><span class="ms">forum</span></span><span><b style="font-weight:500">Discord</b><br><span style="opacity:.75">Léa : on lance une partie ?</span></span></div>
+      <div class="demo" data-d="osd"><span class="ms">volume_up</span><span class="osdbar"><i id="osdi"></i></span></div>
+      <div class="demo" data-d="activity"><span class="ms" style="color:var(--primary)">timer</span><span class="clk" id="tmr">04:59</span></div>
+      <div class="demo" data-d="discord"><span class="av"><span class="ms">headphones</span></span><span style="flex:1">Vocal · 3</span><span class="ms">mic</span></div>
+      <span class="privdot" id="privdot"></span><div class="rain" id="rain"></div>`)}${lbl("play_arrow", "Clique ▶ sur une ligne pour voir l'alerte")}</div>`;
+  if (kind === "theme") return `<div class="stage" id="stage" style="background:${themeWall()}">${islandHtml()}<div class="th" style="padding-top:64px"><div class="mp"><div class="tabs"><i class="on"></i><i></i><i></i><i></i></div><div class="rw">Mode jeu<span class="sw2"></span></div><div class="sl"></div></div></div>${lbl("palette", "Aperçu : l'îlot et le panneau")}</div>`;
+  if (kind === "pet") return `<div class="stage short" id="stage"><div class="petStage" id="petStage"><div class="ground"></div>${petHtml()}</div>${lbl("pets", st.pet_walk ? "Aperçu : promenade" : "Aperçu")}</div>`;
+  if (kind === "player") return `<div class="stage" id="stage">${blobs}<div class="pl">
+      <div class="mini"><span class="disc">${st.player_mini_ring ? `<svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="12.5" fill="none" stroke="#ffffff30" stroke-width="2"/><circle id="ring" cx="14" cy="14" r="12.5" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-dasharray="78.5" stroke-dashoffset="45"/></svg>` : ""}<span class="d${st.player_mini_spin ? " spin" : ""}" id="disc"></span></span>
+        <span class="tx${st.player_mini_lyrics ? " ly" : ""}" id="mtx">${st.player_mini_lyrics ? "Je compte les étoiles" : "Nuits blanches · Halo Maud"}</span><span class="eq"><i></i><i style="animation-delay:-.3s"></i><i style="animation-delay:-.6s"></i></span></div>
+      <div class="bigp"><button class="pbtn" aria-label="Lecture / pause" id="pbtn">${btnSvg()}<span class="ms" id="pic">pause</span></button><svg class="wave" id="wave" viewBox="0 0 280 26" preserveAspectRatio="none"></svg></div>
+    </div>${lbl("touch_app", "Clique le bouton pour mettre en pause")}</div>`;
+  return "";
+}
+// fond d'écran de l'aperçu Thème, teinté par l'accent et le mode
+function themeWall() {
+  const base = /^#/.test(st.color) ? st.color : st.color === "art" ? "#a855f7" : "#6750a4";
+  const [h, s] = hexHsl(base);
+  return st.mode === "light" ? `linear-gradient(140deg,${hsl(h, s * .5, 86)},${hsl(h + 30, s * .45, 70)})`
+    : `radial-gradient(120% 140% at 20% 0%,${hsl(h, Math.min(70, s), 30)} 0%,${hsl(h, s * .5, 12)} 50%,#0d0b16 100%)`;
+}
+function petHtml() {
+  const col = { nature: "#8fd18f", theme: "var(--primary)", pink: "#f5a3c7", sky: "#8fc8f5" }[st.pet_color];
+  if (st.pet === "off") return `<div style="position:absolute;inset:0;display:grid;place-items:center;color:#ffffffa0;font-size:13px">Masqué : ni dessin, ni animations</div>`;
+  return `<div class="pet${st.pet_walk ? " walk" : ""} eyes-${st.pet_eyes} hat-${st.pet_hat}" id="pet" style="--petc:${col}"><div class="body"></div><i class="eye l"></i><i class="eye r"></i><i class="hat party"></i><i class="hat crown"></i><i class="hat cap"></i></div>`;
+}
+
+// bouton festonné : cercle à 9 bosses ; « morph » : carré arrondi en pause
+function cookiePath(R, amp) {
+  let d = "";
+  for (let i = 0; i <= 180; i++) {
+    const a = i / 180 * Math.PI * 2, r = R * (1 + amp * Math.cos(9 * a));
+    d += (i ? "L" : "M") + (38 + r * Math.cos(a)).toFixed(2) + " " + (38 + r * Math.sin(a)).toFixed(2);
+  }
+  return d + "Z";
+}
+function squirclePath() {
+  let d = "";
+  for (let i = 0; i <= 180; i++) {
+    const a = i / 180 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a), n = 4;
+    const r = 34 / Math.pow(Math.pow(Math.abs(c), n) + Math.pow(Math.abs(s), n), 1 / n);
+    d += (i ? "L" : "M") + (38 + r * c).toFixed(2) + " " + (38 + r * s).toFixed(2);
+  }
+  return d + "Z";
+}
+let playing = true;
+function btnColors() {
+  const fill = { auto: "var(--primaryC)", player: "#a855f7", white: "#f4f1f8", fixed: "var(--primary)" }[st.player_btn_color];
+  let ink = { auto: "var(--inkPrimaryC)", white: "#fff", black: "#141218" }[st.player_btn_ink];
+  if (st.player_btn_ink === "auto" && st.player_btn_color === "white") ink = "#141218";
+  if (st.player_btn_ink === "auto" && st.player_btn_color === "fixed") ink = "var(--inkPrimary)";
+  return [fill, ink];
+}
+function btnSvg() {
+  if (st.player_btn === "none") return "";
+  const [fill] = btnColors();
+  const d = st.player_btn === "round" ? cookiePath(34, 0) : (!playing && st.player_btn_morph ? squirclePath() : cookiePath(33, .07));
+  const glow = st.player_btn_glow ? `style="filter:drop-shadow(0 6px 12px ${fill === "#f4f1f8" ? "#ffffff55" : "color-mix(in srgb," + fill + " 70%,transparent)"})"` : "";
+  return `<svg viewBox="0 0 76 76" ${glow}><path class="shape" d="${d}" fill="${fill}"/></svg>`;
+}
+function togglePlay(b) {
+  playing = !playing;
+  b.innerHTML = btnSvg() + `<span class="ms${st.player_btn_pop ? " pop" : ""}" id="pic">${playing ? "pause" : "play_arrow"}</span>`;
+  styleBtn();
+}
+function styleBtn() {
+  const b = $("#pbtn"); if (!b) return;
+  const [, ink] = btnColors();
+  b.classList.toggle("spin", playing && st.player_btn === "cookie" && st.player_btn_spin);
+  $("#pic").style.color = st.player_btn === "none" ? "var(--primary)" : ink;
+  const disc = $("#disc"); if (disc) disc.style.animationPlayState = playing ? "running" : "paused";
+  document.querySelectorAll(".mini .eq i").forEach(i => i.style.animationPlayState = playing ? "running" : "paused");
+}
+
+function replay() {
+  const i = $("#isl"); if (!i) return;
+  i.classList.remove("open");
+  void i.offsetWidth;
+  setTimeout(() => i.classList.add("open"), 60);
+}
+let demoBusy = 0;
+function playDemo(kind) {
+  const isl = $("#isl"); if (!isl) return;
+  const k = { notif: "notif_popups", osd: "osd", activity: "activity", discord: "dc_pill", privacy: "privacy", rain: "wxfx" }[kind];
+  const lab = $("#stage .lbl");
+  if (!st[k]) { lab.innerHTML = `<span class="ms">block</span>Désactivé : rien ne s'affiche`; return }
+  lab.innerHTML = `<span class="ms">play_arrow</span>Démo en cours`;
+  clearTimeout(demoBusy);
+  isl.querySelectorAll(".demo").forEach(d => d.classList.remove("show"));
+  isl.classList.remove("demoing");
+  isl.style.width = isl.style.height = "";
+  $("#privdot").className = "privdot";
+  $("#rain").classList.remove("on");
+  const end = ms => { demoBusy = setTimeout(() => { isl.querySelectorAll(".demo").forEach(d => d.classList.remove("show")); isl.classList.remove("demoing"); isl.style.width = isl.style.height = ""; $("#privdot").className = "privdot"; $("#rain").classList.remove("on"); lab.innerHTML = `<span class="ms">play_arrow</span>Clique ▶ sur une ligne pour voir l'alerte` }, ms) };
+  if (kind === "privacy") { $("#privdot").className = "privdot cam"; setTimeout(() => { $("#privdot").className = "privdot mic" }, 1400); return end(3000) }
+  if (kind === "rain") { $("#rain").classList.add("on"); return end(3500) }
+  const size = { notif: [300, 56], osd: [240, 40], activity: [200, 36], discord: [230, 40] }[kind];
+  isl.classList.add("demoing");
+  isl.style.width = size[0] + "px"; isl.style.height = size[1] + "px";
+  isl.querySelector(`[data-d="${kind}"]`).classList.add("show");
+  if (kind === "osd") { const o = $("#osdi"); o.style.width = "30%"; setTimeout(() => { o.style.width = "74%" }, 500) }
+  if (kind === "activity") { let s = 299; const t = setInterval(() => { s--; const e = $("#tmr"); if (e) e.textContent = "0" + Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") }, 250); timers.push(t); setTimeout(() => clearInterval(t), 3000) }
+  end(3200);
+}
+
+function startStage(kind) {
+  clearTimers();
+  if (kind === "island" || kind === "theme") {
+    const isl = $("#isl");
+    let open = false;
+    const loop = () => { open = !open; isl.classList.toggle("open", open) };
+    // dans Thème, l'îlot reste replié pour laisser voir le panneau
+    if (kind === "island") {
+      timers.push(setTimeout(loop, 500));
+      timers.push(setInterval(loop, 2400));
+    }
+    if (st.clock === "flip") {
+      let n = 2;
+      timers.push(setInterval(() => { const f = $("#flp"); if (!f || isl.classList.contains("open")) return; n = (n + 1) % 10; f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); setTimeout(() => { f.textContent = n }, 250) }, 1200));
+    }
+  }
+  if (kind === "alerts" && st.clock === "flip") { /* l'horloge reste fixe ici */ }
+  if (kind === "player") {
+    styleBtn();
+    const lyr = ["Je compte les étoiles", "au-dessus du périph", "et la ville s'allume", "comme un vieux néon"];
+    let li = 0;
+    if (st.player_mini_lyrics) timers.push(setInterval(() => { if (!playing) return; const m = $("#mtx"); if (!m) return; li = (li + 1) % lyr.length; m.textContent = lyr[li]; m.classList.remove("ly"); void m.offsetWidth; m.classList.add("ly") }, 1800));
+    let ph = 0, prog = .42, last = performance.now();
+    const thick = { thin: 2, normal: 4, thick: 6 }[st.player_bar_size], amp = { low: 2, normal: 3.5, high: 5.5 }[st.player_bar_amp];
+    const tick = now => {
+      const w = $("#wave"); if (!w) return;
+      const dt = (now - last) / 1000; last = now;
+      if (playing) { ph += dt * 5; prog += dt * .02; if (prog > .96) prog = .05 }
+      const px = prog * 280;
+      let d = "";
+      for (let x = 0; x <= px; x += 2) d += (x ? "L" : "M") + x + " " + (13 + (st.player_bar === "wave" && playing ? amp * Math.sin(x / 7 - ph) : 0)).toFixed(2);
+      w.innerHTML = `<path d="M${px + 6} 13H280" stroke="#ffffff35" stroke-width="${thick}" stroke-linecap="round" fill="none"/><path d="${d}" stroke="var(--primary)" stroke-width="${thick}" stroke-linecap="round" fill="none"/><circle cx="${px}" cy="13" r="${thick + 2}" fill="var(--primary)"/>`;
+      const r = $("#ring"); if (r) r.setAttribute("stroke-dashoffset", (78.5 * (1 - prog)).toFixed(1));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+  }
+  if (kind === "pet" && st.pet_walk && st.pet_trail !== "none") {
+    timers.push(setInterval(() => {
+      const p = $("#pet"), s = $("#petStage"); if (!p || !s) return;
+      const r = p.getBoundingClientRect(), b = s.getBoundingClientRect();
+      const t = document.createElement("i");
+      t.className = "trail";
+      t.style.left = (r.left - b.left + r.width / 2 + (Math.random() * 20 - 10)) + "px";
+      t.style.background = { sparkle: "#fff6c2", hearts: "#ff8fb1", bubbles: "#9fd3ff" }[st.pet_trail];
+      if (st.pet_trail === "bubbles") { t.style.background = "none"; t.style.border = "1px solid #9fd3ff" }
+      s.appendChild(t);
+      setTimeout(() => t.remove(), 1000);
+    }, 160));
+  }
+  if (kind === "alerts") {
+    const rain = $("#rain");
+    for (let i = 0; i < 26; i++) { const d = document.createElement("i"); d.style.left = (i * 4 + Math.random() * 3) + "%"; d.style.animationDelay = (-Math.random()) + "s"; rain.appendChild(d) }
+  }
+}
+
+// ---------------------------------------------------------- « où est passé »
+const moves = [
+  ["Notifications dans l'îlot", "Général", "Comportement › Alertes"],
+  ["Indicateurs de volume et de luminosité", "Général", "Comportement › Alertes"],
+  ["Écran de l'îlot", "Général", "Comportement › Barre et écran"],
+  ["Lancer au démarrage, Sauvegarde des réglages", "Général", "Système › Démarrage et mises à jour"],
+  ["Touche Windows", "Général", "Système › Clavier"],
+  ["Raccourcis clavier et d'applications", "Raccourcis", "Système › Clavier"],
+  ["Couleurs, Changer de fond automatiquement", "Apparence", "Personnaliser › Thème"],
+  ["Îlot : fond, contour, forme, animations", "Apparence", "Personnaliser › Îlot et pilule"],
+  ["Taille de la pilule, Horloge", "Pilule", "Personnaliser › Îlot et pilule"],
+  ["Lecteur, Bouton, Barre, Lecteur dans la pilule, Onglet Média", "Apparence", "Personnaliser › Lecteur"],
+  ["Activités, Discord, Voyant caméra / micro, Météo animée", "Pilule", "Comportement › Alertes"],
+  ["Carte « Compagnon » de Pilule", "Pilule", "Retirée (doublon de l'onglet Compagnon)"],
+  ["Îlot en plein écran", "Jeu et absence", "Comportement › Barre et écran"],
+  ["Mouvements et animations", "Accessibilité", "Inchangé, rappelé sous Animations"]
+];
+$("#moves").innerHTML = moves.map(m => `<tr><td>${esc(m[0])}</td><td>${esc(m[1])}</td><td><span class="ms">arrow_forward</span> ${esc(m[2])}</td></tr>`).join("");
+
+$("#tMoved").addEventListener("click", e => {
+  const b = e.currentTarget, on = b.getAttribute("aria-pressed") !== "true";
+  b.setAttribute("aria-pressed", on);
+  $("#panel").classList.toggle("showMoved", on);
+});
+
+applyAccent();
+renderReal();
+renderNav();
+renderContent();
+renderBar();
+})();
+</script>

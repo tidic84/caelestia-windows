@@ -133,7 +133,8 @@ Singletons    Api (invoke/call/listen) · Ilot (état global : réglages, thème
 Fenêtres      Main (îlot) · Bar (écrans sans îlot) · Captions · TipWindow · PetWindow (promenade du compagnon)
 Îlot          Island · Pill · PillClock · Panel · BarContent · BarTask · TaskIcon · TaskPreview · QuickShare · FileDrop (pilule de dépôt des fichiers, `Watch.dropOpen`) · Convert (page de conversion, `Watch.convertOpen`, `files::file_convert`) · Ear
 Pages         HomePage · MediaPage · CtrlPage (+ Mixer : pastilles de sorties, applis groupées) · AppsPage · ClipsPage · WallsPage · MailPage · TasksPage · PcPage · ClaudeUsagePage
-              SoundsPage · AssistPage · SettingsPage (onglet Son : sorties affichées, noms choisis)
+              SoundsPage · AssistPage · SettingsPage (13 onglets groupés créés à la demande, brouillon Enregistrer / Annuler,
+              thèmes prêts ; onglet Son : sorties affichées, noms choisis) · SettingsPreview (aperçus animés du brouillon)
 Cartes PC     PcCard · ServicesCard · HealthCard · ShutdownCard · SensCard
 Addon Claude  UsageChart (graphique de ClaudeUsagePage)
 Compagnon     Pet (10 espèces, expressions, tours)

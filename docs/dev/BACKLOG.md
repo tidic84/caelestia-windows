@@ -13,6 +13,16 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🟢 **Réglages refaits (2026-10-29) : à confirmer par l'utilisateur**
+  - Tant qu'un brouillon existe, les raccourcis d'onglets, Win+V et le
+    dépôt de fichiers rouvrent Réglages (barre qui tremble) au lieu de leur
+    onglet, même îlot refermé (règle « comme Discord » choisie). À assouplir
+    s'il le demande.
+  - La liste des onglets dépasse la hauteur du panneau : elle défile (barre
+    de défilement, onglet choisi toujours visible).
+  - Monochrome ressemble à OLED : à retirer s'il le demande.
+  - Une puce revenue à sa valeur par défaut jamais enregistrée (ex.
+    `cc_min` 30) reste comptée comme modification (bénin).
 - 🟢 **Animations : plan à faire (demande de l'utilisateur, 2026-10-28)** :
   remplacer les réglages d'animation actuels par un simple « Animations :
   oui / non », puis revoir toutes les animations une par une. Prévoir une

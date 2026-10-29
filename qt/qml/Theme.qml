@@ -168,6 +168,13 @@ Item {
         return p
     }
 
+    // cartes noires (OLED) : fond noir pur, cartes a peine plus claires
+    // (tons du neutre du schema s : la teinte du theme reste)
+    function oled(p, s) {
+        const n = x => hex(s.neutralPalette.tone(x))
+        return Object.assign(p, { surface: "#000000", surfaceLow: n(4), surfaceC: n(6), surfaceHigh: n(10), surfaceHighest: n(14) })
+    }
+
     function applyPalette(p) {
         for (const k in p) {
             if (k in roles)
