@@ -228,6 +228,10 @@ fn rgba_thumb(w: usize, h: usize, bytes: &[u8], size: u32) -> Option<String> {
 /// petite selon l'image)
 fn rgba_png(w: usize, h: usize, bytes: &[u8]) -> Option<Vec<u8>> {
     use image::ImageEncoder;
+    // l'encodeur panique (assert) sur un tampon d'une autre taille
+    if w.checked_mul(h).and_then(|n| n.checked_mul(4)) != Some(bytes.len()) {
+        return None;
+    }
     let mut out = Vec::new();
     image::codecs::png::PngEncoder::new(&mut out)
         .write_image(bytes, w as u32, h as u32, image::ExtendedColorType::Rgba8)
@@ -357,10 +361,16 @@ pub fn clip_copy(st: State<'_, Clips>, id: u64) -> bool {
     let Ok(mut cb) = arboard::Clipboard::new() else { return false };
     match (c.text, c.image) {
         (Some(t), _) => cb.set_text(t).is_ok(),
-        (None, Some((w, h, png))) => {
-            let Ok(img) = image::load_from_memory_with_format(&png, image::ImageFormat::Png) else { return false };
-            let bytes = img.into_rgba8().into_raw();
-            cb.set_image(arboard::ImageData { width: w, height: h, bytes: std::borrow::Cow::Owned(bytes) }).is_ok()
+        (None, Some((_, _, png))) => {
+            // PngDecoder::new : sans la limite de 512 Mio d'ImageReader, comme a l'entree
+            let Ok(img) =
+                image::codecs::png::PngDecoder::new(std::io::Cursor::new(&png[..])).and_then(image::DynamicImage::from_decoder)
+            else {
+                return false;
+            };
+            let img = img.into_rgba8();
+            let (width, height) = (img.width() as usize, img.height() as usize);
+            cb.set_image(arboard::ImageData { width, height, bytes: std::borrow::Cow::Owned(img.into_raw()) }).is_ok()
         }
         _ => false,
     }

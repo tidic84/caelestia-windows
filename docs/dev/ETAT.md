@@ -56,7 +56,10 @@ tient en ~30 Mo. Rapport complet : `docs/perf-memoire.md`.
   x86_64-pc-windows-gnu --lib` (conteneur Linux, MinGW), sans nouvel
   avertissement. Encodage et aller-retour PNG testés dans un petit
   programme à part, sur les captures de `docs/`. Relu par un agent de
-  relecture.
+  relecture : rien de bloquant ; appliqué : taille du tampon vérifiée avant
+  l'encodage (l'encodeur panique sinon, hors `catch_unwind`), décodage par
+  `PngDecoder` sans la limite de 512 Mio, dimensions lues sur l'image
+  décodée.
 - **Non vérifié** : pas de compilation MSVC ni de `qt\build.cmd` (pas de
   Windows dans cette session). Pas de mesure de la RAM réelle : faire la
   mesure de `perf-memoire.md` (8 captures Win+Maj+S, mémoire privée avant
