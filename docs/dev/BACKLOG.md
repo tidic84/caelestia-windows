@@ -243,19 +243,19 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Mémoire (voir `docs/perf-memoire.md`)
 
+Répartition mesurée le 2026-10-29 (297 Mo privés, 193 Mo au Gestionnaire).
+
+- 🟠 **Icônes des applis en 64 px** (`apps.rs`, `icon_of`) : la liste
+  jumbo du shell garde ~80 Mo. 48 px, ou extraction dans un processus à
+  part. À décider par l'utilisateur (qualité à 150 %).
+- 🟠 **NVML** (`activity.rs`) : ~19 Mo. Remplaçable par D3DKMT
+  (température) et PDH « GPU Engine » (charge).
+- 🟢 **Barre du second écran** : ~40 Mo et ~40 threads (2e device D3D11).
+  Device partagé (`QQuickGraphicsDevice::fromRhi`, boucle `basic`), risqué.
 - 🟠 **Montée en cours de journée** : 449 Mo une heure après le lancement
-  (2026-10-29), contre ~300 Mo au départ. Le presse-papiers n'explique
-  qu'une partie de l'écart. Relever la mémoire privée toutes les 10 min
-  pendant une journée normale, en notant ce qui a été ouvert.
-- 🟠 **Une fenêtre Qt = un device D3D11** : `TipWindow` (dès la première
-  infobulle), `Captions`, `PetWindow` et chaque `Bar` gardent leur `QRhi`,
-  leurs caches de glyphes et leurs atlas, même masquées. À mesurer d'abord
-  (mémoire privée avant / après la première infobulle), puis essayer
-  `persistentGraphics: false` + `releaseResources()` au masquage, ou un
-  `Loader` qui décharge `TipWindow`.
-- 🟢 **Pages déchargées** (`Panel.qml`) : `gc()` seulement. On pourrait
-  ajouter `trimComponentCache()` et `releaseResources()`. Gain probablement
-  faible.
+  (2026-10-29), contre ~300 Mo au départ. Ce sont surtout des blocs privés
+  de ~15 Mo qui s'ajoutent (9 de plus au bout d'une heure). Relever avec
+  `%TEMP%\ilot-vm.ps1` toutes les 10 min pendant une journée normale.
 
 ## Gestionnaire des tâches : restes
 

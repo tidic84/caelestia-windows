@@ -85,33 +85,68 @@ grandit avec la taille de l'écran.
 mesure toutes les 10 min pendant une journée normale dirait ce qui grimpe,
 et quand.
 
-## Pistes restantes (non faites, à mesurer d'abord)
+## Où partent les ~295 Mo au lancement (mesuré le 2026-10-29)
 
-Le plancher de 228 Mo au lancement vient presque entièrement de Qt : moteur
-QML et objets des pages ouvertes, tas JS, pilote D3D11, polices. Ce n'est
-pas mesurable depuis Linux. Par ordre de gain probable :
+Poste : 2 écrans 1920 × 1080, carte NVIDIA, 530 applis dans le menu
+Démarrer. L'îlot installé, 45 s après son lancement :
 
-1. **Une fenêtre Qt = un device D3D11.** Avec la boucle de rendu par thread,
-   chaque `Window` affichée au moins une fois garde son propre `QRhi`, ses
-   caches de glyphes et ses atlas de textures, même une fois masquée.
-   Ce sont : l'îlot, `TipWindow` (dès la première infobulle), `Captions`,
-   `PetWindow`, et une `Bar` par écran supplémentaire. Pistes :
-   `persistentGraphics: false` et `persistentSceneGraph: false`, puis
-   `releaseResources()` quand une fenêtre est masquée ; ou décharger
-   `TipWindow` par un `Loader` après quelques secondes sans infobulle. Il
-   faut d'abord mesurer : mémoire privée avant et après la première
-   infobulle.
-2. **Fenêtre repliée trop grande** (`perf-pistes.md` piste 8) : la chaîne
-   d'échange fait toute la largeur × 600 px logiques, plus le tampon de
-   profondeur. Cela pèse surtout en mémoire GPU.
-3. **Pages déchargées** (`Panel.qml`, après 5 min) : on appelle déjà `gc()`.
-   On pourrait y ajouter `trimComponentCache()` (types compilés des pages)
-   et `releaseResources()` sur la fenêtre (pipelines et images en cache).
-   Le gain est probablement faible.
-4. **Vider le working set** (`EmptyWorkingSet` après la fermeture du
-   panneau) : le chiffre du Gestionnaire des tâches baisserait, mais la
-   mémoire n'est pas libérée, elle part dans le fichier d'échange et
-   revient par défauts de page. C'est cosmétique, donc déconseillé.
+- 297 Mo de mémoire privée (engagée) ;
+- **193 Mo de working set privé** : c'est la colonne « Mémoire » du
+  Gestionnaire des tâches ;
+- 175 threads.
+
+Méthode : répartition des régions privées par `VirtualQueryEx` (sorte de
+VMMap maison), copie des grosses régions pour voir leur contenu, puis
+variantes de lancement (variables d'environnement, barre coupée) et petits
+programmes isolés pour chiffrer chaque poste. Les scripts sont dans
+`%TEMP%` (`ilot-vm.ps1`, `ilot-var.ps1`, `ilot-dump.ps1`, `d3dcost\`).
+
+| Poste | Coût mesuré | Comment on le sait |
+|---|---|---|
+| Icônes des applis (liste « jumbo » du shell) | **~80 Mo** | Un bloc unique de 80 Mo, rempli d'icônes 256 × 256 BGRA. Un programme seul qui demande les 530 icônes à 64 px garde +94 Mo, contre +14 Mo à 48 px. |
+| Pilote NVIDIA, premier device D3D11 | ~50 Mo, ~20 threads | Programme seul : 4 → 55 Mo pour un device. En rendu logiciel, l'îlot passe de 297 à 213 Mo et de 170 à 77 threads. |
+| Barre du second écran (2e fenêtre Qt) | ~40 Mo, ~40 threads | Barre coupée : 253 Mo, 129 threads. Programme seul : +15 Mo et +20 threads par device supplémentaire, le reste vient de Qt (rendu, caches). |
+| NVML (`nvml.dll`, température et charge du GPU) | ~19 Mo | `nvmlInit` seul : +19 Mo, non rendus par `nvmlShutdown` ni `FreeLibrary`. Dans l'îlot : 18,5 Mo de pages écrites dans `nvml.dll`. |
+| PDH (compteurs du CPU, comme le Gestionnaire) | ~7 Mo | La première requête charge les tables des noms et des aides (+6,6 Mo). Les suivantes ne coûtent presque rien. |
+| Piles des 170 threads | ~5 Mo | Les régions avec page de garde. |
+| Reste : tas Rust, Qt, QML, shell, polices | ~90 Mo | Plusieurs segments de tas de 15 à 23 Mo, dont deux presque vides (pages engagées à zéro, hors working set). |
+
+Ce qui ne marche pas :
+
+- **Autres moteurs de rendu de Qt** : OpenGL 516 Mo, Vulkan 611 Mo, D3D12
+  629 Mo. D3D11, utilisé aujourd'hui, est de loin le plus léger.
+- **`D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS`** : 21
+  threads au lieu de 23 par device, et la même mémoire.
+- **Rendu logiciel** (`QT_QUICK_BACKEND=software`, 213 Mo, ou WARP,
+  223 Mo) : le dessin passe sur le processeur, et `MultiEffect` et les
+  `ShaderEffect` ne marchent pas en mode `software`. À écarter.
+- **Boucle de rendu `basic`** : 290 Mo, pas de gain seule.
+
+## Pistes, par gain
+
+1. **Icônes à 48 px au lieu de 64** (`apps.rs`, `icon_of`) : **−80 Mo**.
+   Au-delà de 48 px, `IShellItemImageFactory` passe par la liste jumbo du
+   shell (256 × 256 par icône, gardée tant que le processus vit). Les
+   icônes de l'onglet Apps s'affichent à 40 px × DPI : à 100 % (le poste),
+   48 px suffisent. À 150 %, il en faudrait 60 et l'icône serait un peu
+   floue. Variantes qui gardent la qualité :
+   - extraire les icônes dans un processus à part (`ilot.exe --apps`, par
+     `ilot_cli`) qui écrit les PNG dans le cache disque puis se ferme ;
+   - garder les icônes en cache disque par appli, pour ne rappeler le shell
+     que pour les nouvelles applis.
+2. **NVML remplacé** (`activity.rs`) : **−19 Mo**. La température vient de
+   `D3DKMTQueryAdapterInfo(KMTQAITYPE_ADAPTERPERFDATA)`, que le
+   Gestionnaire des tâches utilise aussi, et la charge du compteur PDH
+   `\GPU Engine(*engtype_3D)\Utilization Percentage`, que `tasks.rs` lit
+   déjà. Plus de code, à valider sur une carte AMD ou Intel.
+3. **Un seul device pour l'îlot et les barres** : de −15 à −40 Mo, et
+   −20 threads par écran en plus. Il faudrait
+   `QQuickGraphicsDevice::fromRhi` (Qt 6.6 et plus) avec la boucle
+   `basic`, car en boucle `threaded` chaque fenêtre a son propre thread de
+   rendu. Risque : à plusieurs fenêtres, la boucle `basic` peut caler
+   l'animation sur la synchro verticale de chacune. À essayer en dernier.
+4. **Vider le working set** (`EmptyWorkingSet`) : cosmétique, la mémoire
+   part dans le fichier d'échange. Déconseillé.
 
 ## Méthode de mesure (sous Windows)
 

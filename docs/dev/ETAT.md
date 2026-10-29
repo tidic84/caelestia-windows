@@ -38,6 +38,25 @@ reprendre.
 
 ## Journal
 
+### 2026-10-29 : d'où viennent les ~300 Mo (exploration, sans code)
+
+Répartition mesurée sur le poste, détail et méthode dans
+`docs/perf-memoire.md`. Au lancement : 297 Mo privés, 193 Mo au
+Gestionnaire, 175 threads. Les gros postes :
+- icônes des applis à 64 px : ~80 Mo (liste jumbo du shell) ;
+- premier device D3D11 NVIDIA : ~50 Mo ;
+- barre du second écran : ~40 Mo ;
+- NVML : ~19 Mo ;
+- PDH : ~7 Mo.
+
+D3D11 reste le moteur le plus léger : OpenGL, Vulkan et D3D12 dépassent
+500 Mo. Le drapeau D3D11 anti-threads n'apporte rien.
+- **Rien n'est changé dans le code.** Pistes chiffrées dans `BACKLOG.md`
+  (section « Mémoire ») : icônes en 48 px (−80 Mo, à décider pour la
+  qualité à 150 %), NVML remplacé (−19 Mo).
+- `settings.json` a été modifié le temps d'une mesure (barre coupée), puis
+  remis à l'identique (hash vérifié). L'îlot installé a été relancé.
+
 ### 2026-10-29 : mémoire, comparaison avec Nusa
 
 Demande : l'îlot pèse ~300 Mo chez l'utilisateur ; regarder comment Nusa
