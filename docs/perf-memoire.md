@@ -61,6 +61,30 @@ environ 25 à 50 ms d'encodage, dans le thread du presse-papiers. Une photo
 plein écran se compresse moins bien (×2 environ), mais reste plus petite
 qu'en brut.
 
+### Mesuré sous Windows (2026-10-29)
+
+Sur le poste, écran 1920 × 1080, avec Valorant ouvert, donc des captures de
+jeu, qui se compressent mal. Pour chaque version : îlot lancé seul, 30 s
+d'attente, puis 8 captures de l'écran mises dans le presse-papiers par
+PowerShell (`Clipboard.SetImage`), une toutes les 3 s. Mesure 10 s après.
+Script : `%TEMP%\ilot-mem.ps1` (hors du dépôt).
+
+| Version | Au lancement | Après 8 captures | Écart |
+|---|---|---|---|
+| Ancienne (0.4.23 installée) | 300,4 Mo | 367,7 Mo | **+67 Mo** (8 × 8,3 Mo) |
+| Nouvelle (branche, avec `main`) | 319,2 Mo | 341,5 Mo | **+22 Mo** |
+
+Mémoire privée. Le Gestionnaire des tâches (working set) affiche environ
+30 Mo de plus. L'écart au lancement entre les deux versions (19 Mo) vient
+d'autre chose : la nouvelle contient les Réglages refaits de `main`, et le
+bruit d'une mesure à l'autre est du même ordre. En 1440p ou en 4K, le gain
+grandit avec la taille de l'écran.
+
+**Encore inexpliqué** : un `qt\build\ilot.exe` lancé à 13 h 45 était monté
+à **449 Mo** vers 14 h 50. Le presse-papiers n'explique pas tout. Une
+mesure toutes les 10 min pendant une journée normale dirait ce qui grimpe,
+et quand.
+
 ## Pistes restantes (non faites, à mesurer d'abord)
 
 Le plancher de 228 Mo au lancement vient presque entièrement de Qt : moteur

@@ -243,6 +243,10 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Mémoire (voir `docs/perf-memoire.md`)
 
+- 🟠 **Montée en cours de journée** : 449 Mo une heure après le lancement
+  (2026-10-29), contre ~300 Mo au départ. Le presse-papiers n'explique
+  qu'une partie de l'écart. Relever la mémoire privée toutes les 10 min
+  pendant une journée normale, en notant ce qui a été ouvert.
 - 🟠 **Une fenêtre Qt = un device D3D11** : `TipWindow` (dès la première
   infobulle), `Captions`, `PetWindow` et chaque `Bar` gardent leur `QRhi`,
   leurs caches de glyphes et leurs atlas, même masquées. À mesurer d'abord

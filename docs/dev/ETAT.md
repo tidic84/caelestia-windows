@@ -63,11 +63,14 @@ tient en ~30 Mo. Rapport complet : `docs/perf-memoire.md`.
   l'encodage (l'encodeur panique sinon, hors `catch_unwind`), décodage par
   `PngDecoder` sans la limite de 512 Mio, dimensions lues sur l'image
   décodée.
-- **Non vérifié** : pas de compilation MSVC ni de `qt\build.cmd` (pas de
-  Windows dans cette session). Pas de mesure de la RAM réelle : faire la
-  mesure de `perf-memoire.md` (8 captures Win+Maj+S, mémoire privée avant
-  et après), puis recopier une image de l'historique (Win+V, Entrée) et la
-  coller.
+- **Sur le poste (suite de la session, reprise par téléportation)** :
+  `main` fusionné (un conflit dans `ETAT.md`), `qt\build.cmd` passe avec
+  MSVC, et `install.ps1` a installé la nouvelle version. Mesure : 8 captures
+  1080p font passer l'îlot de +67 Mo (ancienne version) à +22 Mo (nouvelle).
+  Détail dans `perf-memoire.md`.
+- **Non vérifié** : recopier une image de l'historique (Win+V, Entrée) et
+  la coller. Un build de test lancé à 13 h 45 était à 449 Mo vers 14 h 50 :
+  cette montée n'est pas expliquée (voir `BACKLOG.md`, « Mémoire »).
 - **Changelog** : rien n'est ajouté avant la version. Ligne proposée pour
   la 0.4.24 : « **Mémoire** : les images de l'historique du
   presse-papiers sont gardées compressées. Une capture d'écran prend
