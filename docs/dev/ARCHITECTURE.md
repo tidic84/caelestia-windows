@@ -58,7 +58,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── examples/sign.rs  Clé et signature des archives (keygen, pub, sign), vérifiées par update.rs
 ├── .github/workflows/release.yml  À la main seulement (ne signe pas) : compile et publie ilot-<ver>-win64.zip
 ├── icons/          icon.ico, icon.png
-└── docs/           Captures, perf-ilot.md (mesures), perf-pistes.md (optimisations), dev/ (ce dossier)
+└── docs/           Captures, perf-ilot.md (mesures), perf-pistes.md (optimisations), perf-memoire.md (RAM, Nusa), dev/ (ce dossier)
                     design/claude-code/ : maquette et spécification de l'animation Claude Code
 ```
 

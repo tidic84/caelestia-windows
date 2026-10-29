@@ -35,6 +35,40 @@ reprendre.
 
 ## Journal
 
+### 2026-10-29 : mémoire, comparaison avec Nusa
+
+Demande : l'îlot pèse ~300 Mo chez l'utilisateur ; regarder comment Nusa
+tient en ~30 Mo. Rapport complet : `docs/perf-memoire.md`.
+
+- **Nusa** : code non publié (le dépôt ne contient que le site), installeur
+  Inno Setup illisible par innoextract 1.9. D'après le site : Rust, rendu
+  GPU sans moteur web, dessine seulement quand ça bouge, et l'étagère garde
+  des chemins plutôt que des contenus. Copier son rendu maison voudrait
+  dire réécrire tout le QML : non adapté. Le principe « références plutôt
+  que contenus » s'applique, lui.
+- **Corrigé** (`src/system.rs`) : l'historique du presse-papiers gardait
+  les 8 dernières images en RGBA brut, soit 15 Mo par capture en 1440p et
+  33 Mo en 4K (jusqu'à 265 Mo). Elles sont gardées en PNG (`rgba_png`) et
+  décodées seulement dans `clip_copy`. Ratio mesuré : ×4,6 (photos) à ×29
+  (interface), sans perte, ~2 ms pour 800 × 540. La miniature et le
+  dédoublonnage (hash sur les octets bruts) sont inchangés.
+- **Vérifié** : `cargo check` et `cargo clippy --target
+  x86_64-pc-windows-gnu --lib` (conteneur Linux, MinGW), sans nouvel
+  avertissement. Encodage et aller-retour PNG testés dans un petit
+  programme à part, sur les captures de `docs/`. Relu par un agent de
+  relecture.
+- **Non vérifié** : pas de compilation MSVC ni de `qt\build.cmd` (pas de
+  Windows dans cette session). Pas de mesure de la RAM réelle : faire la
+  mesure de `perf-memoire.md` (8 captures Win+Maj+S, mémoire privée avant
+  et après), puis recopier une image de l'historique (Win+V, Entrée) et la
+  coller.
+- **Changelog** : rien n'est ajouté avant la version. Ligne proposée pour
+  la 0.4.24 : « **Mémoire** : les images de l'historique du
+  presse-papiers sont gardées compressées. Une capture d'écran prend
+  quelques centaines de Ko au lieu de 15 à 33 Mo. »
+- **À reprendre** : `BACKLOG.md`, section « Mémoire » (une fenêtre Qt =
+  un device D3D11, à mesurer d'abord).
+
 ### 2026-10-26 au 28 : session bugs visuels (0.4.23 à venir)
 
 Méthode :

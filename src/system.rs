@@ -180,7 +180,8 @@ pub fn watch(app: AppHandle) {
 pub struct Clip {
     id: u64,
     text: Option<String>,
-    /// image complete (RGBA), pour pouvoir la recopier
+    /// image complete, pour pouvoir la recopier : largeur, hauteur et PNG.
+    /// Brute (RGBA), une capture d'ecran pese 15 Mo en 1440p, 33 Mo en 4K
     image: Option<(usize, usize, std::sync::Arc<Vec<u8>>)>,
     thumb: String,
     hash: u64,
@@ -223,6 +224,17 @@ fn rgba_thumb(w: usize, h: usize, bytes: &[u8], size: u32) -> Option<String> {
     Some(crate::img::CLIPS.url("image/png", out.into_inner()))
 }
 
+/// Image RGBA -> PNG gardee dans l'historique (sans perte, 4 a 30 fois plus
+/// petite selon l'image)
+fn rgba_png(w: usize, h: usize, bytes: &[u8]) -> Option<Vec<u8>> {
+    use image::ImageEncoder;
+    let mut out = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut out)
+        .write_image(bytes, w as u32, h as u32, image::ExtendedColorType::Rgba8)
+        .ok()?;
+    Some(out)
+}
+
 fn clips_view(q: &VecDeque<Clip>) -> Vec<ClipView> {
     q.iter().map(Clip::view).collect()
 }
@@ -253,13 +265,8 @@ pub fn watch_clipboard(app: AppHandle) {
                     _ => cb.as_mut().ok().and_then(|c| c.get_image().ok()).and_then(|img| {
                         let hash = hash_of(&img.bytes);
                         let thumb = rgba_thumb(img.width, img.height, &img.bytes, 360)?;
-                        Some(Clip {
-                            id: 0,
-                            hash,
-                            text: None,
-                            image: Some((img.width, img.height, std::sync::Arc::new(img.bytes.into_owned()))),
-                            thumb,
-                        })
+                        let png = rgba_png(img.width, img.height, &img.bytes)?;
+                        Some(Clip { id: 0, hash, text: None, image: Some((img.width, img.height, std::sync::Arc::new(png))), thumb })
                     }),
                 };
                 if let Some(mut c) = entry {
@@ -350,9 +357,11 @@ pub fn clip_copy(st: State<'_, Clips>, id: u64) -> bool {
     let Ok(mut cb) = arboard::Clipboard::new() else { return false };
     match (c.text, c.image) {
         (Some(t), _) => cb.set_text(t).is_ok(),
-        (None, Some((w, h, bytes))) => cb
-            .set_image(arboard::ImageData { width: w, height: h, bytes: std::borrow::Cow::Borrowed(&bytes) })
-            .is_ok(),
+        (None, Some((w, h, png))) => {
+            let Ok(img) = image::load_from_memory_with_format(&png, image::ImageFormat::Png) else { return false };
+            let bytes = img.into_rgba8().into_raw();
+            cb.set_image(arboard::ImageData { width: w, height: h, bytes: std::borrow::Cow::Owned(bytes) }).is_ok()
+        }
         _ => false,
     }
 }

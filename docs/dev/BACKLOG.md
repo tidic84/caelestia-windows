@@ -231,6 +231,18 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   Windows, ni ses raccourcis, ni le remappage ne sont actifs, le crochet
   n'est pas installé. Verr. Maj est alors encore sondée toutes les 120 ms.
 
+## Mémoire (voir `docs/perf-memoire.md`)
+
+- 🟠 **Une fenêtre Qt = un device D3D11** : `TipWindow` (dès la première
+  infobulle), `Captions`, `PetWindow` et chaque `Bar` gardent leur `QRhi`,
+  leurs caches de glyphes et leurs atlas, même masquées. À mesurer d'abord
+  (mémoire privée avant / après la première infobulle), puis essayer
+  `persistentGraphics: false` + `releaseResources()` au masquage, ou un
+  `Loader` qui décharge `TipWindow`.
+- 🟢 **Pages déchargées** (`Panel.qml`) : `gc()` seulement. On pourrait
+  ajouter `trimComponentCache()` et `releaseResources()`. Gain probablement
+  faible.
+
 ## Gestionnaire des tâches : restes
 
 - 🟢 Colonne « Disque » : les E/S des processus sont ramenées au débit
@@ -258,6 +270,9 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Fait
 
+- 2026-10-29, après 0.4.23 : images de l'historique du presse-papiers
+  gardées en PNG au lieu du RGBA brut (jusqu'à 8 × 15 à 33 Mo). Détail
+  dans `docs/perf-memoire.md`.
 - 2026-10-28, 0.4.23 à venir : 25 bugs visuels (survol, clics qui
   traversent, coins, thème clair, aperçu des fenêtres, soundboard, Wi-Fi).
   Détail dans `ETAT.md`, session « bugs visuels ».
