@@ -4,7 +4,7 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
-## 0.4.24 — à venir
+## 0.4.24 — 2026-10-29
 
 - **Réglages refaits** :
   - 13 onglets rangés en trois groupes : Personnaliser (Thème, Îlot et pilule, Lecteur, Compagnon), Comportement (Alertes, Barre et écran, Jeu et absence, Son) et Système (Clavier, Météo et agenda, Accessibilité, Addons, Mises à jour) ;
@@ -20,6 +20,7 @@ description à chaque version publiée sur GitHub.
 - **Cartes noires (OLED)** (Réglages › Îlot et pilule) : en mode sombre, le fond devient noir pur et les cartes presque noires.
 - **Moins de mémoire** : l'îlot prend environ 75 Mo de moins au lancement (icônes des applis demandées à 48 px, ce qui évite le grand cache d'icônes de Windows). Les images de l'historique du presse-papiers sont gardées compressées : une capture d'écran n'y pèse plus 8 à 33 Mo.
 - **Réglages plus rapides à ouvrir** : la page ne fait plus recalculer tout l'îlot à chaque ouverture, et chaque onglet n'est créé qu'à sa première visite.
+- **Outils Windows dans Apps** : le lanceur propose aussi le Gestionnaire de périphériques, les Outils Windows (Gestion de l'ordinateur, Observateur d'événements, Planificateur de tâches, Éditeur du Registre…), tous les éléments du Panneau de configuration (Son, Options d'alimentation, Programmes et fonctionnalités, Réseau…), la Gestion des disques, les Connexions réseau, Windows Update et d'autres outils de Windows.
 
 ## 0.4.23 — 2026-10-28
 
