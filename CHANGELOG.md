@@ -4,6 +4,22 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.24 — à venir
+
+- **Réglages refaits** :
+  - 13 onglets rangés en trois groupes : Personnaliser (Thème, Îlot et pilule, Lecteur, Compagnon), Comportement (Alertes, Barre et écran, Jeu et absence, Son) et Système (Clavier, Météo et agenda, Accessibilité, Addons, Mises à jour) ;
+  - une recherche en haut de la liste trouve un réglage par son nom et indique où il était avant (« avant : Apparence ») ; les anciens noms d'onglets (Général, Apparence, Pilule, Raccourcis) trouvent aussi ce qu'ils contenaient.
+- **Enregistrer ou annuler** : un réglage changé ne s'applique plus tout de suite.
+  - Une barre en bas compte les modifications, avec Annuler et Enregistrer (ou Ctrl+S).
+  - Un clic sur le nombre liste les changements (avant → après) et mène à leur onglet.
+  - Un point orange marque chaque réglage modifié et son onglet.
+  - Tant qu'il reste des modifications, l'îlot ne quitte pas Réglages : la barre tremble et rougit.
+  - Les actions restent immédiates (sorties audio, ville, agendas, addons, raccourcis, écran, démarrage, Exporter, Tester…). Pour la touche Windows, l'invite administrateur s'ouvre à l'enregistrement.
+- **Aperçus animés** en haut des onglets Thème, Îlot et pilule, Lecteur et Alertes : ils montrent les changements avant qu'on les enregistre (couleurs, forme, contour, horloge, vitesse des animations, bouton et barre du lecteur, alertes). L'îlot tel qu'il est enregistré reste visible à côté (« Ton îlot »). Le compagnon de l'onglet Compagnon porte aussi les changements.
+- **Thèmes prêts refaits** : 13 thèmes en cartes, avec un aperçu de la pilule et des couleurs. Ardoise (gris-bleu opaque), Brume (gris-bleu sur acrylique) et OLED sont nouveaux, ainsi qu'Aurore, Papier et Bonbon ; Minuit, Néon, Coucher de soleil, Forêt, Glace, Rétro et Monochrome sont revus. Ils règlent aussi l'horloge et les animations. Après une retouche, « Thème perso, d'après X » propose de revenir au thème.
+- **Cartes noires (OLED)** (Réglages › Îlot et pilule) : en mode sombre, le fond devient noir pur et les cartes presque noires.
+- **Réglages plus rapides à ouvrir** : la page ne fait plus recalculer tout l'îlot à chaque ouverture, et chaque onglet n'est créé qu'à sa première visite.
+
 ## 0.4.23 — 2026-10-28
 
 - **Survol et clics plus justes** :

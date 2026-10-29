@@ -27,6 +27,9 @@ reprendre.
 - **Lecteur de musique (0.4.16)** : une première version, validée par
   l'utilisateur. Il reste à le tester à la main (voir « Non vérifié » dans le
   journal du 2026-10-23).
+- **Réglages refaits (2026-10-29, non publiés)** : onglets groupés,
+  brouillon avec Enregistrer / Annuler, thèmes prêts, aperçus. Voir le
+  journal du 2026-10-29 ; à essayer à la main par l'utilisateur.
 - **Prochaine étape** : vérification visuelle par l'utilisateur (coins de
   l'onglet Média, pochette ronde + spectre, réglages du fond, nouvelle section
   Réglages), puis lot Rust média (`BACKLOG.md`, « Lot suivant du lecteur »).
@@ -71,6 +74,76 @@ tient en ~30 Mo. Rapport complet : `docs/perf-memoire.md`.
   quelques centaines de Ko au lieu de 15 à 33 Mo. »
 - **À reprendre** : `BACKLOG.md`, section « Mémoire » (une fenêtre Qt =
   un device D3D11, à mesurer d'abord).
+
+### 2026-10-29 : Réglages refaits (onglets groupés, brouillon, thèmes, aperçus)
+
+Maquettes : `docs/dev/maquettes/reglages.html` (direction A, choisie par
+l'utilisateur) et `reglages-directions.html` (les 4 directions).
+
+Fait (non commité au moment de l'écriture) :
+- **Cartes noires (OLED)** : réglage `cfg.oled` (interface seule, gardé par
+  `extra` côté Rust), Réglages › Îlot et pilule. En mode sombre, fond
+  `#000` et cartes en tons 4/6/10/14 du neutre du schéma :
+  `Theme.oled(p, s)`, appelé par `Ilot.applyTheme` et par les aperçus.
+  Vérifié par l'utilisateur.
+- **Gel au clic sur Réglages** : mesuré par journal temporaire. `load()`
+  remplaçait `Ilot.cfg` à chaque ouverture (≈ 85 ms) : il ne le fait plus
+  que si une valeur diffère (1 ms). Création de la page : 75 ms, désormais
+  par onglet (Loader par onglet, à la première ouverture). Essayé puis
+  retiré : `Loader.asynchronous` sur la page (0,5 s de panneau vide).
+- **Onglets groupés** (13) : Personnaliser (Thème, Îlot et pilule, Lecteur,
+  Compagnon), Comportement (Alertes, Barre et écran, Jeu et absence, Son),
+  Système (Clavier, Météo et agenda, Accessibilité, Addons, Mises à jour).
+  Recherche d'un réglage en haut de la liste (`searchIndex`). Les anciens
+  noms `general`, `look`, `pill` mènent à `updates`, `theme`, `island` ;
+  un nom inconnu mène à Thème.
+- **Brouillon** (comme Discord) : `page.set()` remplace `Ilot.setCfg` dans
+  les onglets ; `cfg` = `Ilot.cfg` + `draft`. Barre en bas : nombre de
+  modifications (clic : liste par onglet), Annuler, Enregistrer (Ctrl+S).
+  Point orange sur les onglets modifiés. `Ilot.settingsDirty` : `showTab`
+  refuse de quitter Réglages, la barre tremble et rougit
+  (`settingsLeaveBlocked`). Restent immédiats : sorties audio, ville,
+  agendas, addons, applis du plein écran, raccourcis, écran, démarrage,
+  boutons d'action. Touche Windows : l'invite admin s'ouvre à
+  l'enregistrement.
+- **Thèmes prêts** (13, en cartes) : Ardoise, Brume, OLED, Minuit, Aurore,
+  Néon, Coucher de soleil, Forêt, Glace, Papier, Bonbon, Rétro, Monochrome.
+  Ils règlent aussi l'horloge et les animations ; `cfg.preset` garde le
+  dernier choisi (« Thème perso, d'après X » et « Revenir à X »).
+- **Repères du brouillon** : point orange sur chaque réglage modifié
+  (propriété `key` de `SubTitle`, `SetRow`, `Chips`), liste « avant →
+  après » au clic sur le nombre (clic : va à l'onglet), vignette « Ton îlot »
+  (état enregistré) sur l'aperçu. Recherche : « avant : ancien onglet » et
+  les anciens noms d'onglets (Général, Apparence, Pilule, Raccourcis)
+  trouvent leurs réglages (remplace le tableau « Où est passé… »).
+- **Aperçus animés** : `SettingsPreview.qml`, en haut des onglets Thème,
+  Îlot et pilule (ouverture en boucle à la vitesse choisie), Lecteur et
+  Alertes. Ils suivent le brouillon (palette calculée sans toucher au
+  thème). Le compagnon de l'onglet Compagnon suit aussi le brouillon.
+
+Vérifié : build, qmllint (pas de nouvel avertissement hors ceux déjà
+présents), captures de chaque onglet par `ILOT_QT_SHOT` avec un code de
+test temporaire (onglet, brouillon, tentative de sortie) retiré ensuite.
+`settings.json` et `ui.json` comparés à leur sauvegarde : inchangés.
+
+Relu par un agent relecteur à chaque étape. Corrigé après relecture :
+interrupteur jamais enregistré coupé puis rallumé (restait « modifié »),
+aperçu en couleur auto / pochette et en mode auto / horaire (suivait la
+config enregistrée : `Ilot.darkFor(c)` partagé), clic sur le thème déjà en
+place. À faire confirmer par l'utilisateur : tant qu'un brouillon existe,
+les raccourcis d'onglets, Win+V et le dépôt de fichiers rouvrent Réglages
+(barre qui tremble) au lieu de leur onglet, même îlot refermé.
+
+Testé par code temporaire (arguments de ligne de commande, retiré
+ensuite ; pas de clics simulés, antivirus) : Enregistrer écrit dans
+`settings.json` exactement les clés du brouillon, Annuler n'écrit rien, le
+thème OLED appliqué puis enregistré écrit ses 5 clés, recherche « pilule »,
+liste avant → après, tentative de sortie. `settings.json` et `ui.json`
+remis depuis leur sauvegarde après chaque test.
+
+Non vérifié : clics de souris réels et Ctrl+S (même fonction `save()` que
+le bouton), l'invite admin de la touche Windows à l'enregistrement (UAC),
+l'aperçu Lecteur avec chaque forme de bouton.
 
 ### 2026-10-26 au 28 : session bugs visuels (0.4.23 à venir)
 

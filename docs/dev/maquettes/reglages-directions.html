@@ -1,0 +1,528 @@
+<title>Réglages : quatre directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&family=Silkscreen&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,1,0&display=block">
+<style>
+/* Maquette : quatre directions pour les Réglages (qt/qml/SettingsPage.qml).
+   Mise en page : une direction par bande (maquette cliquable à gauche,
+   idée / pour / contre à droite), puis un tableau de comparaison.
+   Palette de Theme.qml, sombre comme l'îlot. Les réglages sont partagés :
+   changer la forme dans une direction change l'aperçu des autres. */
+:root{
+  color-scheme:dark;
+  --page:#0e0d11; --surface:#141218; --surfaceC:#211f26; --surfaceHigh:#2b2930; --surfaceHighest:#36343b;
+  --ink:#e6e0e9; --inkVar:#cac4d0; --outline:#938f99; --outlineVar:#49454f;
+  --primary:#cfbdfe; --inkPrimary:#36265d; --primaryC:#4d3d75; --inkPrimaryC:#e9ddff;
+  --secC:#4a4458; --inkSecC:#e8def8;
+  --good:#9ad7a4; --bad:#ffb4ab; --mark:#ffb68a;
+  --ui:Rubik,"Segoe UI",system-ui,sans-serif;
+  --pixel:Silkscreen,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 var(--ui);
+  padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:44px}
+.ms{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;white-space:nowrap;user-select:none;font-feature-settings:"liga";font-size:20px}
+h1{font-size:26px;font-weight:500;margin:0;text-wrap:balance}
+h2{font-size:20px;font-weight:500;margin:0;text-wrap:balance}
+.lead{color:var(--inkVar);margin:6px 0 0;max-width:78ch}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.jump{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.jump a{height:34px;border-radius:17px;background:var(--surfaceHigh);color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;gap:8px;padding:0 14px 0 6px;font-size:13px}
+.jump a b{width:24px;height:24px;border-radius:12px;background:var(--primaryC);color:var(--inkPrimaryC);display:grid;place-items:center;font-weight:500;font-size:12px}
+
+/* une direction */
+.dir{display:grid;grid-template-columns:minmax(0,700px) minmax(0,1fr);gap:24px;align-items:start}
+.dir header{grid-column:1/-1;display:flex;align-items:center;gap:12px}
+.dir header .n{width:36px;height:36px;border-radius:12px;background:var(--primaryC);color:var(--inkPrimaryC);display:grid;place-items:center;font-weight:600;font-size:16px;flex:none}
+.dir header p{margin:0;color:var(--inkVar);font-size:13.5px}
+.why{display:flex;flex-direction:column;gap:14px;min-width:0}
+.why h3{margin:0;font-size:12px;font-weight:500;letter-spacing:1.1px;text-transform:uppercase;color:var(--outline)}
+.why ul{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;color:var(--inkVar);font-size:13.5px}
+.why .pro li::marker{color:var(--good)}
+.why .con li::marker{color:var(--bad)}
+.why .try{background:var(--surface);border-radius:16px;padding:10px 14px;font-size:13px;color:var(--inkVar);display:flex;gap:8px}
+.why .try .ms{color:var(--primary);font-size:18px}
+@media (max-width:980px){.dir{grid-template-columns:minmax(0,1fr)}}
+
+/* cadre de l'îlot ouvert */
+.panel{background:#000;border-radius:30px;padding:14px;height:460px;display:flex;flex-direction:column;gap:10px;overflow:hidden;min-width:0}
+.scroll{overflow-y:auto;scrollbar-width:thin;min-height:0}
+.row2{display:flex;gap:12px;flex:1;min-height:0}
+.search{display:flex;align-items:center;gap:8px;height:36px;border-radius:18px;background:var(--surfaceC);padding:0 12px;flex:none}
+.search .ms{font-size:18px;color:var(--inkVar)}
+.search input{flex:1;min-width:0;background:none;border:0;color:var(--ink);font:inherit;font-size:13px;outline:none}
+.grp{font-size:10.5px;font-weight:500;letter-spacing:1.1px;text-transform:uppercase;color:var(--outline);padding:10px 10px 3px}
+.nb{display:flex;align-items:center;gap:9px;height:32px;border-radius:16px;padding:0 10px;border:0;background:none;cursor:pointer;text-align:left;width:100%;font-size:13px}
+.nb .ms{font-size:18px;color:var(--inkVar)}
+.nb:hover{background:var(--surfaceC)}
+.nb.on{background:var(--secC);color:var(--inkSecC);font-weight:500}
+.nb.on .ms{color:var(--inkSecC)}
+.dot{width:7px;height:7px;border-radius:4px;background:var(--bad);margin-left:auto;flex:none}
+.col{display:flex;flex-direction:column;gap:8px}
+.card{background:var(--surfaceC);border-radius:20px;padding:12px;flex:none}
+.hd{display:flex;align-items:center;gap:12px}
+.ic{width:36px;height:36px;border-radius:12px;background:var(--secC);color:var(--inkSecC);display:grid;place-items:center;flex:none}
+.ic .ms{font-size:19px}
+.t{font-size:13.5px;font-weight:500}
+.s{font-size:11.5px;color:var(--inkVar);line-height:1.35}
+.sub{font-size:11.5px;font-weight:500;color:var(--inkVar);padding:10px 0 0}
+.flow{display:flex;flex-wrap:wrap;gap:5px;padding-top:6px}
+.chip{height:28px;border-radius:14px;padding:0 11px;background:var(--surfaceHigh);font-size:12px;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.chip:hover{background:var(--surfaceHighest)}
+.chip.on{background:var(--secC);color:var(--inkSecC)}
+.chip.on::before{content:"check";font-family:"Material Symbols Rounded";font-size:15px;font-feature-settings:"liga"}
+.tg{display:flex;align-items:center;gap:10px;min-height:40px;padding-top:4px;font-size:13px}
+.tg span{flex:1;min-width:0}
+.swi{width:46px;height:28px;border-radius:14px;background:var(--surfaceHighest);border:2px solid var(--outline);position:relative;flex:none;cursor:pointer;padding:0}
+.swi::after{content:"";position:absolute;left:5px;top:5px;width:14px;height:14px;border-radius:7px;background:var(--outline);transition:all .3s cubic-bezier(.34,1.36,.5,1)}
+.swi[aria-checked="true"]{background:var(--primary);border-color:var(--primary)}
+.swi[aria-checked="true"]::after{left:20px;top:2px;width:20px;height:20px;border-radius:10px;background:var(--inkPrimary)}
+.sws{display:flex;gap:6px;padding-top:6px;flex-wrap:wrap}
+.sw{width:26px;height:26px;border-radius:13px;border:0;cursor:pointer;padding:0}
+.sw.on{box-shadow:0 0 0 2px var(--surfaceC),0 0 0 4px var(--primary)}
+.back{display:flex;align-items:center;gap:8px;flex:none}
+.back button{width:36px;height:36px;border-radius:18px;border:0;background:var(--surfaceC);cursor:pointer;display:grid;place-items:center}
+.back b{font-weight:500;font-size:16px}
+.back small{color:var(--outline);font-size:12px}
+.empty{color:var(--inkVar);font-size:13px;padding:10px}
+
+/* aperçu : îlot */
+.stage{position:relative;border-radius:18px;overflow:hidden;flex:none;height:120px;
+  background:radial-gradient(120% 140% at 20% 0%,#3a2f5e 0%,#1b1730 45%,#0d0b16 100%)}
+.stage .lbl{position:absolute;left:12px;bottom:8px;font-size:11px;color:#ffffffa0}
+.isl{position:absolute;left:50%;top:12px;transform:translateX(-50%);width:170px;height:32px;border-radius:16px;color:#fff;
+  transition:width var(--dur,.5s) var(--ease,ease),height var(--dur,.5s) var(--ease,ease),border-radius var(--dur,.5s) var(--ease,ease)}
+.isl .bgl{position:absolute;inset:0;border-radius:inherit;background:#211f26;overflow:hidden}
+.isl.bg-black .bgl{background:#000}
+.isl.bg-glass .bgl{background:#1d1b2399;backdrop-filter:blur(14px)}
+.isl.bg-aurora .bgl{background:#0b0a12}
+.isl.bg-aurora .bgl::before,.isl.bg-aurora .bgl::after{content:"";position:absolute;width:70%;height:160%;top:-30%;border-radius:50%;filter:blur(14px);opacity:.75;animation:aur 7s ease-in-out infinite alternate}
+.isl.bg-aurora .bgl::before{left:-10%;background:#3ad6a2}
+.isl.bg-aurora .bgl::after{right:-10%;background:#6d4fc4;animation-delay:-3s}
+@keyframes aur{to{transform:translateX(35%) scaleY(.7)}}
+.isl.shape-pill{border-radius:20px}
+.isl.shape-square{border-radius:8px}
+.isl.open{width:300px;height:92px;border-radius:24px}
+.isl.open.shape-pill{border-radius:40px}
+.isl.open.shape-square{border-radius:12px}
+.isl .closed{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 11px;transition:opacity .2s}
+.isl .closed .ms{font-size:15px;opacity:.8}
+.isl.open .closed{opacity:0}
+.isl .opened{position:absolute;inset:0;padding:12px;display:flex;gap:12px;align-items:center;opacity:0;transition:opacity .15s}
+.isl.open .opened{opacity:1;transition-delay:calc(var(--dur,.5s)*.45)}
+.isl .art{width:66px;height:66px;border-radius:18px;flex:none;background:linear-gradient(135deg,#ff9a8b,#a855f7 60%,#3b2a73)}
+.isl .meta b{font-weight:500;font-size:14px;display:block}
+.isl .meta i{font-style:normal;font-size:11.5px;opacity:.7}
+.clk{font-weight:600;font-size:13px;font-variant-numeric:tabular-nums}
+.clk.neon{color:var(--primary);text-shadow:0 0 6px var(--primary),0 0 12px var(--primary)}
+.clk.pixel{font-family:var(--pixel);font-weight:400;font-size:12px;letter-spacing:1px}
+.ana{width:20px;height:20px}
+.ana .mh{transform-origin:10px 10px;animation:rot 6s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* B : tuiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.tile{background:var(--surfaceC);border-radius:18px;border:0;padding:12px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:8px;min-height:96px;position:relative}
+.tile:hover{background:var(--surfaceHigh)}
+.tile .ic{width:32px;height:32px;border-radius:11px}
+.tile .ic .ms{font-size:18px}
+.tile b{font-weight:500;font-size:13px}
+.tile small{color:var(--inkVar);font-size:11.5px;line-height:1.3}
+.tile .dot{position:absolute;right:12px;top:12px}
+.recent{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--outline)}
+
+/* C : atelier */
+.seg{display:flex;background:var(--surfaceC);border-radius:18px;padding:3px;flex:none;align-self:center}
+.seg button{height:30px;border-radius:15px;border:0;background:none;padding:0 14px;cursor:pointer;font-size:12.5px;display:flex;align-items:center;gap:6px}
+.seg button .ms{font-size:17px}
+.seg button.on{background:var(--secC);color:var(--inkSecC);font-weight:500}
+.desk{position:relative;flex:1.15;min-width:0;border-radius:20px;overflow:hidden;background:radial-gradient(110% 120% at 30% 10%,#43357a 0%,#1d1836 50%,#0d0b16 100%)}
+.desk .isl{top:14px}
+.hot{position:absolute;border:0;background:none;cursor:pointer;border-radius:14px;outline:2px dashed transparent;outline-offset:4px;transition:outline-color .2s}
+.hot:hover{outline-color:#ffffff50}
+.hot.on{outline:2px solid var(--primary)}
+.hot .tagl{position:absolute;left:50%;transform:translateX(-50%);bottom:-24px;font-size:10.5px;background:var(--primaryC);color:var(--inkPrimaryC);border-radius:8px;padding:1px 7px;white-space:nowrap;opacity:0;transition:opacity .2s}
+.hot.on .tagl,.hot:hover .tagl{opacity:1}
+.taskbar{position:absolute;left:0;right:0;bottom:0;height:30px;background:#0009;backdrop-filter:blur(10px)}
+.mplayer{width:150px;height:58px;border-radius:16px;background:#000;display:flex;align-items:center;gap:8px;padding:8px}
+.mplayer .a{width:42px;height:42px;border-radius:12px;background:conic-gradient(#ff9a8b,#a855f7,#3b2a73,#ff9a8b);animation:rot 6s linear infinite;flex:none;clip-path:polygon(50% 0,61% 12%,77% 7%,80% 23%,96% 27%,90% 42%,100% 55%,88% 66%,93% 82%,77% 82%,70% 97%,56% 89%,44% 100%,35% 87%,19% 93%,17% 77%,2% 71%,10% 56%,0 43%,12% 33%,6% 18%,22% 16%,27% 2%,41% 10%)}
+.mplayer .w{flex:1;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--primary) 45%,#ffffff30 45%)}
+.blob{width:40px;height:34px;border-radius:50% 50% 44% 44%/62% 62% 38% 38%;background:#8fd18f;position:relative;animation:bob 1.2s ease-in-out infinite}
+.blob::before,.blob::after{content:"";position:absolute;top:12px;width:5px;height:7px;border-radius:3px;background:#1a1a1a}
+.blob::before{left:11px}.blob::after{right:11px}
+@keyframes bob{50%{transform:translateY(-3px)}}
+.side{flex:1;min-width:0}
+
+/* D : essentiels */
+.ess{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ess .card.wide{grid-column:1/-1}
+.presets{display:flex;gap:8px;overflow-x:auto;padding:6px 0 2px;scrollbar-width:thin}
+.pre{flex:none;width:96px;border-radius:14px;border:0;background:var(--surfaceHigh);padding:8px;cursor:pointer;display:flex;flex-direction:column;gap:6px;font-size:11.5px;text-align:left}
+.pre.on{box-shadow:inset 0 0 0 2px var(--primary)}
+.pre i{display:block;height:34px;border-radius:9px;position:relative}
+.pre i::after{content:"";position:absolute;left:50%;top:6px;transform:translateX(-50%);width:44px;height:10px;border-radius:5px;background:var(--pp,#000)}
+.acc{background:var(--surfaceC);border-radius:16px;flex:none}
+.acc>button{width:100%;display:flex;align-items:center;gap:10px;border:0;background:none;padding:8px 12px;cursor:pointer;text-align:left;min-height:46px}
+.acc>button .ms{font-size:19px;color:var(--inkVar)}
+.acc>button small{margin-left:auto;color:var(--outline);font-size:11.5px;text-align:right}
+.acc>button .chev{transition:transform .25s}
+.acc.open>button .chev{transform:rotate(180deg)}
+.acc .body{padding:0 12px 12px 41px;display:none}
+.acc.open .body{display:block}
+.ttl{font-size:11px;font-weight:500;letter-spacing:1.1px;text-transform:uppercase;color:var(--outline);padding:6px 4px 0}
+
+/* comparaison */
+.tblwrap{overflow-x:auto;background:var(--surface);border-radius:20px}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:13.5px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--outlineVar);vertical-align:top}
+thead th{font-size:11.5px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--outline)}
+tbody th{font-weight:500;color:var(--inkVar)}
+tr:last-child td,tr:last-child th{border-bottom:0}
+.lv{display:inline-flex;gap:3px;vertical-align:-1px;margin-right:6px}
+.lv i{width:8px;height:8px;border-radius:2px;background:var(--surfaceHighest)}
+.lv i.f{background:var(--primary)}
+.reco{background:var(--surface);border-radius:20px;padding:16px 18px;display:flex;gap:12px}
+.reco .ms{color:var(--primary);font-size:24px}
+.reco p{margin:0;color:var(--inkVar);max-width:80ch}
+.reco b{color:var(--ink);font-weight:500}
+@media (max-width:640px){
+  .panel{height:auto;max-height:560px}
+  .row2{flex-direction:column}
+  .navA{width:auto!important;max-height:120px}
+  .desk{min-height:240px}
+  .ess{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Réglages : quatre directions</h1>
+    <p class="lead">Le même contenu rangé de quatre façons. Chaque maquette est cliquable, et les réglages sont partagés : change la forme de l'îlot dans une direction, l'aperçu change dans les autres. Toutes reprennent le nouveau classement (Apparence répartie, Pilule supprimée) et le correctif du gel.</p>
+    <nav class="jump" aria-label="Directions">
+      <a href="#dA"><b>A</b>Barre groupée</a>
+      <a href="#dB"><b>B</b>Accueil en tuiles</a>
+      <a href="#dC"><b>C</b>Atelier</a>
+      <a href="#dD"><b>D</b>Essentiels d'abord</a>
+      <a href="#cmp"><b class="ms" style="font-size:15px">compare</b>Comparer</a>
+    </nav>
+  </header>
+
+  <section class="dir" id="dA">
+    <header><span class="n">A</span><div><h2>Barre groupée</h2><p>La page actuelle, mieux rangée : onglets en trois groupes, recherche, aperçu en haut.</p></div></header>
+    <div class="panel"><div class="row2">
+      <div class="col navA" style="width:190px;flex:none;min-height:0">
+        <label class="search"><span class="ms">search</span><input id="qA" type="search" placeholder="Rechercher" autocomplete="off"></label>
+        <div class="scroll" id="navA"></div>
+      </div>
+      <div class="scroll col" id="bodyA" style="flex:1;min-width:0"></div>
+    </div></div>
+    <div class="why">
+      <div><h3>Idée</h3><ul style="list-style:none;padding:0;color:var(--inkVar)"><li>On garde le principe d'aujourd'hui : une colonne d'onglets à gauche et des cartes à droite. Les onglets sont regroupés sous trois titres, et les pages visuelles ont un aperçu collé en haut.</li></ul></div>
+      <div><h3>Pour</h3><ul class="pro"><li>Le plus proche de l'existant : rien à réapprendre.</li><li>Un clic pour atteindre n'importe quel onglet.</li><li>Le moins de travail : <code>SettingsPage</code> découpée en un fichier par onglet.</li></ul></div>
+      <div><h3>Contre</h3><ul class="con"><li>Encore 13 onglets dans une colonne de 176 px.</li><li>On ne voit pas ses réglages d'un coup d'œil.</li></ul></div>
+      <div class="try"><span class="ms">touch_app</span>Essaie : Îlot et pilule, puis change la forme ou l'horloge.</div>
+    </div>
+  </section>
+
+  <section class="dir" id="dB">
+    <header><span class="n">B</span><div><h2>Accueil en tuiles</h2><p>Comme les Paramètres d'un téléphone : un accueil avec une tuile par thème, qui résume les choix actuels.</p></div></header>
+    <div class="panel" id="panelB"></div>
+    <div class="why">
+      <div><h3>Idée</h3><ul style="list-style:none;padding:0;color:var(--inkVar)"><li>L'onglet Réglages s'ouvre sur un accueil. Chaque tuile dit ce qui est réglé (« Arrondie · Opaque · Classique »). Un clic ouvre la page, avec un bouton retour. En haut, la recherche et les derniers réglages touchés.</li></ul></div>
+      <div><h3>Pour</h3><ul class="pro"><li>Vue d'ensemble immédiate : on sait où on en est.</li><li>Toute la largeur du panneau pour chaque page.</li><li>Les « derniers réglages » ramènent à ce qu'on vient de changer.</li></ul></div>
+      <div><h3>Contre</h3><ul class="con"><li>Un clic de plus pour tout, et un retour pour changer de page.</li><li>Les résumés des tuiles sont à écrire et à tenir à jour.</li></ul></div>
+      <div class="try"><span class="ms">touch_app</span>Essaie : la tuile Îlot et pilule, puis Retour. Les derniers réglages se remplissent.</div>
+    </div>
+  </section>
+
+  <section class="dir" id="dC">
+    <header><span class="n">C</span><div><h2>Atelier</h2><p>L'apparence se règle sur un bureau miniature : clique la pilule, le lecteur ou le compagnon pour voir ses réglages.</p></div></header>
+    <div class="panel" id="panelC"></div>
+    <div class="why">
+      <div><h3>Idée</h3><ul style="list-style:none;padding:0;color:var(--inkVar)"><li>Trois modes en haut. Apparence montre un bureau vivant (îlot, lecteur, compagnon, fond d'écran) : on clique ce qu'on veut changer, et l'aperçu est toujours visible. Comportement et Système restent des listes simples.</li></ul></div>
+      <div><h3>Pour</h3><ul class="pro"><li>On trouve un réglage visuel en montrant la chose, sans connaître son nom.</li><li>L'aperçu ne quitte jamais l'écran.</li><li>Sépare clairement « à quoi ça ressemble » et « comment ça marche ».</li></ul></div>
+      <div><h3>Contre</h3><ul class="con"><li>Le plus gros chantier : un bureau miniature à dessiner en QML.</li><li>Les réglages sans objet visible (Onglet Média, animations) cherchent leur place.</li><li>Moitié moins de largeur pour les réglages.</li></ul></div>
+      <div class="try"><span class="ms">touch_app</span>Essaie : clique le lecteur ou le compagnon sur le bureau, puis le fond d'écran.</div>
+    </div>
+  </section>
+
+  <section class="dir" id="dD">
+    <header><span class="n">D</span><div><h2>Essentiels d'abord</h2><p>Une seule page : en haut, ce qu'on change souvent ; en dessous, tout le reste replié par thème.</p></div></header>
+    <div class="panel" id="panelD"></div>
+    <div class="why">
+      <div><h3>Idée</h3><ul style="list-style:none;padding:0;color:var(--inkVar)"><li>Plus d'onglets. Les essentiels sont en grand (thèmes prêts avec aperçu, clair ou sombre, animations, barre, mode jeu, notifications). Tout le reste est dans des blocs repliés qui montrent leur résumé. La recherche ouvre les bons blocs.</li></ul></div>
+      <div><h3>Pour</h3><ul class="pro"><li>On ne se perd plus : un seul endroit, qu'on fait défiler.</li><li>Les réglages courants en un clic, sans chercher.</li><li>Les réglages rares ne gênent plus.</li></ul></div>
+      <div><h3>Contre</h3><ul class="con"><li>Choisir les « essentiels », c'est trancher pour tout le monde.</li><li>Les blocs ouverts font une page très longue.</li><li>Le gel revient si tout est créé d'un coup : il faut des blocs chargés à l'ouverture.</li></ul></div>
+      <div class="try"><span class="ms">touch_app</span>Essaie : un thème prêt, puis cherche « horloge ».</div>
+    </div>
+  </section>
+
+  <section id="cmp" style="display:flex;flex-direction:column;gap:14px">
+    <h2>Comparer</h2>
+    <div class="tblwrap"><table>
+      <thead><tr><th></th><th>A · Barre groupée</th><th>B · Accueil en tuiles</th><th>C · Atelier</th><th>D · Essentiels d'abord</th></tr></thead>
+      <tbody id="cmpBody"></tbody>
+    </table></div>
+    <div class="reco"><span class="ms">recommend</span><p><b>Mon conseil : A, avec deux idées prises ailleurs.</b> C'est la seule direction qui respecte « pas de refonte non demandée » : on garde la page qu'on connaît, on la range et on corrige le gel. On peut y ajouter les résumés de B sous chaque onglet de la colonne (« Arrondie · Classique »), et le clic sur l'aperçu de C (cliquer l'horloge dans l'aperçu fait défiler jusqu'à la carte Horloge). Si tu veux vraiment repartir de zéro, B est la plus sûre et C la plus originale.</p></div>
+  </section>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+// réglages partagés par les quatre maquettes
+const st = {
+  preset: "", color: "#6750a4", mode: "auto", shape: "round", island_bg: "solid", clock: "digital", anim: "normal", pill_size: "m",
+  player_btn: "cookie", player_bar: "wave", pet: "blob", pet_walk: true,
+  notif_popups: true, osd: true, activity: true, dc_pill: true, privacy: true, wxfx: true,
+  bar: true, hide_taskbar: true, bar_tasks: true, game_mode: true, match_alert: true, away: "on", fs_hide: "normal",
+  win_key: true, autostart: true, update_mode: "notify", motion: "system", text_size: "100"
+};
+const O = {
+  shape: [["round","Arrondie"],["pill","Pilule"],["square","Carrée"]],
+  island_bg: [["solid","Opaque"],["black","Noir pur"],["glass","Translucide"],["aurora","Aurore boréale"]],
+  clock: [["digital","Classique"],["analog","À aiguilles"],["neon","Néon"],["pixel","Pixel"]],
+  anim: [["normal","Normale"],["fast","Rapide"],["soft","Douce"],["calm","Sans rebond"],["off","Instantanée"]],
+  pill_size: [["s","Petite"],["m","Moyenne"],["l","Grande"]],
+  mode: [["auto","Comme Windows"],["dark","Sombre"],["light","Clair"],["time","Selon l'heure"]],
+  player_btn: [["cookie","Festonné"],["round","Rond"],["none","Icône seule"]],
+  player_bar: [["wave","Ondulée"],["flat","Plate"]],
+  pet: [["blob","Blob"],["cat","Chat"],["ghost","Fantôme"],["off","Masqué"]],
+  away: [["on","Pause musique + récap"],["recap","Récap seulement"],["off","Désactivé"]],
+  fs_hide: [["normal","Normal"],["show","Toujours affiché"],["auto","Masquer auto"]],
+  update_mode: [["auto","Installer seul"],["notify","Prévenir"],["off","Ne pas vérifier"]],
+  motion: [["system","Comme Windows"],["full","Toutes"],["reduced","Réduites"]],
+  text_size: [["100","Normale"],["112","Grande"],["125","Très grande"]]
+};
+const lab = (k) => (O[k].find(o => o[0] === st[k]) || ["", ""])[1];
+const swatches = ["#6750a4","#1e88e5","#00897b","#43a047","#fb8c00","#e53935","#d81b60"];
+const presets = [["Minuit", "#1e88e5", "glass", "round"], ["Néon", "#d81b60", "black", "pill"], ["Forêt", "#43a047", "solid", "round"], ["Coucher de soleil", "#fb8c00", "aurora", "round"], ["Rétro", "#c0ca33", "solid", "square"]];
+
+// cartes : [titre, icône, lignes] ; ligne = ["ch", clé, titre] | ["tg", clé, titre] | ["sw"] | ["txt", texte]
+const C = [
+  { id: "theme", g: "Personnaliser", icon: "palette", label: "Thème", sum: () => (st.preset || "Couleur perso") + " · " + lab("mode"),
+    cards: [["Couleurs", "colorize", [["sw"], ["ch", "mode", "Clair ou sombre"]]]] },
+  { id: "island", g: "Personnaliser", icon: "pill", label: "Îlot et pilule", stage: true, sum: () => lab("shape") + " · " + lab("island_bg") + " · " + lab("clock"),
+    cards: [["Forme et matière", "rounded_corner", [["ch", "shape", "Forme"], ["ch", "island_bg", "Fond"]]],
+            ["Pilule repliée", "schedule", [["ch", "pill_size", "Taille"], ["ch", "clock", "Horloge"]]],
+            ["Animations", "animation", [["ch", "anim", "Vitesse et rebond"]]]] },
+  { id: "player", g: "Personnaliser", icon: "music_note", label: "Lecteur", sum: () => lab("player_btn") + " · barre " + lab("player_bar").toLowerCase(),
+    cards: [["Bouton lecture", "play_circle", [["ch", "player_btn", "Forme"]]], ["Barre de progression", "linear_scale", [["ch", "player_bar", "Style"]]]] },
+  { id: "pet", g: "Personnaliser", icon: "emoji_emotions", label: "Compagnon", sum: () => lab("pet") + (st.pet_walk ? " · se promène" : ""),
+    cards: [["Compagnon", "pets", [["ch", "pet", "Espèce"], ["tg", "pet_walk", "Il se promène quand tu ne fais rien"]]]] },
+  { id: "alerts", g: "Comportement", icon: "notifications", label: "Alertes", sum: () => ["notif_popups","osd","activity","dc_pill","privacy","wxfx"].filter(k => st[k]).length + " sur 6 actives",
+    cards: [["Dans l'îlot", "notifications_active", [["tg", "notif_popups", "Notifications dans l'îlot"], ["tg", "osd", "Indicateurs de volume et de luminosité"]]],
+            ["Dans la pilule", "pill", [["tg", "activity", "Activités en cours"], ["tg", "dc_pill", "Raccourcis Discord"], ["tg", "privacy", "Voyant caméra / micro"], ["tg", "wxfx", "Météo animée"]]]] },
+  { id: "bar", g: "Comportement", icon: "dashboard", label: "Barre et écran", sum: () => (st.bar ? "Barre affichée" : "Sans barre") + " · plein écran " + lab("fs_hide").toLowerCase(),
+    cards: [["Barre en haut de l'écran", "dashboard", [["tg", "bar", "Afficher la barre"], ["tg", "hide_taskbar", "Masquer la barre des tâches Windows"], ["tg", "bar_tasks", "Fenêtres ouvertes"]]],
+            ["Îlot en plein écran", "fullscreen", [["ch", "fs_hide", ""]]]] },
+  { id: "game", g: "Comportement", icon: "sports_esports", label: "Jeu et absence", sum: () => (st.game_mode ? "Mode jeu activé" : "Mode jeu coupé") + " · absent : " + lab("away").toLowerCase(),
+    cards: [["Jeu", "sports_esports", [["tg", "game_mode", "Mode jeu"], ["tg", "match_alert", "Alerte « partie trouvée »"]]], ["Mode absent", "bedtime", [["ch", "away", ""]]]] },
+  { id: "sound", g: "Comportement", icon: "volume_up", label: "Son", sum: () => "4 sorties affichées sur 9",
+    cards: [["Sorties affichées", "speaker", [["txt", "Sonar Game, Sonar Chat, Casque Shure, Speakers"]]]] },
+  { id: "keys", g: "Système", icon: "keyboard", label: "Clavier", sum: () => (st.win_key ? "Touche Windows" : "Touche Windows libre") + " · 5 raccourcis",
+    cards: [["Touche Windows", "keyboard_command_key", [["tg", "win_key", "Ouvre l'îlot au lieu du menu Démarrer"]]], ["Raccourcis", "keyboard", [["txt", "Win + V : presse-papiers · Win + Alt + M : mélangeur"]]]] },
+  { id: "weather", g: "Système", icon: "partly_cloudy_day", label: "Météo et agenda", sum: () => "Lyon · 1 agenda",
+    cards: [["Météo", "location_on", [["txt", "Lyon"]]], ["Agenda", "event", [["txt", "Perso (iCal)"]]]] },
+  { id: "access", g: "Système", icon: "accessibility_new", label: "Accessibilité", sum: () => "Texte " + lab("text_size").toLowerCase() + " · mouvements " + lab("motion").toLowerCase(),
+    cards: [["Accessibilité", "accessibility_new", [["ch", "text_size", "Taille du texte"], ["ch", "motion", "Mouvements et animations"]]]] },
+  { id: "addons", g: "Système", icon: "grid_view", label: "Addons", sum: () => "6 sur 14 · Claude Code",
+    cards: [["Addons", "grid_view", [["txt", "Mail, Presse-papiers, Minuteur, Soundboard, Claude Code, Tâches"]]]] },
+  { id: "system", g: "Système", icon: "system_update", label: "Démarrage et mises à jour", dot: true, sum: () => "0.4.23 disponible",
+    cards: [["Îlot 0.4.22", "system_update", [["txt", "La 0.4.23 est disponible."], ["ch", "update_mode", "Mises à jour automatiques"]]],
+            ["Démarrage", "rocket_launch", [["tg", "autostart", "Lancer au démarrage de Windows"]]]] }
+];
+const CAT = Object.fromEntries(C.map(c => [c.id, c]));
+const recent = [];
+
+// ------------------------------------------------------------ morceaux
+function rowHtml(r) {
+  if (r[0] === "ch") return (r[2] ? `<div class="sub">${esc(r[2])}</div>` : "") + `<div class="flow">` + O[r[1]].map(([v, l]) => `<button class="chip${st[r[1]] === v ? " on" : ""}" data-k="${r[1]}" data-v="${v}">${esc(l)}</button>`).join("") + "</div>";
+  if (r[0] === "tg") return `<div class="tg"><span>${esc(r[2])}</span><button class="swi" role="switch" aria-checked="${!!st[r[1]]}" aria-label="${esc(r[2])}" data-tg="${r[1]}"></button></div>`;
+  if (r[0] === "sw") return `<div class="sub">Couleur d'accent</div><div class="sws">` + swatches.map(c => `<button class="sw${st.color === c ? " on" : ""}" style="background:${c}" data-k="color" data-v="${c}" aria-label="${c}"></button>`).join("") + "</div>";
+  return `<div class="s" style="padding-top:6px">${esc(r[1])}</div>`;
+}
+const cardHtml = ([t, ic, rows]) => `<div class="card"><div class="hd"><div class="ic"><span class="ms">${ic}</span></div><div class="t">${esc(t)}</div></div>${rows.map(rowHtml).join("")}</div>`;
+function clockHtml() {
+  if (st.clock === "analog") return `<svg class="ana" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1.5"/><line x1="10" y1="10" x2="10" y2="5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line class="mh" x1="10" y1="10" x2="10" y2="3" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+  return `<span class="clk ${st.clock}">14:32</span>`;
+}
+const ANIM = { normal: [.5, "cubic-bezier(.34,1.45,.5,1)"], fast: [.26, "cubic-bezier(.3,1.3,.5,1)"], soft: [.85, "cubic-bezier(.25,1.25,.4,1)"], calm: [.42, "cubic-bezier(.2,0,0,1)"], off: [0, "linear"] };
+function islHtml(extra) {
+  const [d, e] = ANIM[st.motion === "reduced" && st.anim !== "off" ? "calm" : st.anim];
+  const w = { s: 140, m: 170, l: 200 }[st.pill_size];
+  return `<div class="isl loop shape-${st.shape} bg-${st.island_bg}" style="--dur:${d}s;--ease:${e};${extra || ""}" data-w="${w}">
+    <div class="bgl"></div><div class="closed"><span class="ms">partly_cloudy_day</span>${clockHtml()}<span class="ms">wifi</span></div>
+    <div class="opened"><div class="art"></div><div class="meta"><b>Nuits blanches</b><i>Halo Maud</i></div></div></div>`;
+}
+const stageHtml = () => `<div class="stage">${islHtml()}<div class="lbl">Aperçu : l'îlot s'ouvre et se ferme</div></div>`;
+// taille de la pilule repliée (la classe .open l'écrase)
+function sizeIsl() { document.querySelectorAll(".isl[data-w]").forEach(i => { if (!i.classList.contains("open")) { i.style.width = i.dataset.w + "px"; i.style.height = { s: 28, m: 32, l: 38 }[st.pill_size] + "px" } else i.style.width = i.style.height = "" }) }
+function search(q) {
+  const nq = norm(q), hits = [];
+  C.forEach(c => c.cards.forEach(([t, , rows]) => {
+    if (norm(t).includes(nq)) hits.push([c, t]);
+    rows.forEach(r => { const s = r[0] === "ch" ? r[2] + " " + O[r[1]].map(o => o[1]).join(" ") : r[0] === "tg" ? r[2] : ""; if (s && norm(s).includes(nq)) hits.push([c, r[2] || t]) });
+  }));
+  return hits;
+}
+function touch(k) {
+  const c = C.find(c => c.cards.some(cd => cd[2].some(r => r[1] === k)));
+  if (!c) return;
+  const r = c.cards.flatMap(cd => cd[2]).find(r => r[1] === k);
+  const name = r[2] || c.label;
+  const i = recent.findIndex(x => x[1] === name);
+  if (i >= 0) recent.splice(i, 1);
+  recent.unshift([c.id, name]);
+  recent.length = Math.min(recent.length, 4);
+}
+
+// ------------------------------------------------------------ A
+let curA = "island";
+function renderA() {
+  const q = $("#qA").value.trim();
+  if (q) {
+    const h = search(q);
+    $("#navA").innerHTML = h.length ? h.slice(0, 20).map(([c, t]) => `<button class="nb" data-a="${c.id}" style="height:auto;padding:6px 10px;flex-direction:column;align-items:flex-start;gap:0;border-radius:12px"><span>${esc(t)}</span><small style="color:var(--outline);font-size:11px">${esc(c.label)}</small></button>`).join("") : `<div class="empty">Rien pour « ${esc(q)} ».</div>`;
+  } else {
+    let h = "", g = "";
+    C.forEach(c => { if (c.g !== g) { g = c.g; h += `<div class="grp">${g}</div>` } h += `<button class="nb${c.id === curA ? " on" : ""}" data-a="${c.id}"><span class="ms">${c.icon}</span><span>${esc(c.label)}</span>${c.dot ? '<i class="dot"></i>' : ""}</button>` });
+    $("#navA").innerHTML = h;
+  }
+  const c = CAT[curA];
+  $("#bodyA").innerHTML = (c.stage ? stageHtml() : "") + c.cards.map(cardHtml).join("");
+}
+$("#navA").addEventListener("click", e => { const b = e.target.closest("[data-a]"); if (b) { curA = b.dataset.a; $("#bodyA").scrollTop = 0; renderA() } });
+$("#qA").addEventListener("input", renderA);
+
+// ------------------------------------------------------------ B
+let curB = "", qB = "";
+function renderB() {
+  const p = $("#panelB");
+  if (curB) {
+    const c = CAT[curB];
+    p.innerHTML = `<div class="back"><button data-b="" aria-label="Retour"><span class="ms">arrow_back</span></button><div><b>${esc(c.label)}</b><br><small>Réglages › ${esc(c.g)}</small></div></div>`
+      + `<div class="scroll col" style="flex:1">${c.stage ? stageHtml() : ""}${c.cards.map(cardHtml).join("")}</div>`;
+    return;
+  }
+  const f = qB ? new Set(search(qB).map(h => h[0].id)) : null;
+  const list = C.filter(c => !f || f.has(c.id));
+  p.innerHTML = `<label class="search"><span class="ms">search</span><input id="qB" type="search" placeholder="Rechercher un réglage" autocomplete="off" value="${esc(qB)}"></label>`
+    + (recent.length && !qB ? `<div class="recent">Derniers réglages ${recent.map(r => `<button class="chip" data-b="${r[0]}">${esc(r[1])}</button>`).join("")}</div>` : "")
+    + `<div class="scroll" style="flex:1"><div class="tiles">` + (list.length ? list.map(c => `<button class="tile" data-b="${c.id}">${c.dot ? '<i class="dot"></i>' : ""}<span class="ic"><span class="ms">${c.icon}</span></span><b>${esc(c.label)}</b><small>${esc(c.sum())}</small></button>`).join("") : `<div class="empty">Rien pour « ${esc(qB)} ».</div>`) + "</div></div>";
+  const i = $("#qB");
+  i.addEventListener("input", () => { qB = i.value.trim(); renderB(); const j = $("#qB"); j.focus(); j.setSelectionRange(j.value.length, j.value.length) });
+}
+$("#panelB").addEventListener("click", e => { const b = e.target.closest("[data-b]"); if (b) { curB = b.dataset.b; renderB() } });
+
+// ------------------------------------------------------------ C
+let modeC = "look", selC = "island", curC = "alerts";
+function renderC() {
+  const p = $("#panelC");
+  const seg = `<div class="seg">${[["look","brush","Apparence"],["how","tune","Comportement"],["sys","settings","Système"]].map(([id, ic, l]) => `<button class="${modeC === id ? "on" : ""}" data-m="${id}"><span class="ms">${ic}</span>${l}</button>`).join("")}</div>`;
+  if (modeC === "look") {
+    const cat = CAT[selC === "wall" ? "theme" : selC];
+    p.innerHTML = seg + `<div class="row2">
+      <div class="desk">
+        <button class="hot${selC === "wall" ? " on" : ""}" data-h="wall" style="inset:0;border-radius:20px;outline-offset:-4px" aria-label="Fond d'écran et couleurs"><span class="tagl" style="bottom:auto;top:62px">Couleurs</span></button>
+        <button class="hot${selC === "island" ? " on" : ""}" data-h="island" style="left:50%;top:8px;width:220px;height:46px;transform:translateX(-50%)" aria-label="Îlot">${islHtml("top:6px")}<span class="tagl">Îlot et pilule</span></button>
+        <button class="hot${selC === "player" ? " on" : ""}" data-h="player" style="left:18px;bottom:52px" aria-label="Lecteur"><div class="mplayer"><div class="a"></div><div class="w"></div></div><span class="tagl">Lecteur</span></button>
+        <button class="hot${selC === "pet" ? " on" : ""}" data-h="pet" style="right:30px;bottom:30px;padding:4px" aria-label="Compagnon">${st.pet === "off" ? '<span class="s">masqué</span>' : '<div class="blob"></div>'}<span class="tagl">Compagnon</span></button>
+        <div class="taskbar"></div>
+      </div>
+      <div class="side scroll col"><div class="s" style="padding:2px 4px">Tu règles : <b style="color:var(--ink);font-weight:500">${esc(cat.label)}</b></div>${cat.cards.map(cardHtml).join("")}</div>
+    </div>`;
+  } else {
+    const g = modeC === "how" ? "Comportement" : "Système";
+    const list = C.filter(c => c.g === g);
+    if (!list.some(c => c.id === curC)) curC = list[0].id;
+    p.innerHTML = seg + `<div class="row2"><div class="col" style="width:200px;flex:none">${list.map(c => `<button class="nb${c.id === curC ? " on" : ""}" data-c="${c.id}"><span class="ms">${c.icon}</span><span>${esc(c.label)}</span>${c.dot ? '<i class="dot"></i>' : ""}</button>`).join("")}</div>
+      <div class="scroll col" style="flex:1;min-width:0">${CAT[curC].cards.map(cardHtml).join("")}</div></div>`;
+  }
+}
+$("#panelC").addEventListener("click", e => {
+  const m = e.target.closest("[data-m]"), h = e.target.closest("[data-h]"), c = e.target.closest("[data-c]");
+  if (m) { modeC = m.dataset.m; renderC() }
+  else if (h) { selC = h.dataset.h; renderC() }
+  else if (c) { curC = c.dataset.c; renderC() }
+});
+
+// ------------------------------------------------------------ D
+let qD = "";
+const openD = new Set();
+function renderD() {
+  const p = $("#panelD");
+  const hits = qD ? new Set(search(qD).map(h => h[0].id)) : null;
+  const ess = `<div class="ttl">Essentiels</div><div class="ess">
+    <div class="card wide"><div class="hd"><div class="ic"><span class="ms">auto_awesome</span></div><div class="t">Thèmes prêts</div></div><div class="presets">${presets.map(([n, c, bg, sh]) => `<button class="pre${st.preset === n ? " on" : ""}" data-pre="${n}"><i style="background:linear-gradient(135deg,${c},#1a1626);--pp:${bg === "glass" ? "#ffffff40" : bg === "aurora" ? "#3ad6a2" : "#000"}"></i>${esc(n)}</button>`).join("")}</div></div>
+    <div class="card">${rowHtml(["ch", "mode", "Clair ou sombre"])}</div>
+    <div class="card">${rowHtml(["ch", "anim", "Animations"])}</div>
+    <div class="card wide">${stageHtml()}</div>
+    <div class="card">${rowHtml(["tg", "bar", "Barre en haut de l'écran"])}${rowHtml(["tg", "notif_popups", "Notifications dans l'îlot"])}</div>
+    <div class="card">${rowHtml(["tg", "game_mode", "Mode jeu"])}${rowHtml(["tg", "autostart", "Lancer au démarrage"])}</div>
+  </div>`;
+  const all = `<div class="ttl">${qD ? "Résultats" : "Tous les réglages"}</div>` + C.filter(c => !hits || hits.has(c.id)).map(c => {
+    const o = openD.has(c.id) || (hits && hits.has(c.id));
+    return `<div class="acc${o ? " open" : ""}"><button data-d="${c.id}" aria-expanded="${o}"><span class="ms">${c.icon}</span><span style="font-size:13px">${esc(c.label)}</span><small>${esc(c.sum())}</small><span class="ms chev">expand_more</span></button><div class="body">${o ? c.cards.map(([t, , rows]) => `<div class="sub" style="color:var(--primary)">${esc(t)}</div>${rows.map(rowHtml).join("")}`).join("") : ""}</div></div>`;
+  }).join("");
+  const sc = p.querySelector(".scroll"), y = sc ? sc.scrollTop : 0;
+  p.innerHTML = `<label class="search"><span class="ms">search</span><input id="qD" type="search" placeholder="Rechercher un réglage" autocomplete="off" value="${esc(qD)}"></label><div class="scroll col" style="flex:1">${qD ? "" : ess}${all}</div>`;
+  p.querySelector(".scroll").scrollTop = y;
+  const i = $("#qD");
+  i.addEventListener("input", () => { qD = i.value.trim(); renderD(); const j = $("#qD"); j.focus(); j.setSelectionRange(j.value.length, j.value.length) });
+}
+$("#panelD").addEventListener("click", e => {
+  const a = e.target.closest("[data-d]"), pr = e.target.closest("[data-pre]");
+  if (a) { const id = a.dataset.d; openD.has(id) ? openD.delete(id) : openD.add(id); renderD() }
+  if (pr) { const x = presets.find(p => p[0] === pr.dataset.pre); Object.assign(st, { preset: x[0], color: x[1], island_bg: x[2], shape: x[3] }); renderAll() }
+});
+
+// ------------------------------------------------------------ commun
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-k],[data-tg]");
+  if (!t || !t.closest(".panel")) return;
+  if (t.dataset.tg) { st[t.dataset.tg] = !st[t.dataset.tg]; touch(t.dataset.tg) }
+  else { st[t.dataset.k] = t.dataset.v; if (t.dataset.k === "color") st.preset = ""; else touch(t.dataset.k) }
+  renderAll();
+});
+function accent() {
+  const n = parseInt(st.color.slice(1), 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0; if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = (h * 60 + 360) % 360;
+  const s = Math.min(70, (d / (1 - Math.abs(mx + mn - 1)) || 0) * 80), p = document.documentElement.style;
+  p.setProperty("--primary", `hsl(${h} ${s}% 84%)`); p.setProperty("--inkPrimary", `hsl(${h} ${s}% 22%)`);
+  p.setProperty("--primaryC", `hsl(${h} ${s * .6}% 34%)`); p.setProperty("--inkPrimaryC", `hsl(${h} ${s}% 92%)`);
+  p.setProperty("--secC", `hsl(${h} ${s * .3}% 30%)`); p.setProperty("--inkSecC", `hsl(${h} ${s * .4}% 90%)`);
+}
+function keepScroll(fn) {
+  const sc = [...document.querySelectorAll(".panel .scroll")].map(e => e.scrollTop);
+  fn();
+  document.querySelectorAll(".panel .scroll").forEach((e, i) => { if (sc[i] !== undefined) e.scrollTop = sc[i] });
+}
+function renderAll() { accent(); keepScroll(() => { renderA(); renderB(); renderC() }); renderD(); sizeIsl() }
+let open = false;
+setInterval(() => { open = !open; document.querySelectorAll(".isl.loop").forEach(i => i.classList.toggle("open", open)); sizeIsl() }, 2400);
+
+// comparaison
+const lv = n => `<span class="lv">${[1, 2, 3].map(i => `<i class="${i <= n ? "f" : ""}"></i>`).join("")}</span>`;
+const rows = [
+  ["Clics pour un réglage", ["1 (onglet)", "2 (tuile, puis réglage)", "1 en Apparence, 2 ailleurs", "0 pour les essentiels, 1 sinon"]],
+  ["Vue d'ensemble", [[1, "Faible"], [3, "Forte : résumés"], [2, "Moyenne"], [3, "Forte : résumés"]]],
+  ["Place des aperçus", ["En haut des onglets visuels", "En haut des pages visuelles", "Toujours à l'écran", "Un seul, dans les essentiels"]],
+  ["Changement pour toi", [[1, "Faible"], [2, "Moyen"], [3, "Fort"], [3, "Fort"]]],
+  ["Travail en QML", [[1, "Découper SettingsPage"], [2, "Plus l'accueil et les résumés"], [3, "Plus le bureau miniature"], [2, "Plus les blocs repliables"]]],
+  ["Risque de gel", ["Réglé : un Loader par onglet", "Réglé : une page à la fois", "Bureau toujours chargé", "Blocs chargés à l'ouverture, sinon le gel revient"]]
+];
+$("#cmpBody").innerHTML = rows.map(([t, v]) => `<tr><th>${t}</th>${v.map(x => `<td>${Array.isArray(x) ? lv(x[0]) + esc(x[1]) : esc(x)}</td>`).join("")}</tr>`).join("");
+
+renderAll();
+})();
+</script>
