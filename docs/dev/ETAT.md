@@ -38,6 +38,56 @@ reprendre.
 
 ## Journal
 
+### 2026-10-29 : outils Windows dans Apps
+
+Le lanceur ne listait que `shell:AppsFolder`, où manquent le Gestionnaire
+de périphériques, l'Observateur d'événements, l'Éditeur du Registre…
+`apps.rs` (`scan`) ajoute maintenant, sans doublon de nom :
+- le dossier « Outils Windows » (`{D20EA4E1-…}`) : Gestion de
+  l'ordinateur, Planificateur, Moniteur de ressources, Regedit, PowerShell…
+  Identifiants AppsFolder, lancés comme avant ;
+- tous les éléments du Panneau de configuration (`{21EC2020-…}`) :
+  Gestionnaire de périphériques, Son, Options d'alimentation, Programmes et
+  fonctionnalités… Identifiant `shell:::{21EC…}\::{CLSID}`. `app_launch`
+  l'ouvre par son verbe par défaut (`ShellExecuteExW` sur le PIDL, comme un
+  double-clic). `explorer.exe <chemin>` ignorait Espaces de stockage et
+  Dossiers de travail. Les 36 éléments ont été testés par ce code : tous
+  s'ouvrent. Polices est écarté (dossier réel). `lusrmgr.msc` n'est listé
+  que si `gpedit.msc` existe (Windows Famille) ;
+- une liste fixe `TOOLS` de System32 : Gestion des disques, Connexions
+  réseau, gpedit, lusrmgr, certmgr, Paramètres système avancés,
+  Fonctionnalités de Windows, Restauration du système, netplwiz.
+- pages des Paramètres, avec l'icône des Paramètres : Windows Update et
+  Résolution des problèmes (`ms-settings:troubleshoot`). Elles sont ajoutées
+  avant le Panneau de configuration, dont l'élément « Résolution des
+  problèmes » n'ouvre plus rien après quelques appels : il est écarté par
+  son nom.
+Référence : tout le menu Win+X est présent (Terminal, Gestion des disques,
+Connexions réseau, Système, Observateur…).
+- Liste vérifiée par un test temporaire (453 entrées, toutes avec icône,
+  test retiré).
+- Ouvertures testées par `explorer.exe <id>`, comme `app_launch` : tous
+  les outils de `TOOLS`, Windows Update, le Gestionnaire de périphériques et
+  le Moniteur de ressources. Les `.msc` admin s'ouvrent sans invite UAC
+  sur ce poste.
+- Relu par un agent (rôle `relecteur`) : rien de bloquant, applis
+  existantes inchangées. Seconde relecture de `app_launch` : ajout de
+  `SEE_MASK_NOASYNC` (le thread s'arrête juste après l'appel), retesté.
+- Test final des 36 éléments du Panneau de configuration avec la version
+  `NOASYNC`, avec l'accord de l'utilisateur. 35 s'ouvrent ; Résolution des
+  problèmes est remplacé (voir plus haut). Les fenêtres du test ont été
+  fermées par PID. Les dialogues `rundll32` n'ont pas de fenêtre principale
+  pour `Get-Process` : il faut les chercher par `EnumWindows`.
+- Mémoire : 233 Mo privés au lancement, contre 222 Mo avant, sur une seule
+  mesure. Les `.cpl` tiers (Java, Wacom) ne sont pas chargés.
+- Compilé, installé (version finale d'`app_launch` comprise). Mémoire au
+  lancement, après 25 s : 194 Mo privés, contre 222 Mo à la référence.
+  Pas de hausse visible (une mesure intermédiaire donnait 233 Mo).
+- **Incident** : le script de test fermait les « nouvelles » fenêtres par
+  différence de titres. Il a fermé le navigateur de l'utilisateur, dont un
+  onglet venait de changer de titre. Ne plus fermer de fenêtres que par PID
+  du test.
+
 ### 2026-10-29 : d'où viennent les ~300 Mo (exploration, sans code)
 
 Répartition mesurée sur le poste, détail et méthode dans

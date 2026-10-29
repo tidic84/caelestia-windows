@@ -17,13 +17,15 @@ use windows::Win32::Graphics::Gdi::{
     DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO,
     BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ,
 };
-use windows::core::{HSTRING, PCWSTR};
+use windows::core::{w, HSTRING, PCWSTR};
+use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::{
     BHID_EnumItems, FOLDERID_AppsFolder, IEnumShellItems, IShellItem, IShellItemImageFactory,
-    SHCreateItemFromParsingName, SHGetKnownFolderItem, KF_FLAG_DEFAULT, SIGDN, SIGDN_NORMALDISPLAY,
-    SIGDN_PARENTRELATIVEPARSING, SIIGBF_ICONONLY,
+    SHCreateItemFromParsingName, SHGetKnownFolderItem, SHParseDisplayName, ShellExecuteExW,
+    KF_FLAG_DEFAULT, SEE_MASK_INVOKEIDLIST, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW, SIGDN, SIGDN_NORMALDISPLAY,
+    SIGDN_DESKTOPABSOLUTEPARSING, SIGDN_PARENTRELATIVEPARSING, SIIGBF_ICONONLY,
 };
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -214,11 +216,29 @@ const SKIP: &[&str] = &[
     "documentation", "help", "aide", "website", "site web", "license", "licence",
 ];
 
-fn scan() -> windows::core::Result<Vec<App>> {
-    crate::com_init_sta();
-    let mut out: Vec<App> = Vec::new();
+/// Outils absents du menu Demarrer et des dossiers ci-dessous (fichier de
+/// System32, nom affiche).
+const TOOLS: &[(&str, &str)] = &[
+    ("diskmgmt.msc", "Gestion des disques"),
+    ("ncpa.cpl", "Connexions réseau"),
+    ("gpedit.msc", "Éditeur de stratégie de groupe locale"),
+    ("lusrmgr.msc", "Utilisateurs et groupes locaux"),
+    ("certmgr.msc", "Gestionnaire de certificats"),
+    ("SystemPropertiesAdvanced.exe", "Paramètres système avancés (variables d'environnement)"),
+    ("optionalfeatures.exe", "Fonctionnalités de Windows"),
+    ("rstrui.exe", "Restauration du système"),
+    ("netplwiz.exe", "Comptes d'utilisateurs (avancé)"),
+];
+
+fn tool_path(file: &str) -> String {
+    let sys = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+    format!(r"{sys}\System32\{file}")
+}
+
+/// Ajoute les elements d'un dossier du shell. `abs` : l'identifiant est le
+/// chemin complet (« shell:... »), lance tel quel, et non un nom d'AppsFolder.
+fn push_items(folder: &IShellItem, abs: bool, out: &mut Vec<App>) -> windows::core::Result<()> {
     unsafe {
-        let folder: IShellItem = SHGetKnownFolderItem(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, None)?;
         let en: IEnumShellItems = folder.BindToHandler(None, &BHID_EnumItems)?;
         loop {
             let mut items = [None];
@@ -230,20 +250,65 @@ fn scan() -> windows::core::Result<Vec<App>> {
             let Some(item) = items[0].take() else { break };
             let (Some(name), Some(id)) = (
                 name_of(&item, SIGDN_NORMALDISPLAY),
-                name_of(&item, SIGDN_PARENTRELATIVEPARSING),
+                name_of(&item, if abs { SIGDN_DESKTOPABSOLUTEPARSING } else { SIGDN_PARENTRELATIVEPARSING }),
             ) else {
                 continue;
             };
             let low = name.to_lowercase();
-            if SKIP.iter().any(|s| low.contains(s)) || id.starts_with("http") {
+            // sans nom, le shell rend le chemin « ::{...} »
+            if name.trim().is_empty() || name.starts_with("::{") || SKIP.iter().any(|s| low.contains(s)) || id.starts_with("http") {
                 continue;
             }
-            if out.iter().any(|a| a.name == name) {
+            // Polices (dossier reel, nom traduit) ne s'ouvre pas par ce chemin
+            if out.iter().any(|a| a.name == name) || (abs && !id.rsplit('\\').next().is_some_and(|c| c.starts_with("::{"))) {
                 continue;
             }
+            let id = if abs { format!("shell:{id}") } else { id };
             let icon = icon_of(&item);
             let added = added_of(&item);
             out.push(App { name, id, icon, added });
+        }
+    }
+    Ok(())
+}
+
+fn scan() -> windows::core::Result<Vec<App>> {
+    crate::com_init_sta();
+    let mut out: Vec<App> = Vec::new();
+    unsafe {
+        let folder: IShellItem = SHGetKnownFolderItem(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, None)?;
+        push_items(&folder, false, &mut out)?;
+        // Outils Windows (Observateur d'evenements, Gestion de l'ordinateur,
+        // Editeur du Registre...) : caches du menu Demarrer, mais lances par
+        // AppsFolder comme les autres
+        if let Ok(f) = SHCreateItemFromParsingName::<_, _, IShellItem>(w!("shell:::{D20EA4E1-3957-11d2-A40B-0C5020524153}"), None) {
+            let _ = push_items(&f, false, &mut out);
+        }
+        // pages des Parametres, avec l'icone de l'appli Parametres. Avant le
+        // Panneau de configuration : son « Resolution des problemes » renvoie
+        // aux Parametres, mais pas toujours
+        let settings = out.iter().find(|a| a.id.starts_with("windows.immersivecontrolpanel")).map(|a| a.icon.clone());
+        if let Some(icon) = settings {
+            for (id, name) in [("ms-settings:windowsupdate", "Windows Update"), ("ms-settings:troubleshoot", "Résolution des problèmes")] {
+                if !out.iter().any(|a| a.name == name) {
+                    out.push(App { name: name.into(), id: id.into(), icon: icon.clone(), added: 0 });
+                }
+            }
+        }
+        // Panneau de configuration, tous les elements (Gestionnaire de
+        // peripheriques, Son, Connexions reseau...)
+        if let Ok(f) = SHCreateItemFromParsingName::<_, _, IShellItem>(w!("shell:::{21EC2020-3AEA-1069-A2DD-08002B30309D}"), None) {
+            let _ = push_items(&f, true, &mut out);
+        }
+        // Windows Famille a lusrmgr.msc mais la console y affiche une erreur :
+        // gpedit.msc, absent de cette edition, sert de temoin
+        let pro = Path::new(&tool_path("gpedit.msc")).exists();
+        for (file, name) in TOOLS {
+            let path = tool_path(file);
+            if Path::new(&path).exists() && (pro || *file != "lusrmgr.msc") && !out.iter().any(|a| a.name == *name) {
+                let icon = file_icon(&path);
+                out.push(App { name: name.to_string(), id: path, icon, added: 0 });
+            }
         }
     }
     out.sort_by_key(|a| a.name.to_lowercase());
@@ -269,8 +334,36 @@ pub fn apps_refresh(app: AppHandle) {
 }
 
 pub fn app_launch(id: String) {
+    // element du Panneau de configuration : verbe par defaut de l'element,
+    // comme un double-clic. `explorer.exe <chemin>` ignore certains
+    // (Espaces de stockage, Dossiers de travail)
+    if let Some(path) = id.strip_prefix("shell:") {
+        let path = path.to_string();
+        std::thread::spawn(move || {
+            crate::com_init_sta();
+            unsafe {
+                let mut pidl = std::ptr::null_mut();
+                if SHParseDisplayName(&HSTRING::from(path), None, &mut pidl, 0, None).is_err() {
+                    return;
+                }
+                let mut info = SHELLEXECUTEINFOW {
+                    cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+                    // NOASYNC : le thread (et son STA) s'arrete juste apres
+                    fMask: SEE_MASK_INVOKEIDLIST | SEE_MASK_NOASYNC,
+                    lpIDList: pidl as _,
+                    nShow: SW_SHOWNORMAL.0,
+                    ..Default::default()
+                };
+                let _ = ShellExecuteExW(&mut info);
+                CoTaskMemFree(Some(pidl as _));
+            }
+        });
+        return;
+    }
+    // page des Parametres ou outil de System32 (chemin complet) : ouvert tel quel
+    let direct = id.starts_with("ms-settings:") || TOOLS.iter().any(|(f, _)| id == tool_path(f));
     let _ = Command::new("explorer.exe")
-        .arg(format!("shell:AppsFolder\\{id}"))
+        .arg(if direct { id } else { format!("shell:AppsFolder\\{id}") })
         .creation_flags(CREATE_NO_WINDOW)
         .spawn();
 }

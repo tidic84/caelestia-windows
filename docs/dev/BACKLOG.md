@@ -190,6 +190,9 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Rust (`src/`), à voir selon l'usage
 
+- 🟢 **Outils Windows dans Apps** (`src/apps.rs`, `TOOLS`) :
+  - les éléments du Panneau de configuration qui renvoient aux Paramètres
+    restent listés (masquables) ;
 - 🟢 **Lot suivant du lecteur** (touche `src/media.rs`) : clic sur la pochette
   pour ramener l'appli au premier plan. Aléatoire, répétition et choix de
   l'appli suivie sont déjà notés plus haut (« Lecteur, une seule session »).

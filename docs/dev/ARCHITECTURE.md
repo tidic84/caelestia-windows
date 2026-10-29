@@ -85,7 +85,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 │                 connexion des casques (IKsControl KSPROPSETID_BtAudio), oubli
 ├── notif.rs      Notifications Windows (wpndatabase.db en lecture seule)
 ├── theme.rs      Clair/sombre, accent, source  ├── wall.rs  Fonds d'écran      ├── we.rs  Wallpaper Engine
-├── apps.rs       Lanceur (shell:AppsFolder)    ├── games.rs Jeux Steam/Epic/Ubisoft/GOG, sélecteurs de fichiers
+├── apps.rs       Lanceur (AppsFolder + outils) ├── games.rs Jeux Steam/Epic/Ubisoft/GOG, sélecteurs de fichiers
 ├── files.rs      Fichiers déposés (conversion, zip, presse-papiers)
 ├── tasks.rs      Gestionnaire des tâches       ├── pdh.rs   Compteurs PDH (CPU, GPU, disque)
 ├── procgroup.rs Regroupement des processus comme Windows (algorithme pur, testé)
