@@ -56,6 +56,11 @@ D3D11 reste le moteur le plus léger : OpenGL, Vulkan et D3D12 dépassent
   qualité à 150 %), NVML remplacé (−19 Mo).
 - `settings.json` a été modifié le temps d'une mesure (barre coupée), puis
   remis à l'identique (hash vérifié). L'îlot installé a été relancé.
+- **Ensuite, icônes à 48 px** (`apps.rs`, `icon_of`) : 297 → 222 Mo privés
+  au lancement, 193 → 124 Mo au Gestionnaire. Compilé, installé, relu par
+  un agent (seule l'icône d'un jeu sans jaquette, en 56 px, est agrandie
+  à 100 %). Qualité validée à l'écran par l'utilisateur. Ligne ajoutée au
+  changelog 0.4.24.
 
 ### 2026-10-29 : mémoire, comparaison avec Nusa
 

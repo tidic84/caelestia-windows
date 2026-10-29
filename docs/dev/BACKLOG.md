@@ -245,9 +245,6 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 Répartition mesurée le 2026-10-29 (297 Mo privés, 193 Mo au Gestionnaire).
 
-- 🟠 **Icônes des applis en 64 px** (`apps.rs`, `icon_of`) : la liste
-  jumbo du shell garde ~80 Mo. 48 px, ou extraction dans un processus à
-  part. À décider par l'utilisateur (qualité à 150 %).
 - 🟠 **NVML** (`activity.rs`) : ~19 Mo. Remplaçable par D3DKMT
   (température) et PDH « GPU Engine » (charge).
 - 🟢 **Barre du second écran** : ~40 Mo et ~40 threads (2e device D3D11).
@@ -284,6 +281,9 @@ Répartition mesurée le 2026-10-29 (297 Mo privés, 193 Mo au Gestionnaire).
 
 ## Fait
 
+- 2026-10-29, 0.4.24 à venir : icônes des applis demandées à 48 px
+  (`apps.rs`, `icon_of`) au lieu de 64 : −75 Mo au lancement (liste jumbo
+  du shell évitée). Qualité validée par l'utilisateur.
 - 2026-10-29, après 0.4.23 : images de l'historique du presse-papiers
   gardées en PNG au lieu du RGBA brut (jusqu'à 8 × 15 à 33 Mo). Détail
   dans `docs/perf-memoire.md`.

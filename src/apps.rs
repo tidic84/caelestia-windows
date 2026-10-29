@@ -154,7 +154,10 @@ pub(crate) fn icon_of(item: &IShellItem) -> String {
         let Ok(f) = item.cast::<IShellItemImageFactory>() else {
             return String::new();
         };
-        match f.GetImage(SIZE { cx: 64, cy: 64 }, SIIGBF_ICONONLY) {
+        // 48 px au plus : au-dela, le shell decode chaque icone en 256 x 256
+        // dans sa liste « jumbo », gardee tant que l'ilot tourne (~80 Mo pour
+        // 300 applis, docs/perf-memoire.md)
+        match f.GetImage(SIZE { cx: 48, cy: 48 }, SIIGBF_ICONONLY) {
             Ok(hbmp) => {
                 let r = bitmap_png(hbmp).unwrap_or_default();
                 let _ = DeleteObject(HGDIOBJ(hbmp.0));

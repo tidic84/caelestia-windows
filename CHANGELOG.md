@@ -18,6 +18,7 @@ description à chaque version publiée sur GitHub.
 - **Aperçus animés** en haut des onglets Thème, Îlot et pilule, Lecteur et Alertes : ils montrent les changements avant qu'on les enregistre (couleurs, forme, contour, horloge, vitesse des animations, bouton et barre du lecteur, alertes). L'îlot tel qu'il est enregistré reste visible à côté (« Ton îlot »). Le compagnon de l'onglet Compagnon porte aussi les changements.
 - **Thèmes prêts refaits** : 13 thèmes en cartes, avec un aperçu de la pilule et des couleurs. Ardoise (gris-bleu opaque), Brume (gris-bleu sur acrylique) et OLED sont nouveaux, ainsi qu'Aurore, Papier et Bonbon ; Minuit, Néon, Coucher de soleil, Forêt, Glace, Rétro et Monochrome sont revus. Ils règlent aussi l'horloge et les animations. Après une retouche, « Thème perso, d'après X » propose de revenir au thème.
 - **Cartes noires (OLED)** (Réglages › Îlot et pilule) : en mode sombre, le fond devient noir pur et les cartes presque noires.
+- **Moins de mémoire** : l'îlot prend environ 75 Mo de moins au lancement (icônes des applis demandées à 48 px, ce qui évite le grand cache d'icônes de Windows). Les images de l'historique du presse-papiers sont gardées compressées : une capture d'écran n'y pèse plus 8 à 33 Mo.
 - **Réglages plus rapides à ouvrir** : la page ne fait plus recalculer tout l'îlot à chaque ouverture, et chaque onglet n'est créé qu'à sa première visite.
 
 ## 0.4.23 — 2026-10-28
