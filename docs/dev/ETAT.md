@@ -66,6 +66,8 @@ le profil puis `pets\` à côté de `ilot.exe` (profil prioritaire à id égal).
 - **0.4.25 publiée** le 2026-10-30 (avec le compagnon en sprites du
   collaborateur). Build par `vcvars64 -vcvars_ver=14.44` : voir le piège
   MSVC dans `CLAUDE.md`.
+- **Archive 0.4.25 refaite** (même soir) avec `3ef3042` (pack Zekrom livré
+  dans `pets\`) : zip et `.sig` remplacés, tag `v0.4.25` déplacé.
 
 ### 2026-10-30 : compagnon, retouches avant la 0.4.25
 

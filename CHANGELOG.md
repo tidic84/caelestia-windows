@@ -8,6 +8,7 @@ description à chaque version publiée sur GitHub.
 
 - **Compagnons en sprites** : l'îlot sait afficher un compagnon animé venu d'un pack personnel (dossier `.ilot\pets`), avec promenade au-dessus de la barre des tâches, attaques animées et buste dans la pilule. Aucun pack n'est fourni avec l'îlot.
 - **Réglages › Compagnon** : l'aperçu montre le buste d'un pack en grand, centré.
+- **Zekrom livré avec l'îlot** : le pack de compagnon Zekrom est installé avec l'appli (dossier `pets` à côté de `ilot.exe`) et se choisit dans Réglages › Compagnon. Un pack du même nom dans `.ilot\pets` reste prioritaire.
 - **Lancement au démarrage plus rapide** : l'îlot démarre maintenant par une tâche planifiée « à l'ouverture de session » au lieu de la clé `Run` de l'Explorateur, qui lançait ses entrées une à une (l'îlot arrivait 2 à 3 min après l'ouverture de session). Il attend la barre des tâches avant de s'afficher. Les installations existantes passent d'elles-mêmes à la tâche au premier lancement ; la clé `Run` reste le repli si le Planificateur refuse la tâche.
 
 ## 0.4.24 — 2026-10-29
