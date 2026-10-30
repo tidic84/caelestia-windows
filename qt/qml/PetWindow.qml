@@ -18,7 +18,9 @@ Window {
     title: "Ilot compagnon"
     readonly property var scr: host ? host.screen : null
     width: scr ? scr.width : 1200
-    height: 260
+    // pack de sprites : hauteur de sa zone (json.area : les attaques « ciel »
+    // ont besoin de place) ; especes dessinees : inchangee
+    height: isPack ? Math.max(120, Math.min(800, Number(pack.json.area) || 360)) : 260
     x: scr ? scr.virtualX : 0
     // au-dessus de la barre des taches
     y: scr ? scr.virtualY + scr.height - height - 48 : 0
@@ -310,6 +312,7 @@ Window {
     }
     Connections {
         target: Watch
+        enabled: !w.isPack
         function onPetOutChanged() {
             if (!Watch.petOut)
                 w.leave()
@@ -328,7 +331,12 @@ Window {
     }
 
     // ------------------------------------------------------ arrivee
-    Component.onCompleted: arrive()
+    Component.onCompleted: {
+        if (!isPack)
+            return arrive()
+        // les scenes ne concernent que les especes dessinees
+        Watch.petScene = ""
+    }
     function arrive() {
         cleanup()
         scene = "arrive"
@@ -2380,6 +2388,7 @@ Window {
     // ===================================================== compagnon
     Item {
         id: walker
+        visible: !w.isPack
         x: w.px - w.pw / 2
         y: w.gy - w.ph + w.py + (w.floating ? Math.sin(w.floatPhase) * 4 * w.k : 0) + (w.swim ? Math.sin(w.floatPhase * 3) * 6 * w.k : 0)
         width: w.pw
@@ -2407,6 +2416,76 @@ Window {
             transform: Scale {
                 origin.x: pet.width / 2
                 xScale: w.dir
+            }
+        }
+    }
+
+    // ============================================== pack de sprites
+    // cfg.pet = "pack:<id>" (Watch.petPack) : PackStage remplace le compagnon
+    // dessine et ses scenes (rien de tout cela ne tourne alors). Meme logique
+    // de depart : Watch.petOut faux -> leave() ; gone() -> Watch.petReturned().
+    readonly property var pack: Watch.petPack
+    readonly property bool isPack: !!pack
+    readonly property string packId: pack ? pack.id : ""
+    property bool packLeaving: false
+    // change d'espece pendant la promenade
+    // (dans les deux sens, y compris pendant le retour dans la pilule)
+    onIsPackChanged: {
+        leaveA.stop()
+        leaving = false
+        packLeaving = false
+        if (isPack) {
+            cleanup()
+            Watch.petScene = ""
+        }
+        // il remontait : on ferme tout de suite, sans nouvelle arrivee
+        if (!Watch.petOut)
+            return Watch.petReturned()
+        if (!isPack)
+            arrive()
+    }
+    onPackIdChanged: {
+        if (!packStage.item || !pack)
+            return
+        packStage.item.pack = pack
+        // il remontait : le nouveau pack repart aussitot
+        if (packLeaving)
+            packStage.item.leave()
+    }
+    Loader {
+        id: packStage
+        anchors.fill: parent
+        active: w.isPack
+        // par son nom : le fichier n'est pas une dependance de compilation
+        source: "PackStage.qml"
+        onLoaded: {
+            item.pack = w.pack
+            item.running = Qt.binding(() => Watch.petWinOn && !Ilot.covered && !Theme.reduced)
+        }
+    }
+    Connections {
+        target: packStage.item
+        ignoreUnknownSignals: true
+        function onGone() {
+            w.packLeaving = false
+            Watch.petReturned()
+        }
+    }
+    Connections {
+        target: Watch
+        enabled: w.isPack
+        function onPetOutChanged() {
+            if (!Watch.petOut) {
+                w.packLeaving = true
+                if (packStage.item)
+                    packStage.item.leave()
+                else
+                    Watch.petReturned()
+            } else if (w.packLeaving) {
+                // revenu se promener pendant qu'il remontait : il revient
+                w.packLeaving = false
+                packStage.source = ""
+                packStage.source = "PackStage.qml"
             }
         }
     }

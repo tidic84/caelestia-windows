@@ -864,11 +864,46 @@ Item {
     // (affection, niveaux). Apres un moment sans clavier ni souris, il descend
     // se promener au-dessus de la barre des taches (PetWindow). « Masque » :
     // plus rien ne tourne (ni minuterie, ni fenetre, ni dessin).
+    // pack choisi : rien tant que la liste des packs n'est pas arrivee (pas
+    // de blob qui clignote au lancement)
     readonly property bool petShown: (cfg.pet || "blob") !== "off"
-    readonly property string petSpecies: petShown ? cfg.pet || "blob" : "blob"
+        && (petPacksReady || String(cfg.pet || "").indexOf("pack:") !== 0)
+    // packs de sprites hors du depot (src/pets.rs, commande pet_packs) :
+    // cfg.pet = "pack:<id>". Pack absent du poste : retour au blob, sans erreur.
+    property var petPacks: []
+    // premiere reponse de pet_packs recue (succes ou erreur)
+    property bool petPacksReady: false
+    property int petPacksTries: 0
+    function petPacksReload() {
+        Api.invoke("pet_packs").then(l => {
+            w.petPacks = l || []
+            w.petPacksReady = true
+        }, e => {
+            // au lancement, la fenetre de l'ilot n'est pas encore connue du
+            // Rust ("fenetre inconnue") : on redemande un peu plus tard
+            if (!w.petPacksReady && ++w.petPacksTries < 10)
+                petPacksRetry.start()
+            else
+                w.petPacksReady = true
+        })
+    }
+    Timer {
+        id: petPacksRetry
+        interval: 500
+        onTriggered: w.petPacksReload()
+    }
+    function petPackOf(v) {
+        const s = String(v || "")
+        return s.indexOf("pack:") === 0 ? petPacks.find(p => "pack:" + p.id === s) || null : null
+    }
+    // pack courant ({ id, name, url, json, meta }), ou null
+    readonly property var petPack: petShown ? petPackOf(cfg.pet) : null
+    readonly property string petSpecies: !petShown ? "blob"
+        : String(cfg.pet || "").indexOf("pack:") === 0 ? (petPack ? cfg.pet : "blob") : cfg.pet || "blob"
     readonly property var petNames: ({ blob: "Blobby", cat: "Minou", ghost: "Boo", bunny: "Pompon", frog: "Gribouille",
         penguin: "Glagla", chick: "Piou", robot: "Bip", axolotl: "Axo", mush: "Champi" })
-    readonly property string petName: String(cfg.pet_name || "").trim() || petNames[petSpecies] || "Blobby"
+    readonly property string petDefaultName: petPack ? petPack.name : petNames[petSpecies] || "Blobby"
+    readonly property string petName: String(cfg.pet_name || "").trim() || petDefaultName
     readonly property var petMoodLabels: ({ idle: "tranquille", music: "écoute la musique", game: "joue avec toi", hot: "a chaud",
         sleep: "dort", party: "fait la fête", surprise: "a vu quelque chose", love: "est aux anges" })
     property real partyUntil: 0
@@ -1044,7 +1079,10 @@ Item {
         mailSeen = true
     }
 
+
+
     Component.onCompleted: {
+        petPacksReload()
         Api.listen("gaming", a => {
             const before = w.gaming.game ? w.gaming.game.id : null
             w.gaming = a

@@ -90,6 +90,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── tasks.rs      Gestionnaire des tâches       ├── pdh.rs   Compteurs PDH (CPU, GPU, disque)
 ├── procgroup.rs Regroupement des processus comme Windows (algorithme pur, testé)
 ├── svc.rs        Services Windows par pid (« Hôte de service : X »)
+├── pets.rs       Packs de compagnon hors du dépôt (commande pet_packs, voir plus bas)
 ├── pc.rs         Mode d'alimentation, logiciels constructeur, instantané Toolhelp
 ├── health.rs     Disques, nettoyage, pilote NVIDIA, idle_secs
 ├── status.rs     État des services en ligne (toutes les 3 min)
@@ -137,13 +138,52 @@ Pages         HomePage · MediaPage · CtrlPage (+ Mixer : pastilles de sorties,
               thèmes prêts ; onglet Son : sorties affichées, noms choisis) · SettingsPreview (aperçus animés du brouillon)
 Cartes PC     PcCard · ServicesCard · HealthCard · ShutdownCard · SensCard
 Addon Claude  UsageChart (graphique de ClaudeUsagePage)
-Compagnon     Pet (10 espèces, expressions, tours)
+Compagnon     Pet (10 espèces, expressions, tours) · PetBust (buste d'un pack dans la pilule et l'aperçu)
+              PackStage (promenade d'un pack) · SpritePet (lecteur de sprites) · PetFx (effets des attaques)
 Décor         Aurora · WxFx (météo animée) · Glow · Eq · VizBars
 Composants    Btn · IconBtn · TextBtn · M3Switch · M3Slider · Seg · Field · Area · CtxMenu · Card · Chip · Empty
               Gauge · Spinner · Scroller · Tip · Txt · Ms · ClaudeMark · RoundImage · ArtImage · RoundArt · MediaControls · SeekBar · PlayBtn
               NotifRow · TimerBody
 Modules JS    calc · emoji · ical · rank (frécence du lanceur) · mcu (material-color-utilities)
 ```
+
+**Packs de compagnon** (Réglages › Compagnon, `cfg.pet = "pack:<id>"`).
+Le personnage vit hors du dépôt (pas de contenu sous licence dans le dépôt
+public), le moteur est générique.
+- **Sécurité** : un pack exécute du QML (`Attacks.qml`) avec les droits de
+  l'appli. N'installer que des packs de confiance, faits soi-même.
+- **Emplacement** : `%USERPROFILE%\.ilot\pets\<id>\` (`id` :
+  `[A-Za-z0-9_-]`). Pour les essais, `ILOT_PETS_DIR` remplace le dossier
+  `pets`.
+- **`pet_packs`** (`src/pets.rs`) : renvoie `[{ id, name, url, json, meta }]`.
+  `url` est le dossier en `file:///…/`, `json` le `pack.json`, `meta` les
+  JSON cités, déjà lus (`meta.sprites`, `meta.bust`). Les fichiers sont lus
+  par leur chemin réel, qui doit rester dans le dossier du pack (jonctions
+  résolues, dossier de pack en jonction refusé), 16 Mo par fichier, 32 Mo
+  par pack, 32 variantes au plus. Dossier absent : `[]` ; pack invalide :
+  ignoré.
+- **`pack.json`** :
+  ```json
+  { "name": "…", "area": 360, "attacks": "Attacks.qml", "sizes": { "s": 110, "m": 150, "l": 200 }, "greet": "roar",
+    "sprites": { "dir": "sprites", "meta": "sprites.json", "fps": 12, "loops": ["idle","walk","dash"], "idle": "idle", "walk": "walk" },
+    "bust": { "dir": "bust", "variants": "variants.json", "fps": 12, "click": "bust_roar",
+              "moods": { "idle": "bust_idle", "music": "bust_music", "love": "bust_love", "sleep": "bust_sleep" } } }
+  ```
+  `area` est la hauteur de la fenêtre de promenade (PetWindow, 260 pour les
+  espèces dessinées).
+- **`sprites.json`** : `{ w, h, anims: { <nom>: [ {ancres…}, … ] } }`, une
+  planche `<nom>.png` par animation, images côte à côte de `w × h` pixels.
+- **Buste** : `bust/variants.json` = `{ size, variants: [{ h, dir }] }`.
+  Chaque `bust/<dir>/` contient ses planches déjà recadrées et réduites et
+  son `sprites.json`. PetBust vise `size × k × DPR` pixels physiques, prend
+  la plus petite variante assez haute (sinon la plus grande) et l'affiche
+  1:1 (AnimatedSprite, une texture par planche, au plus proche ; propriété
+  `crisp`). Ancien format, en repli : `"meta": "sprites.json"`, avec `crop`
+  `[x, y, w, h]` et `scale`.
+- **Branchements** : `Watch.petPacks`, `petPack` et `petPacksReady`
+  (rechargés à l'ouverture des Réglages). Pack absent : `blob`. `Pill`
+  affiche PetBust à la place de Pet. Dans `PetWindow`, un `Loader` charge
+  PackStage à la place du compagnon dessiné et des scènes.
 
 **Sorties audio affichées** (Réglages › Son, depuis la 0.4.20). Tout est en
 QML, sans code Rust.

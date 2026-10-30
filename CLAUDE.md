@@ -137,6 +137,29 @@ Ne pas commiter `dist\`, le zip, le `.sig` ni `notes.md`.
   arrêter l'appli le dérange et la capture est blanche. Vérifier avant
   `Get-Process RocketLeague` (ou autre jeu) et relancer l'appli installée
   après chaque capture.
+- **Mise à jour en attente pendant un test** : une version de test plus
+  ancienne que la release installe au démarrage la mise à jour téléchargée
+  (`install_pending_at_start`) **dans `qt\build`**, puis se relance. Lancé
+  depuis le Bash de Claude Code, l'installeur hérite d'un `PSModulePath`
+  (PowerShell 7) où `Get-FileHash` manque : il échoue et boucle (îlot ↔
+  installeur). Pendant un test : `"update_mode": "notify"` dans
+  `settings.json`, et `git pull` avant pour avoir la version publiée.
+  Relancer l'appli installée par `explorer.exe "<chemin>\ilot.exe"`
+  (environnement propre). Sortir de la boucle : tuer les `powershell.exe`
+  dont la ligne contient `Ilot\update\install.ps1`, et les `ilot.exe`.
+- **Script de test qui relance l'appli installée** : retirer d'abord
+  `ILOT_QT_LOG`/`ILOT_QT_SHOT` de l'environnement, sinon l'appli relancée
+  écrase le journal du test. `console.log` n'arrive pas dans le journal :
+  utiliser `console.warn`.
+- **Modifier `settings.json` depuis PowerShell 5** : `Set-Content -Encoding
+  UTF8` ajoute un BOM et l'appli repart sur les réglages par défaut. Écrire
+  par `[IO.File]::WriteAllText($f, $t, (New-Object Text.UTF8Encoding $false))`.
+- **Banc hors écran (`qml.exe`, `QT_QPA_PLATFORM=offscreen`)** : rendu
+  logiciel, `AnimatedSprite` n'y est pas dessiné (buste invisible). Pour
+  une capture, le remplacer par une `Image` découpée dans une copie.
+- **Packs de compagnon** (`%USERPROFILE%\.ilot\pets\<id>\`) : jamais dans le
+  dépôt (contenu sous droits). Pilule repliée sans compagnon pendant une
+  activité (vocal Discord, notification) : normal, pas un bug du pack.
 - **Effets système de l'appli** :
   - barre des tâches en masquage automatique, rétablie quand on quitte (si
     l'appli plante, redémarrer l'Explorateur) ;

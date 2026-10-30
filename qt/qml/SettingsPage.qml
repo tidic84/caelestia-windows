@@ -17,6 +17,31 @@ Item {
     readonly property bool shown: Ilot.mode === "open" && Ilot.currentTab === "settings"
     // reglages affiches : ceux de l'ilot, et le brouillon par-dessus
     readonly property var cfg: Object.assign({}, Ilot.cfg, draft)
+    // Compagnon : pack de sprites choisi dans le brouillon (Watch.petPacks)
+    readonly property var petPackDraft: Watch.petPackOf(cfg.pet)
+    // pack absent du poste : traite comme une espece dessinee (blob)
+    readonly property bool petIsPack: !!petPackDraft
+    // promenade : elle montre le reglage enregistre (Watch), pas le brouillon
+    readonly property bool petSaved: (cfg.pet || "blob") === (Ilot.cfg.pet || "blob")
+    // packs caches tant qu'ils ne sont pas debloques (ui.json) ; un pack deja
+    // choisi (enregistre ou brouillon) garde sa puce
+    readonly property bool petPacksUnlocked: !!Ilot.ui.petPacksUnlocked
+    // chaines intermediaires : cfg change a chaque reglage, elles seulement si
+    // l'espece change (sinon toutes les puces seraient recreees)
+    readonly property string petDraftId: cfg.pet || ""
+    readonly property string petSavedId: Ilot.cfg.pet || ""
+    readonly property var petPacksShown: Watch.petPacks.filter(p => petPacksUnlocked
+        || "pack:" + p.id === petDraftId || "pack:" + p.id === petSavedId)
+    // deblocage : taper le nom exact d'un pack dans la recherche le propose
+    // (searchHits) ; le choisir ajoute les packs aux puces de Compagnon
+    signal petUnlocked()
+    function unlockPacks() {
+        if (!petPacksUnlocked)
+            Ilot.saveUi({ petPacksUnlocked: true })
+        Ilot.settingsSection = "pet"
+        // apres le chargement de l'apercu de l'onglet
+        Qt.callLater(() => page.petUnlocked())
+    }
     // onglet des reglages (Ilot.openSettings l'ouvre de l'exterieur ; les
     // anciens noms d'onglets y menent encore)
     readonly property string section: {
@@ -192,8 +217,11 @@ Item {
     property bool winkeyBusy: false
 
     onShownChanged: {
-        if (shown)
+        if (shown) {
+            // packs de compagnon ajoutes ou retires sur le poste
+            Watch.petPacksReload()
             return load()
+        }
         keyRec = ""
         appPick = false
     }
@@ -511,10 +539,14 @@ Item {
         if (query === "")
             return []
         const words = fold(query).split(/\s+/)
-        return searchIndex.filter(e => {
+        // pack de compagnon : seulement sur son nom exact (easter egg) ;
+        // 5e case = id du pack
+        const packs = Watch.petPacks.filter(p => p.name && fold(p.name) === fold(query))
+                                    .map(p => [p.name, "pet", "", "", p.id])
+        return packs.concat(searchIndex.filter(e => {
             const t = fold(e[0] + " " + e[2])
             return words.every(w => t.indexOf(w) >= 0)
-        }).slice(0, 10)
+        })).slice(0, 10)
     }
     // onglets et titres de groupe, a plat
     readonly property var navItems: {
@@ -643,7 +675,10 @@ Item {
                     radius: 14
                     color: hovered ? Theme.alpha(Theme.ink, 0.08) : "transparent"
                     onClicked: {
-                        Ilot.settingsSection = modelData[1]
+                        if (modelData[4])
+                            page.unlockPacks()
+                        else
+                            Ilot.settingsSection = modelData[1]
                         navSearch.text = ""
                     }
                     Column {
@@ -659,7 +694,8 @@ Item {
                         }
                         Txt {
                             width: parent.width
-                            text: (hit.sec ? hit.sec.label : "") + (hit.modelData[3] ? " · avant : " + hit.modelData[3] : "")
+                            text: hit.modelData[4] ? (page.petPacksUnlocked ? "Compagnon" : "Compagnon secret · l'ajouter")
+                                : (hit.sec ? hit.sec.label : "") + (hit.modelData[3] ? " · avant : " + hit.modelData[3] : "")
                             px: 11
                             color: Theme.inkVariant
                             elide: Text.ElideRight
@@ -1878,7 +1914,9 @@ Item {
                     SubTitle { text: "Espèce"; key: "pet" }
                     Chips {
                         model: [["blob", "Blob"], ["cat", "Chat"], ["ghost", "Fantôme"], ["bunny", "Lapin"], ["frog", "Grenouille"], ["penguin", "Pingouin"],
-                                ["chick", "Poussin"], ["robot", "Robot"], ["axolotl", "Axolotl"], ["mush", "Champignon"], ["off", "Masqué"]]
+                                ["chick", "Poussin"], ["robot", "Robot"], ["axolotl", "Axolotl"], ["mush", "Champignon"]]
+                               // packs de sprites du poste (debloques, ou celui deja choisi)
+                               .concat(page.petPacksShown.map(p => ["pack:" + p.id, p.name]), [["off", "Masqué"]])
                         current: page.cfg.pet || "blob"
                         key: "pet"
                         onPicked: v => page.set({ pet: v })
@@ -1906,6 +1944,27 @@ Item {
                             radius: 18
                             color: Theme.surfaceHigh
                             clip: true
+                            // deblocage : un bref eclat sur l'apercu
+                            Rectangle {
+                                id: unlockFlash
+                                anchors.fill: parent
+                                radius: parent.radius
+                                color: Theme.primary
+                                opacity: 0
+                                SequentialAnimation {
+                                    id: unlockA
+                                    NumberAnimation { target: unlockFlash; property: "opacity"; to: 0.22; duration: 140; easing.type: Easing.OutQuad }
+                                    NumberAnimation { target: unlockFlash; property: "opacity"; to: 0; duration: 700; easing.type: Easing.InQuad }
+                                }
+                                Connections {
+                                    target: page
+                                    function onPetUnlocked() {
+                                        unlockA.restart()
+                                        if (stagePet.item)
+                                            stagePet.item.trick("flip")
+                                    }
+                                }
+                            }
                             // sol
                             Rectangle {
                                 y: parent.height - 34
@@ -1917,15 +1976,37 @@ Item {
                             Loader {
                                 id: stagePet
                                 active: page.shown && page.section === "pet"
-                                x: 40
-                                y: stage.height - 34 - 18 * 4.5 + 6
-                                sourceComponent: Pet {
+                                // buste d'un pack : centre au-dessus du sol (150 px)
+                                x: page.petPackDraft && item ? 75 - item.width / 2 : 40
+                                y: stage.height - 34 - (item ? item.height : 18 * 4.5) + 6
+                                sourceComponent: page.petPackDraft ? stageBust : stagePetVec
+                                // pack de sprites : son buste, plus grand
+                                Component {
+                                    id: stageBust
+                                    PetBust {
+                                        // planches par hauteur : la plus grande, 1:1 ;
+                                        // ancien format : meme taille quel que soit json.bust.scale
+                                        k: multi ? 4.5 : 6.5 / zoom
+                                        centered: false
+                                        listen: false
+                                        interactive: true
+                                        pack: page.petPackDraft
+                                        mood: Watch.mood === "sleep" || Watch.mood === "surprise" ? "idle" : Watch.mood
+                                        tip: "Clic : un tour · appui long : caresse"
+                                        onPoked: Watch.petLoved(1, false)
+                                        onCaressed: Watch.petLoved(2, true)
+                                    }
+                                }
+                            }
+                            Component {
+                                id: stagePetVec
+                                Pet {
                                     k: 4.5
                                     listen: false
                                     interactive: true
                                     look: 0
                                     // apercu du brouillon
-                                    species: page.cfg.pet && page.cfg.pet !== "off" ? page.cfg.pet : "blob"
+                                    species: page.cfg.pet && page.cfg.pet !== "off" && String(page.cfg.pet).indexOf("pack:") !== 0 ? page.cfg.pet : "blob"
                                     hat: page.cfg.pet_hat || "none"
                                     faceAcc: page.cfg.pet_face || "none"
                                     neck: page.cfg.pet_neck || "none"
@@ -2049,7 +2130,7 @@ Item {
                             id: petName
                             width: Math.min(parent.width, 260)
                             height: 34
-                            placeholder: Watch.petNames[Watch.petSpecies] || ""
+                            placeholder: page.petPackDraft ? page.petPackDraft.name : Watch.petNames[Watch.petSpecies] || ""
                             text: page.cfg.pet_name || ""
                             onFocused: {
                                 Ilot.pinned = true
@@ -2063,8 +2144,10 @@ Item {
                                 onTriggered: if (petName.text.trim() !== (page.cfg.pet_name || "")) page.set({ pet_name: petName.text.trim().slice(0, 24) })
                             }
                         }
-                        SubTitle { text: "Couleur"; key: "pet_color" }
+                        // pack de sprites : ni couleur, ni yeux, ni accessoires
+                        SubTitle { text: "Couleur"; key: "pet_color"; visible: !page.petIsPack }
                         Flow {
+                            visible: !page.petIsPack
                             width: parent.width
                             topPadding: 8
                             spacing: 6
@@ -2090,31 +2173,35 @@ Item {
                                 }
                             }
                         }
-                        SubTitle { text: "Yeux"; key: "pet_eyes" }
+                        SubTitle { text: "Yeux"; key: "pet_eyes"; visible: !page.petIsPack }
                         Chips {
+                            visible: !page.petIsPack
                             model: [["dot", "Points"], ["shine", "Brillants"], ["big", "Grands"], ["lash", "Cils"], ["sleepy", "Endormis"], ["square", "Carrés"]]
                             current: page.cfg.pet_eyes || "dot"
                             key: "pet_eyes"
                             onPicked: v => page.set({ pet_eyes: v })
                         }
-                        SubTitle { text: "Chapeau"; key: "pet_hat" }
+                        SubTitle { text: "Chapeau"; key: "pet_hat"; visible: !page.petIsPack }
                         Chips {
+                            visible: !page.petIsPack
                             model: [["none", "Aucun"], ["party", "Fête"], ["crown", "Couronne"], ["cap", "Casquette"], ["beanie", "Bonnet"], ["top", "Haut-de-forme"],
                                     ["wizard", "Sorcier"], ["chef", "Toque"], ["flower", "Fleur"], ["bow", "Nœud"], ["halo", "Auréole"], ["horns", "Cornes"], ["headphones", "Casque audio"]]
                             current: page.cfg.pet_hat || "none"
                             key: "pet_hat"
                             onPicked: v => page.set({ pet_hat: v })
                         }
-                        SubTitle { text: "Visage"; key: "pet_face" }
+                        SubTitle { text: "Visage"; key: "pet_face"; visible: !page.petIsPack }
                         Chips {
+                            visible: !page.petIsPack
                             model: [["none", "Rien"], ["glasses", "Lunettes"], ["sun", "Lunettes de soleil"], ["monocle", "Monocle"], ["mask", "Masque"],
                                     ["blush", "Joues roses"], ["freckles", "Taches de rousseur"]]
                             current: page.cfg.pet_face || "none"
                             key: "pet_face"
                             onPicked: v => page.set({ pet_face: v })
                         }
-                        SubTitle { text: "Cou"; key: "pet_neck" }
+                        SubTitle { text: "Cou"; key: "pet_neck"; visible: !page.petIsPack }
                         Chips {
+                            visible: !page.petIsPack
                             model: [["none", "Rien"], ["bowtie", "Nœud papillon"], ["scarf", "Écharpe"], ["bell", "Grelot"], ["bandana", "Bandana"]]
                             current: page.cfg.pet_neck || "none"
                             key: "pet_neck"
@@ -2158,14 +2245,32 @@ Item {
                                 onPicked: v => page.set({ pet_trail: v })
                             }
                         }
-                        SubTitle { text: "Voir une scène tout de suite (40 s)" }
+                        // scenes du compagnon dessine enregistre (pas pour un pack)
+                        SubTitle { text: "Voir une scène tout de suite (40 s)"; visible: !Watch.petPack && !page.petIsPack }
                         Chips {
+                            visible: !Watch.petPack && !page.petIsPack
                             model: [["stroll", "Balade"], ["sleep", "Sieste"], ["ball", "Ballon"], ["butterfly", "Papillon"], ["balloon", "Montgolfière"],
                                     ["fishing", "Pêche"], ["skate", "Skate"], ["bubbles", "Bulles"], ["read", "Lecture"], ["plane", "Avion en papier"],
                                     ["garden", "Jardinage"], ["hide", "Cache-cache"], ["meditate", "Méditation"], ["dance", "Danse"], ["stars", "Étoiles filantes"],
                                     ["coffee", "Café"], ["umbrella", "Parapluie"], ["snow", "Bonhomme de neige"], ["special", "Son tour secret"]]
                             current: ""
                             onPicked: v => Watch.petDemo(v)
+                        }
+                        // pack de sprites enregistre : pas de scenes, sa propre promenade
+                        TextBtn {
+                            visible: !!Watch.petPack && page.petSaved && !Watch.petOut
+                            icon: "play_arrow"
+                            text: "Le voir se promener (40 s)"
+                            onClicked: Watch.petDemo("stroll")
+                        }
+                        Txt {
+                            visible: (!!Watch.petPack || page.petIsPack) && !page.petSaved
+                            topPadding: 10
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            px: 11.5
+                            color: Theme.inkVariant
+                            text: "Enregistre pour le voir se promener."
                         }
                         Txt {
                             visible: Theme.reduced
@@ -3980,6 +4085,8 @@ Item {
         // reglage concerne : libelles des choix pour la liste des modifications
         property string key: ""
         Component.onCompleted: if (key) page.choices[key] = model
+        // choix ajoutes ensuite (packs de compagnon)
+        onModelChanged: if (key) page.choices[key] = model
         signal picked(var v)
         width: parent ? parent.width : 0
         topPadding: 12

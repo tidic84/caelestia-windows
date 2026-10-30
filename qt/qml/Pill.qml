@@ -115,6 +115,7 @@ Item {
                 Behavior on y { NumberAnimation { duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emph } }
             },
             Scale {
+                id: miniScale
                 origin.x: mini.width / 2
                 origin.y: mini.height / 2
                 xScale: pill.actOn ? 0.9 : 1
@@ -129,11 +130,26 @@ Item {
             active: Watch.petShown
             visible: active && !mini.lyOnly
             anchors.verticalCenter: parent.verticalCenter
-            sourceComponent: Pet {
-                opacity: Watch.petWinOn ? 0 : 1
-                // parti : plus d'animation dans la pilule (sa place reste)
-                visible: opacity > 0
-                Behavior on opacity { NumberAnimation { duration: 400 } }
+            sourceComponent: Watch.petPack ? miniBust : miniPet
+            Component {
+                id: miniPet
+                Pet {
+                    opacity: Watch.petWinOn ? 0 : 1
+                    // parti : plus d'animation dans la pilule (sa place reste)
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: 400 } }
+                }
+            }
+            // pack de sprites : son buste anime
+            Component {
+                id: miniBust
+                PetBust {
+                    // pixel pres, sauf pendant la reduction (activite)
+                    crisp: miniScale.xScale === 1
+                    opacity: Watch.petWinOn ? 0 : 1
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: 400 } }
+                }
             }
         }
         // musique : pochette ronde qui tourne dans un anneau qui se remplit
@@ -640,12 +656,26 @@ Item {
                 active: Watch.petShown && pill.peek
                 visible: active && !Watch.petWinOn
                 anchors.verticalCenter: parent.verticalCenter
-                sourceComponent: Pet {
-                    k: 1.45
-                    interactive: true
-                    tip: Watch.petName + " " + (Watch.petMoodLabels[Watch.mood] || "") + " · niveau " + Watch.petLevel + " — clic, double clic ou appui long"
-                    onPoked: Watch.petLoved(1, false)
-                    onCaressed: Watch.petLoved(2, true)
+                sourceComponent: Watch.petPack ? peekBust : peekPet
+                Component {
+                    id: peekPet
+                    Pet {
+                        k: 1.45
+                        interactive: true
+                        tip: Watch.petName + " " + (Watch.petMoodLabels[Watch.mood] || "") + " · niveau " + Watch.petLevel + " — clic, double clic ou appui long"
+                        onPoked: Watch.petLoved(1, false)
+                        onCaressed: Watch.petLoved(2, true)
+                    }
+                }
+                Component {
+                    id: peekBust
+                    PetBust {
+                        k: 1.45
+                        interactive: true
+                        tip: Watch.petName + " " + (Watch.petMoodLabels[Watch.mood] || "") + " · niveau " + Watch.petLevel + " — clic ou appui long"
+                        onPoked: Watch.petLoved(1, false)
+                        onCaressed: Watch.petLoved(2, true)
+                    }
                 }
             }
             Txt {

@@ -23,6 +23,16 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   - Monochrome ressemble à OLED : à retirer s'il le demande.
   - Une puce revenue à sa valeur par défaut jamais enregistrée (ex.
     `cc_min` 30) reste comptée comme modification (bénin).
+- 🟢 **Compagnon en sprites (packs) : intégré le 2026-10-29, reste à voir**
+  - Buste dans la pilule repliée vu en vrai le 2026-10-30 (capture) ; le
+    survol (peek) n'a toujours pas été vu.
+  - Charge Foudre allégée le 2026-10-30 (un éclair toutes les 3 images) :
+    images lentes de 43 à 5 au banc hors écran.
+  - Draco-Choc : tiré en biais vers le coin haut le plus loin, 45 % de la
+    largeur au plus, fondu au bout (2026-10-30). Au banc hors écran (zone
+    520 px), encore ~80 images > 20 ms, dès la charge : pas mieux qu'avant.
+  - Un pack exécute du QML (`Attacks.qml`) avec les droits de l'appli : packs
+    personnels uniquement. Garde-fou à prévoir si des packs circulent un jour.
 - 🟢 **Animations : plan à faire (demande de l'utilisateur, 2026-10-28)** :
   remplacer les réglages d'animation actuels par un simple « Animations :
   oui / non », puis revoir toutes les animations une par une. Prévoir une

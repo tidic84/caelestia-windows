@@ -29,6 +29,7 @@ mod net;
 mod notif;
 mod pc;
 mod pdh;
+mod pets;
 mod prefs;
 mod privacy;
 mod procgroup;
@@ -288,6 +289,7 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "caffeine_get" => json(system::caffeine_get()),
         "user_info" => json(system::user_info()),
         "motion_reduced" => json(system::motion_reduced()),
+        "pet_packs" => json(pets::pet_packs()),
         "http_get" => system::http_get(a!("url")).and_then(json),
         "open_url" => json(system::open_url(a!("url"))),
         // son

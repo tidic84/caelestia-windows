@@ -38,6 +38,79 @@ reprendre.
 
 ## Journal
 
+### 2026-10-30 : compagnon, retouches avant la 0.4.25
+
+Décisions de l'utilisateur : la 0.4.25 sortira **avec** le moteur de packs ;
+easter egg choisi par lui : taper le nom exact du pack (« zekrom ») dans la
+recherche des Réglages le propose ; le clic débloque les packs
+(`Ilot.ui.petPacksUnlocked`), ouvre Compagnon, éclat + salto. Les 5 clics
+sur l'aperçu sont retirés. Compilé, relu, installé, **pas testé en vrai**.
+Toujours **rien de commité** : attendre son feu vert.
+- Pack (hors dépôt, `%USERPROFILE%\.ilot\pets\zekrom\`) :
+  - Charge Foudre allégée (éclair 1 image sur 3, étincelles 1 sur 2) ;
+  - Draco-Choc tiré en biais vers le coin haut le plus loin, longueur 45 %
+    de la largeur au plus, fondu au bout, `box()` au lieu de la pleine largeur ;
+  - planches du buste : hauteurs 99 à 198 pour l'aperçu des Réglages, plus
+    50 à 96 pour la pilule à 225-300 % (relecture : sans elles, la pilule
+    aurait pris une planche d'aperçu). Script `zekromust_variants.py`,
+    source `zk_bust_full` (reproduit les planches validées au pixel près).
+- Dépôt : `SettingsPage.qml`, buste du pack centré au-dessus du sol de
+  l'aperçu. Il fait ~100 px au lieu de 43, la pilule est inchangée.
+- Vérifié : banc hors écran (`qml.exe`, offscreen) ; Draco-Choc vers la
+  droite et vers la gauche, Draco-Météore sans coupure en 520 px, aperçu
+  rendu au bon endroit ; buste vu dans la pilule repliée (capture réelle) ;
+  compilé, relu (agent `relecteur`), installé.
+- Bug trouvé au banc : deux `const k` imbriqués dans `drawBeam` levaient
+  une `TypeError` après quelques images (moteur JS de Qt). Renommés.
+- Pas vu en vrai : l'aperçu des Réglages dans l'appli installée (îlot masqué
+  pendant les captures), les attaques sur le vrai bureau.
+
+### 2026-10-29 : compagnon en sprites (packs), premier pack intégré
+
+**À reprendre à la prochaine session (demande de l'utilisateur) :**
+- **Ne rien commiter ni publier sur GitHub** tant que l'utilisateur n'a pas
+  validé : le travail est installé chez lui mais reste en local, non commité.
+- L'utilisateur considère que **l'easter egg n'est pas fait** : en reparler
+  avec lui (ce qu'il veut exactement), puis le tester en vrai. La version
+  actuelle (5 clics sur l'aperçu) n'est qu'une première proposition.
+- Le personnage n'est « pas encore parfait » : lui demander ce qui reste à
+  revoir, puis voir les restes listés dans `BACKLOG.md`.
+
+Moteur générique dans le dépôt, personnage hors dépôt
+(`%USERPROFILE%\.ilot\pets\<id>\`, contenu sous droits). Détails et format
+de pack : `ARCHITECTURE.md`, section « Packs de compagnon ».
+- Nouveaux : `src/pets.rs` (commande `pet_packs`, chemins canonicalisés,
+  jonctions refusées, budgets de taille), `qt/qml/PetBust.qml` (buste de la
+  pilule, planches pré-réduites par hauteur d'écran, affichage 1:1),
+  `SpritePet.qml`, `PetFx.qml` (Canvas actif seulement pendant une attaque,
+  bande utile, 60 images/s max), `PackStage.qml` (arrivée, promenade, une
+  attaque toutes les 15 à 20 s, jamais deux fois la même).
+- Branchés : `Watch.qml` (`cfg.pet = "pack:<id>"`, retour au blob si pack
+  absent), `Pill.qml`, `SettingsPage.qml` (puce du pack), `PetWindow.qml`
+  (zone de 360 px pour un pack, espèces dessinées inchangées).
+- Buste choisi par l'utilisateur dans le navigateur : rendu Blender 768 px,
+  réduit et accentué (netteté + contraste), 22 px repliée, 32 px au survol.
+  Script : `bust_variants.py`, dans le dossier du prototype (hors dépôt).
+- Bugs trouvés au test réel et corrigés : `pet_packs` appelé avant que la
+  fenêtre soit connue du Rust (« fenetre inconnue », relance 10 × 500 ms) ;
+  `PackStage` lisait `pj` avant son recalcul dans `onPackChanged` (attaques
+  jamais chargées) ; première attaque jamais programmée si les attaques
+  arrivaient après l'entrée.
+- Vérifié : `cargo test` (35 ok), build, 3 relectures, test réel (promenade,
+  5 attaques visibles, 3 en 58 s, ≈ 2 % CPU machine, journal vide),
+  Réglages › Compagnon en vrai. Installé (0.4.24 + packs), pack choisi.
+- Pas vu en vrai : le buste dans la pilule (vocal Discord), le survol. Voir
+  `BACKLOG.md`.
+- Ensuite, à la demande de l'utilisateur :
+  - easter egg : les puces des packs sont cachées dans Réglages › Compagnon
+    jusqu'à 5 clics rapides sur l'aperçu (`Ilot.ui.petPacksUnlocked`) ; un
+    pack déjà choisi garde sa puce. Relu, compilé, installé, pas testé en vrai ;
+  - pack (hors dépôt) : zone passée à 520 px, effets du haut en fondu (plus de
+    bord coupé), aura retirée sur l'attaque à faisceau. Vérifié hors écran.
+- Incident : la version de test, lancée depuis le Bash de Claude Code, a
+  tenté d'installer la 0.4.24 téléchargée et a bouclé (voir le piège dans
+  `CLAUDE.md`). Réglé à la main, 0.4.24 installée proprement.
+
 ### 2026-10-29 : outils Windows dans Apps
 
 Le lanceur ne listait que `shell:AppsFolder`, où manquent le Gestionnaire
@@ -221,6 +294,24 @@ remis depuis leur sauvegarde après chaque test.
 Non vérifié : clics de souris réels et Ctrl+S (même fonction `save()` que
 le bouton), l'invite admin de la touche Windows à l'enregistrement (UAC),
 l'aperçu Lecteur avec chaque forme de bouton.
+### 2026-10-28 : nouveau compagnon en sprites (prototype hors dépôt)
+
+Aucun fichier du dépôt n'a changé, sauf ce journal et `BACKLOG.md`.
+
+Fait :
+- Un modèle 3D de jeu a été rendu dans Blender en style chibi toon :
+  aplats et contour Freestyle.
+- Les planches de sprites sont prêtes : marche, repos, poses d'attaque, et
+  un buste pour la pilule. Les ancres exportées par image donnent la gueule,
+  la turbine et les yeux.
+- Moteur d'effets en canvas : éclairs, orbes, faisceaux, particules.
+- 5 attaques fidèles aux jeux. Validées par l'utilisateur dans le navigateur.
+- Tout est rangé hors du dépôt, dans `%USERPROFILE%\.ilot\<prototype>\`
+  (`LISEZMOI.md`), car le contenu est sous droits.
+- Skill `animer-personnage` pour les prochains personnages.
+
+Prochaine étape : l'intégration dans l'îlot, selon le plan approuvé
+(voir `BACKLOG.md`, en tête de la partie Qt).
 
 ### 2026-10-26 au 28 : session bugs visuels (0.4.23 à venir)
 

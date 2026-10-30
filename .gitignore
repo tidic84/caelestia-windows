@@ -9,3 +9,6 @@ qt/build/
 /ilot-*-win64.zip
 /ilot-*-win64.zip.sig
 /notes.md
+
+# journaux et fichiers du plugin Playwright (dont le modele 3D du compagnon, sous droits)
+.playwright-mcp/
