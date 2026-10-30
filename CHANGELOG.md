@@ -4,6 +4,11 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.25 — 2026-10-30
+
+- **Compagnons en sprites** : l'îlot sait afficher un compagnon animé venu d'un pack personnel (dossier `.ilot\pets`), avec promenade au-dessus de la barre des tâches, attaques animées et buste dans la pilule. Aucun pack n'est fourni avec l'îlot.
+- **Réglages › Compagnon** : l'aperçu montre le buste d'un pack en grand, centré.
+
 ## 0.4.24 — 2026-10-29
 
 - **Réglages refaits** :
