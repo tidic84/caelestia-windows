@@ -90,7 +90,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── tasks.rs      Gestionnaire des tâches       ├── pdh.rs   Compteurs PDH (CPU, GPU, disque)
 ├── procgroup.rs Regroupement des processus comme Windows (algorithme pur, testé)
 ├── svc.rs        Services Windows par pid (« Hôte de service : X »)
-├── pets.rs       Packs de compagnon hors du dépôt (commande pet_packs, voir plus bas)
+├── pets.rs       Packs de compagnon du profil (commande pet_packs, voir plus bas)
 ├── pc.rs         Mode d'alimentation, logiciels constructeur, instantané Toolhelp
 ├── health.rs     Disques, nettoyage, pilote NVIDIA, idle_secs
 ├── status.rs     État des services en ligne (toutes les 3 min)
@@ -148,8 +148,9 @@ Modules JS    calc · emoji · ical · rank (frécence du lanceur) · mcu (mater
 ```
 
 **Packs de compagnon** (Réglages › Compagnon, `cfg.pet = "pack:<id>"`).
-Le personnage vit hors du dépôt (pas de contenu sous licence dans le dépôt
-public), le moteur est générique.
+Le moteur est générique ; l'appli lit le personnage dans le profil. Une
+copie du pack Zekrom est versionnée dans `pets/zekrom/` (dépôt privé, contenu
+sous droits, hors de l'archive de release).
 - **Sécurité** : un pack exécute du QML (`Attacks.qml`) avec les droits de
   l'appli. N'installer que des packs de confiance, faits soi-même.
 - **Emplacement** : `%USERPROFILE%\.ilot\pets\<id>\` (`id` :

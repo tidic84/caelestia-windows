@@ -1,0 +1,11 @@
+{
+  "name": "Zekrom",
+  "area": 520,
+  "attacks": "Attacks.qml",
+  "sizes": { "s": 110, "m": 150, "l": 200 },
+  "greet": "roar",
+  "sprites": { "dir": "sprites", "meta": "sprites.json", "fps": 12, "loops": ["idle", "walk", "dash"],
+               "idle": "idle", "walk": "walk" },
+  "bust":    { "dir": "bust", "variants": "variants.json", "fps": 12, "click": "bust_roar",
+               "moods": { "idle": "bust_idle", "music": "bust_music", "game": "bust_idle", "party": "bust_music", "love": "bust_love", "sleep": "bust_sleep" } }
+}

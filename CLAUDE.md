@@ -163,8 +163,12 @@ Ne pas commiter `dist\`, le zip, le `.sig` ni `notes.md`.
 - **Banc hors écran (`qml.exe`, `QT_QPA_PLATFORM=offscreen`)** : rendu
   logiciel, `AnimatedSprite` n'y est pas dessiné (buste invisible). Pour
   une capture, le remplacer par une `Image` découpée dans une copie.
-- **Packs de compagnon** (`%USERPROFILE%\.ilot\pets\<id>\`) : jamais dans le
-  dépôt (contenu sous droits). Pilule repliée sans compagnon pendant une
+- **Packs de compagnon** (`%USERPROFILE%\.ilot\pets\<id>\`) : le pack Zekrom
+  est versionné dans `pets/zekrom/` (2026-10-30, accord de l'utilisateur :
+  dépôt **privé**). Contenu sous droits (Pokémon X/Y) : à retirer de
+  l'historique si le dépôt devient public. L'appli ne lit que le dossier du
+  profil : y copier `pets\zekrom` après une modif. Jamais dans l'archive de
+  release. Pilule repliée sans compagnon pendant une
   activité (vocal Discord, notification) : normal, pas un bug du pack.
 - **Effets système de l'appli** :
   - barre des tâches en masquage automatique, rétablie quand on quitte (si
