@@ -19,7 +19,7 @@ reprendre.
   dans `CLAUDE.md` (section Commandes). La 0.4.22 est en attente
   (changelog « à venir »).
 - **Installée sur le poste** : oui, dans `%LOCALAPPDATA%\Programs\Ilot`, avec
-  un raccourci dans le dossier Démarrage. Elle a été construite depuis les
+  une tâche planifiée `Ilot` (ouverture de session). Elle a été construite depuis les
   sources par `install.ps1`.
 - **Consigne de l'utilisateur** : ne corriger que l'essentiel, sans rien qui
   change l'usage. Le Rust se traite « selon l'usage », et les bugs au fur et à
@@ -37,6 +37,20 @@ reprendre.
   le clic droit de la ligne `explorer`.
 
 ## Journal
+
+### 2026-10-30 : 0.4.25, lancement au démarrage par tâche planifiée
+
+- `src/settings.rs` : « Lancer au démarrage » crée la tâche `Ilot` (schtasks
+  + XML, utilisateur courant, sans admin, priorité normale, sans limite de
+  durée) ; repli sur la clé `Run`. Au lancement, `migrate_autostart` remplace
+  une ancienne clé `Run` par la tâche.
+- `qt/src/main.cpp` : `--autostart` attend `Shell_TrayWnd` (60 s au plus)
+  avant de démarrer.
+- `install.ps1` : tâche par `Register-ScheduledTask` au lieu du raccourci
+  Démarrage (supprimé, ainsi que la clé `Run`).
+- Compilé, clippy sans nouvel avertissement. Relecture faite dans la session
+  (l'agent `relecteur` n'existe pas sur le poste). Non vérifié : un vrai
+  redémarrage de session.
 
 ### 2026-10-30 : compagnon, retouches avant la 0.4.25
 

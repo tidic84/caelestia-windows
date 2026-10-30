@@ -1,7 +1,9 @@
 //! Reglages : lancement au demarrage, ecran de l'ilot, apparence, meteo,
 //! calendriers, fonds, notifications, barre, addons, mises a jour.
 
-use std::path::PathBuf;
+use std::os::windows::process::CommandExt;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
@@ -13,6 +15,9 @@ use windows::Win32::System::Registry::{
 
 const RUN: PCWSTR = w!(r"Software\Microsoft\Windows\CurrentVersion\Run");
 const RUN_NAME: PCWSTR = w!("Ilot");
+/// Tache planifiee du lancement au demarrage (racine du Planificateur).
+const TASK: &str = "Ilot";
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Ce qui est enregistre dans `%APPDATA%\io.github.tidic84.ilot\settings.json`.
 /// Le lancement au demarrage n'y figure pas : le registre fait foi.
@@ -137,20 +142,119 @@ fn save(app: &AppHandle, cfg: &Config) {
 }
 
 // --------------------------------------------------------------- demarrage
+//
+// Lancement par une tache planifiee « a l'ouverture de session » : la cle
+// `Run` passe par la file de l'Explorateur, qui lance ses entrees une a une
+// (l'ilot arrivait 2 a 3 min apres l'ouverture de session). La cle `Run`
+// reste le repli si le Planificateur refuse la tache.
 
-fn autostart_on() -> bool {
+fn schtasks(args: &[&str]) -> bool {
+    Command::new("schtasks.exe")
+        .args(args)
+        .creation_flags(CREATE_NO_WINDOW)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+fn task_on() -> bool {
+    schtasks(&["/Query", "/TN", TASK])
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
+
+/// Tache de l'utilisateur courant, sans droits admin. `--autostart` : l'ilot
+/// attend la barre de l'Explorateur (main.cpp). Priorite normale (7 par
+/// defaut, sous la normale) et pas de limite de duree (72 h par defaut).
+fn task_create(exe: &Path) -> bool {
+    let user = match (std::env::var("USERDOMAIN"), std::env::var("USERNAME")) {
+        (Ok(d), Ok(u)) => format!("{d}\\{u}"),
+        (_, Ok(u)) => u,
+        _ => return false,
+    };
+    let dir = exe.parent().map(|d| d.display().to_string()).unwrap_or_default();
+    let xml = format!(
+        r#"<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>Lance l'ilot a l'ouverture de session.</Description></RegistrationInfo>
+  <Triggers>
+    <LogonTrigger><Enabled>true</Enabled><UserId>{user}</UserId></LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author"><UserId>{user}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>false</StartWhenAvailable>
+    <IdleSettings><StopOnIdleEnd>false</StopOnIdleEnd><RestartOnIdle>false</RestartOnIdle></IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>4</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec><Command>{exe}</Command><Arguments>--autostart</Arguments><WorkingDirectory>{dir}</WorkingDirectory></Exec>
+  </Actions>
+</Task>
+"#,
+        user = xml_escape(&user),
+        exe = xml_escape(&exe.display().to_string()),
+        dir = xml_escape(&dir),
+    );
+    // schtasks lit l'XML en UTF-16 (avec BOM)
+    let bytes: Vec<u8> = std::iter::once(0xFEFF)
+        .chain(xml.encode_utf16())
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    let f = std::env::temp_dir().join(format!("ilot-task-{}.xml", std::process::id()));
+    if std::fs::write(&f, bytes).is_err() {
+        return false;
+    }
+    let Some(fs) = f.to_str() else { return false };
+    let ok = schtasks(&["/Create", "/TN", TASK, "/XML", fs, "/F"]);
+    let _ = std::fs::remove_file(&f);
+    ok
+}
+
+fn run_on() -> bool {
     unsafe { RegGetValueW(HKEY_CURRENT_USER, RUN, RUN_NAME, RRF_RT_REG_SZ, None, None, None) }
         .is_ok()
 }
 
-fn set_autostart(on: bool) -> bool {
+/// Chemin enregistre dans la cle `Run` (sans les guillemets).
+fn run_exe() -> Option<PathBuf> {
+    let mut buf = [0u16; 1024];
+    let mut len = (buf.len() * 2) as u32;
     unsafe {
-        if !on {
-            let r = RegDeleteKeyValueW(HKEY_CURRENT_USER, RUN, RUN_NAME);
-            return r.is_ok() || !autostart_on();
-        }
-        let Ok(exe) = std::env::current_exe() else { return false };
-        let cmd: Vec<u16> = format!("\"{}\"", exe.display()).encode_utf16().chain([0]).collect();
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            RUN,
+            RUN_NAME,
+            RRF_RT_REG_SZ,
+            None,
+            Some(buf.as_mut_ptr() as _),
+            Some(&mut len),
+        )
+    }
+    .ok()
+    .ok()?;
+    let n = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+    let s = String::from_utf16_lossy(&buf[..n]);
+    let s = s.trim().trim_matches('"');
+    (!s.is_empty()).then(|| PathBuf::from(s))
+}
+
+fn run_set(exe: &Path) -> bool {
+    let cmd: Vec<u16> = format!("\"{}\"", exe.display()).encode_utf16().chain([0]).collect();
+    unsafe {
         RegSetKeyValueW(
             HKEY_CURRENT_USER,
             RUN,
@@ -160,6 +264,39 @@ fn set_autostart(on: bool) -> bool {
             (cmd.len() * 2) as u32,
         )
         .is_ok()
+    }
+}
+
+fn run_delete() {
+    let _ = unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, RUN, RUN_NAME) };
+}
+
+fn autostart_on() -> bool {
+    task_on() || run_on()
+}
+
+fn set_autostart(on: bool) -> bool {
+    if !on {
+        run_delete();
+        if task_on() {
+            schtasks(&["/Delete", "/TN", TASK, "/F"]);
+        }
+        return !autostart_on();
+    }
+    let Ok(exe) = std::env::current_exe() else { return false };
+    if task_create(&exe) {
+        run_delete();
+        return true;
+    }
+    run_set(&exe)
+}
+
+/// Ancien lancement par la cle `Run` : remplace par la tache, vers le meme
+/// executable. La cle reste si la tache n'a pas pu etre creee.
+fn migrate_autostart() {
+    let Some(exe) = run_exe() else { return };
+    if exe.is_file() && task_create(&exe) {
+        run_delete();
     }
 }
 
@@ -288,4 +425,5 @@ pub fn addon_on(app: &AppHandle, id: &str) -> bool {
 
 pub fn init(app: &AppHandle) {
     app.manage(Settings(Mutex::new(load(app))));
+    std::thread::spawn(migrate_autostart);
 }

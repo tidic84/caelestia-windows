@@ -99,6 +99,17 @@ int main(int argc, char *argv[])
     if (GetLastError() == ERROR_ALREADY_EXISTS)
         return 0;
 
+    // `--autostart` (tache planifiee, src/settings.rs) : lancee des
+    // l'ouverture de session, parfois avant la barre de l'Explorateur, que
+    // la zone de notification et le masquage de la barre supposent la
+    for (int i = 1; i < argc; ++i) {
+        if (!strcmp(argv[i], "--autostart")) {
+            for (int t = 0; t < 240 && !FindWindowW(L"Shell_TrayWnd", nullptr); ++t)
+                Sleep(250);
+            break;
+        }
+    }
+
     QString logFile = qEnvironmentVariable("ILOT_QT_LOG");
     if (!logFile.isEmpty()) {
         s_log = new QFile(logFile);

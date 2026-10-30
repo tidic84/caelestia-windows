@@ -163,7 +163,7 @@ Ne pas commiter `dist\`, le zip, le `.sig` ni `notes.md`.
 - **Effets système de l'appli** :
   - barre des tâches en masquage automatique, rétablie quand on quitte (si
     l'appli plante, redémarrer l'Explorateur) ;
-  - clé `Run` dans HKCU ;
+  - tâche planifiée `Ilot` (ouverture de session), ou clé `Run` dans HKCU en repli ;
   - en option, remappage de la touche Windows dans HKLM (droits admin et
     redémarrage).
 
