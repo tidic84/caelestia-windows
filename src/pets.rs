@@ -1,6 +1,8 @@
-//! Packs de compagnon en sprites (Reglages > Compagnon). Un pack vit hors du
-//! depot, dans `%USERPROFILE%\.ilot\pets\<id>\pack.json` (ou dans le dossier
-//! de la variable `ILOT_PETS_DIR`, pour les essais). La commande `pet_packs`
+//! Packs de compagnon en sprites (Reglages > Compagnon). Un pack vit dans
+//! `%USERPROFILE%\.ilot\pets\<id>\pack.json`, ou dans `pets\<id>\` a cote de
+//! `ilot.exe` (packs livres avec l'appli ; celui du profil l'emporte a id
+//! egal), ou dans le dossier de la variable `ILOT_PETS_DIR` (essais). La
+//! commande `pet_packs`
 //! renvoie `[{ id, name, url, json, meta }]` :
 //! - `url` : dossier du pack en `file:///…/` (slash final), pour les images ;
 //! - `json` : le `pack.json` tel quel ;
@@ -24,15 +26,37 @@ const BUDGET: u64 = 32 << 20;
 /// Variantes de buste gardees au plus.
 const MAX_VARIANTS: usize = 32;
 
-fn root() -> Option<PathBuf> {
+/// Dossiers lus, par priorite : le profil, puis les packs livres avec
+/// l'appli (`pets\` a cote de `ilot.exe`, copie par `qt\build.cmd`).
+/// `ILOT_PETS_DIR` remplace les deux.
+fn roots() -> Vec<PathBuf> {
     if let Some(d) = std::env::var_os("ILOT_PETS_DIR").filter(|d| !d.is_empty()) {
-        return Some(PathBuf::from(d));
+        return vec![PathBuf::from(d)];
     }
-    Some(Path::new(&std::env::var_os("USERPROFILE")?).join(".ilot").join("pets"))
+    let mut r = Vec::new();
+    if let Some(home) = std::env::var_os("USERPROFILE") {
+        r.push(Path::new(&home).join(".ilot").join("pets"));
+    }
+    if let Some(dir) = std::env::current_exe().ok().as_deref().and_then(Path::parent) {
+        r.push(dir.join("pets"));
+    }
+    r
 }
 
 pub fn pet_packs() -> Vec<Value> {
-    root().map(|r| scan(&r)).unwrap_or_default()
+    merge(roots().iter().map(|r| scan(r)))
+}
+
+/// Un pack par id : le premier dossier qui le contient l'emporte.
+fn merge(lists: impl Iterator<Item = Vec<Value>>) -> Vec<Value> {
+    let mut out: Vec<Value> = Vec::new();
+    for p in lists.flatten() {
+        if !out.iter().any(|q| q["id"] == p["id"]) {
+            out.push(p);
+        }
+    }
+    out.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
+    out
 }
 
 /// Identifiant sur : il sert dans `cfg.pet = "pack:<id>"` et dans l'URL.
@@ -221,6 +245,15 @@ mod tests {
         assert_eq!(p["meta"]["bust"]["w"], 10);
         // dossier hors du pack : refuse
         assert!(p["meta"].get("sprites").is_none());
+    }
+
+    #[test]
+    fn profil_avant_packs_livres() {
+        let p = |id: &str, name: &str| serde_json::json!({ "id": id, "name": name });
+        let packs = merge([vec![p("zekrom", "profil")], vec![p("zekrom", "livre"), p("autre", "livre")]].into_iter());
+        assert_eq!(packs.len(), 2);
+        assert_eq!(packs[0]["id"], "autre");
+        assert_eq!(packs[1]["name"], "profil");
     }
 
     #[test]

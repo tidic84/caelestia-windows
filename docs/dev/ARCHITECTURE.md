@@ -148,14 +148,14 @@ Modules JS    calc · emoji · ical · rank (frécence du lanceur) · mcu (mater
 ```
 
 **Packs de compagnon** (Réglages › Compagnon, `cfg.pet = "pack:<id>"`).
-Le moteur est générique ; l'appli lit le personnage dans le profil. Une
-copie du pack Zekrom est versionnée dans `pets/zekrom/` (dépôt privé, contenu
-sous droits, hors de l'archive de release).
+Le moteur est générique. Le pack Zekrom est versionné dans `pets/zekrom/`
+(dépôt privé, contenu sous droits) et livré avec l'appli (`qtuild.cmd` le
+copie dans `qtuild\pets`).
 - **Sécurité** : un pack exécute du QML (`Attacks.qml`) avec les droits de
   l'appli. N'installer que des packs de confiance, faits soi-même.
-- **Emplacement** : `%USERPROFILE%\.ilot\pets\<id>\` (`id` :
-  `[A-Za-z0-9_-]`). Pour les essais, `ILOT_PETS_DIR` remplace le dossier
-  `pets`.
+- **Emplacement** : `%USERPROFILE%\.ilot\pets\<id>\`, puis `pets\<id>\` à
+  côté de `ilot.exe` (packs livrés) ; à id égal, le profil l'emporte (`id` :
+  `[A-Za-z0-9_-]`). Pour les essais, `ILOT_PETS_DIR` remplace les deux.
 - **`pet_packs`** (`src/pets.rs`) : renvoie `[{ id, name, url, json, meta }]`.
   `url` est le dossier en `file:///…/`, `json` le `pack.json`, `meta` les
   JSON cités, déjà lus (`meta.sprites`, `meta.bust`). Les fichiers sont lus

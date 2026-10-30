@@ -166,9 +166,11 @@ Ne pas commiter `dist\`, le zip, le `.sig` ni `notes.md`.
 - **Packs de compagnon** (`%USERPROFILE%\.ilot\pets\<id>\`) : le pack Zekrom
   est versionné dans `pets/zekrom/` (2026-10-30, accord de l'utilisateur :
   dépôt **privé**). Contenu sous droits (Pokémon X/Y) : à retirer de
-  l'historique si le dépôt devient public. L'appli ne lit que le dossier du
-  profil : y copier `pets\zekrom` après une modif. Jamais dans l'archive de
-  release. Pilule repliée sans compagnon pendant une
+  l'historique si le dépôt devient public. Livré avec l'appli : `build.cmd`
+  copie `pets\` dans `qtuild\pets`, donc dans l'archive de release (les
+  assets d'un dépôt privé demandent un accès). Un pack du même id dans le
+  profil l'emporte : supprimer `%USERPROFILE%\.ilot\pets\zekrom` pour tester
+  la version livrée. Pilule repliée sans compagnon pendant une
   activité (vocal Discord, notification) : normal, pas un bug du pack.
 - **Effets système de l'appli** :
   - barre des tâches en masquage automatique, rétablie quand on quitte (si

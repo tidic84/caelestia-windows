@@ -13,4 +13,8 @@ cargo build --release || (popd & exit /b 1)
 popd
 cmake -S "%~dp0." -B "%~dp0build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=%QTDIR% || exit /b 1
 cmake --build "%~dp0build" || exit /b 1
+rem packs de compagnon livres avec l'appli (pets\ du depot, a cote de ilot.exe)
+if exist "%~dp0..\pets" robocopy "%~dp0..\pets" "%~dp0build\pets" /MIR /NFL /NDL /NJH /NJS /NP >nul
+rem robocopy : 8 ou plus = echec (1 a 7 = fichiers copies)
+if errorlevel 8 exit /b 1
 "%QTDIR%\bin\windeployqt.exe" --release --qmldir "%~dp0qml" --no-translations --no-system-d3d-compiler --no-opengl-sw "%~dp0build\ilot.exe" >nul

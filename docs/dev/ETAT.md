@@ -38,6 +38,18 @@ reprendre.
 
 ## Journal
 
+### 2026-10-30 (soir) : pack Zekrom livré avec l'appli
+
+Demande de l'utilisateur (dépôt privé, lui et un ami) : `pets/zekrom/`
+versionné, puis livré dans le build. `qtuild.cmd` copie `pets\` dans
+`qtuild\pets` (donc install, release, mise à jour) ; `src/pets.rs` lit
+le profil puis `pets\` à côté de `ilot.exe` (profil prioritaire à id égal).
+- Vérifié : `cargo test pets` (4 ok), build, relu (agent `relecteur`), test
+  réel profil masqué (pack trouvé dans `qt/build/pets/zekrom/`), installé.
+- Constaté : dépôt privé ⇒ releases en 404 sans compte ; la mise à jour
+  automatique ne trouve plus rien (voir `BACKLOG.md`).
+- Non publié : la prochaine release (Tidic) embarquera le pack.
+
 ### 2026-10-30 : 0.4.25, lancement au démarrage par tâche planifiée
 
 - `src/settings.rs` : « Lancer au démarrage » crée la tâche `Ilot` (schtasks

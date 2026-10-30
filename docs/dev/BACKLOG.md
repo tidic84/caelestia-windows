@@ -31,6 +31,14 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   - Draco-Choc : tiré en biais vers le coin haut le plus loin, 45 % de la
     largeur au plus, fondu au bout (2026-10-30). Au banc hors écran (zone
     520 px), encore ~80 images > 20 ms, dès la charge : pas mieux qu'avant.
+  - Pack livré (`pets\` à côté de `ilot.exe`, 2026-10-30) : la mise à jour
+    automatique copie par `robocopy /E` (`update.rs`), donc un fichier retiré
+    du pack reste chez les installés (gênant seulement s'il est encore cité).
+- 🔴 **Mise à jour automatique muette depuis que le dépôt est privé**
+  (constaté le 2026-10-30) : `update.rs` interroge
+  `api.github.com/.../releases/latest` sans compte, réponse 404 (« Aucune
+  version publiée »). Télécharger la release à la main (GitHub connecté ou
+  `gh release download`) tant que le dépôt reste privé.
   - Un pack exécute du QML (`Attacks.qml`) avec les droits de l'appli : packs
     personnels uniquement. Garde-fou à prévoir si des packs circulent un jour.
 - 🟢 **Animations : plan à faire (demande de l'utilisateur, 2026-10-28)** :
