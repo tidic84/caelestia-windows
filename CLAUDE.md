@@ -79,6 +79,12 @@ Ne pas commiter `dist\`, le zip, le `.sig` ni `notes.md`.
   `powershell.exe` depuis Bash.
 - **`install.ps1` finit avec `$LASTEXITCODE = 1`** : c'est le code de robocopy
   (1 veut dire « fichiers copiés »). Ce n'est pas un échec.
+- **`type_traits` ou `msvcprt.lib` introuvables** (depuis le 2026-10-30) :
+  `VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt` manque dans
+  VS 2022, et `vcvars64` ne charge plus MSVC 14.44 (toujours installé). Sans
+  toucher au système : appeler d'abord `vcvars64.bat -vcvars_ver=14.44` dans
+  un `.cmd` temporaire, puis `qt\build.cmd` ou `release.ps1` depuis ce même
+  `.cmd`. Réparer : Visual Studio Installer › VS 2022 › Réparer.
 - **`C:\MinGW\bin` est dans le PATH** : la toolchain doit rester MSVC (c'est ce
   que fait `build.cmd`).
 - **L'appli tourne en une seule instance** (mutex). `install.ps1` la tue avant

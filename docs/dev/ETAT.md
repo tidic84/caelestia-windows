@@ -51,6 +51,9 @@ reprendre.
 - Compilé, clippy sans nouvel avertissement. Relecture faite dans la session
   (l'agent `relecteur` n'existe pas sur le poste). Non vérifié : un vrai
   redémarrage de session.
+- **0.4.25 publiée** le 2026-10-30 (avec le compagnon en sprites du
+  collaborateur). Build par `vcvars64 -vcvars_ver=14.44` : voir le piège
+  MSVC dans `CLAUDE.md`.
 
 ### 2026-10-30 : compagnon, retouches avant la 0.4.25
 
