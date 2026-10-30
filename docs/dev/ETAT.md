@@ -62,6 +62,9 @@ Toujours **rien de commité** : attendre son feu vert.
   compilé, relu (agent `relecteur`), installé.
 - Bug trouvé au banc : deux `const k` imbriqués dans `drawBeam` levaient
   une `TypeError` après quelques images (moteur JS de Qt). Renommés.
+- **0.4.25 commitée et poussée** (`6ccbbc5` travail, `58ecd10` version) avec
+  l'accord de l'utilisateur. Release **non publiée** : la clé de signature
+  n'est pas sur ce poste ; Tidic doit lancer `release.ps1`.
 - Pas vu en vrai : l'aperçu des Réglages dans l'appli installée (îlot masqué
   pendant les captures), les attaques sur le vrai bureau.
 
