@@ -697,7 +697,9 @@ Item {
         else if (Ilot.overlay === "share")
             Ilot.overlay = ""
         Api.invoke("qs_discover", { on: shareOpen })
-        if (!shareOpen)
+        // fermeture voulue (bouton, Echap, onglet) : on oublie les fichiers ;
+        // ilot replie (aller chercher un autre fichier) : on les garde
+        if (!shareOpen && Ilot.mode === "open")
             clearShareFiles()
     }
     Connections {

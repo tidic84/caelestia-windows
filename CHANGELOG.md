@@ -4,6 +4,12 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.26 — 2026-11-03
+
+- **Quick Share garde les fichiers** : quand l'îlot se replie pendant qu'on va chercher un autre fichier, ceux déjà ajoutés restent là ; le nouveau fichier déposé s'ajoute aux autres. Ils sont oubliés seulement quand on ferme Quick Share soi-même (bouton, Échap, autre onglet).
+- **Plus de « Direct » à tort sur YouTube** : quand le navigateur ne donne pas la durée (pub, changement de vidéo), la barre du lecteur n'affiche plus « Direct ».
+- **Pas de clic involontaire au survol de la pilule** : pendant le court instant où la pilule s'agrandit, ses boutons (lecture, suivant, Discord…) ne réagissent pas ; un clic ouvre alors le panneau.
+
 ## 0.4.25 — 2026-10-30
 
 - **Compagnons en sprites** : l'îlot sait afficher un compagnon animé venu d'un pack personnel (dossier `.ilot\pets`), avec promenade au-dessus de la barre des tâches, attaques animées et buste dans la pilule. Aucun pack n'est fourni avec l'îlot.

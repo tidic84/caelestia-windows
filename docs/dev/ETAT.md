@@ -38,6 +38,31 @@ reprendre.
 
 ## Journal
 
+### 2026-11-03 : Quick Share garde ses fichiers, « Direct » à tort
+
+- **Quick Share** (`Watch.qml`, `onShareOpenChanged`) : les fichiers en
+  attente étaient effacés à chaque fermeture de la page, même quand l'îlot
+  se repliait parce qu'on allait chercher un autre fichier. Maintenant, ils
+  ne sont oubliés que sur une fermeture voulue, îlot ouvert (bouton, Échap,
+  choix d'un onglet). Si l'îlot se replie, on les retrouve en rouvrant
+  Quick Share, ou en déposant un fichier de plus.
+- **« Direct » sur YouTube** (`SeekBar.qml`) : Chromium met la durée à zéro
+  (`ClearPosition`, timeline vide) quand il ne connaît pas la position (pub,
+  changement de vidéo). L'îlot affichait alors « Direct ». Une durée nulle
+  n'affiche plus rien. Un vrai direct dans Chrome a une durée immense, pas
+  nulle. Une appli qui annonce un direct avec une durée nulle n'a donc plus
+  l'étiquette.
+- **Clics involontaires au survol de la pilule** (`Pill.qml`, `peekBox`) :
+  pendant `Theme.dur(400)` après l'entrée en survol, une zone au-dessus du
+  contenu prend le clic gauche et ouvre le panneau (`Ilot.pillClicked()`,
+  comme sur la pilule repliée). Les boutons qui bougent encore (pause,
+  suivant, Discord, pochette) ne reçoivent plus de clic. Un appui commencé
+  pendant ce délai reste à la zone jusqu'au relâchement.
+
+Vérifié : `qt\build.cmd` compile. Non vérifié en vrai (aucun lancement,
+aucune capture). Relu dans la session, pas par `relecteur`, qui n'est pas
+installé.
+
 ### 2026-10-30 (soir) : pack Zekrom livré avec l'appli
 
 Demande de l'utilisateur (dépôt privé, lui et un ami) : `pets/zekrom/`

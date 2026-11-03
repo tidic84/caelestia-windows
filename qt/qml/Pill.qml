@@ -644,6 +644,34 @@ Item {
             }
         }
 
+        // juste apres l'entree en survol, la pilule grandit encore et les
+        // boutons bougent : un clic rapide tomberait sur l'un d'eux (pause,
+        // suivant...). Le temps de l'animation, un clic ouvre le panneau,
+        // comme sur la pilule repliee.
+        Timer {
+            id: peekSettle
+            interval: Theme.dur(400)
+        }
+        Connections {
+            target: pill
+            function onPeekChanged() {
+                if (pill.peek)
+                    peekSettle.restart()
+                else
+                    peekSettle.stop()
+            }
+        }
+        MouseArea {
+            anchors.fill: parent
+            anchors.leftMargin: -10
+            anchors.rightMargin: -12
+            z: 10
+            // un appui commence pendant le delai reste a cette zone
+            enabled: peekSettle.running || pressed
+            cursorShape: Qt.PointingHandCursor
+            onClicked: Ilot.pillClicked()
+        }
+
         // heure, date, meteo, mails
         Row {
             visible: !Ilot.hasMedia && !Watch.actShown

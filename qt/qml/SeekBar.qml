@@ -53,7 +53,9 @@ Item {
         width: sb.small ? 34 : 38
         height: parent.height
         horizontalAlignment: Text.AlignRight
-        text: !Ilot.hasMedia ? "" : sb.dur ? "-" + Ilot.fmtTime(sb.dur - (sb.dragging ? sb.dragFrac * sb.dur : Ilot.pos)) : "Direct"
+        // duree nulle : inconnue, pas forcement un direct (Chrome l'efface
+        // pendant une pub ou un changement de video YouTube)
+        text: Ilot.hasMedia && sb.dur ? "-" + Ilot.fmtTime(sb.dur - (sb.dragging ? sb.dragFrac * sb.dur : Ilot.pos)) : ""
         px: sb.small ? 10 : 11
         weight: Font.Medium
         tnum: true
