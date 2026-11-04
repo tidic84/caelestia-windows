@@ -1,0 +1,458 @@
+<title>Renommer les applis</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,1,0">
+<style>
+/* Maquette sombre unique, comme l'îlot (Theme.qml, variante violette) : bureau simulé, puis comparatif et note technique. */
+:root{
+  color-scheme:dark;
+  --primary:#cfbdfe; --inkPrimary:#36265d; --primaryC:#4d3d75; --inkPrimaryC:#e9ddff;
+  --secC:#4a4458; --inkSecC:#e8def8; --terC:#633b48; --inkTerC:#ffd8e4;
+  --surface:#141218; --surfaceLow:#1d1b20; --surfaceC:#211f26; --surfaceHigh:#2b2930; --surfaceHighest:#36343b;
+  --ink:#e6e0e9; --inkVar:#cac4d0; --outline:#938f99; --outlineVar:#49454f; --error:#ffb4ab; --good:#9ee6a8;
+  --page:#0b0a0d;
+  --emph:cubic-bezier(.05,.7,.1,1);
+  --font:Rubik,"Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:13px var(--font);
+  padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-weight:500;font-size:20px;margin:0 0 6px;text-wrap:balance}
+h2{font-size:12px;font-weight:500;color:var(--outline);text-transform:uppercase;letter-spacing:.06em;margin:26px 0 8px 6px}
+.lead{color:var(--inkVar);max-width:1240px;line-height:1.5;margin:0 0 14px}
+.ms{font-family:"Material Symbols Rounded";font-size:19px;line-height:1;user-select:none;font-weight:normal;font-style:normal;flex:none}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+kbd{font:500 11px var(--font);background:var(--surfaceHighest);border-radius:6px;padding:2px 6px;color:var(--inkVar)}
+code{font-size:12px;color:var(--inkPrimaryC)}
+
+.sim{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--surfaceC);border-radius:16px;padding:10px 14px;margin:0 0 18px;max-width:1240px}
+.sim .t{color:var(--inkVar);margin:0 4px 0 10px}
+.sim .t:first-child{margin-left:2px}
+.btn{height:34px;border-radius:12px;border:0;background:var(--surfaceHigh);display:inline-flex;align-items:center;gap:6px;padding:0 12px;cursor:pointer}
+.btn:hover{background:var(--surfaceHighest)}
+.btn.on{background:var(--primaryC);color:var(--inkPrimaryC)}
+.btn .ms{font-size:17px}
+
+/* ====================== bureau + panneau Apps */
+.desk{max-width:1240px;min-height:560px;border-radius:20px;position:relative;overflow:hidden;padding:46px 12px 70px;
+  background:radial-gradient(120% 90% at 20% 100%,#3a2d5c 0,#1b1527 55%,#0f0c15 100%)}
+.panel{position:relative;margin:0 auto;max-width:640px;background:var(--surface);border-radius:28px;padding:12px}
+.tabs{display:flex;gap:4px;margin-bottom:10px;overflow:hidden}
+.tabs span{height:30px;border-radius:15px;padding:0 12px;display:flex;align-items:center;gap:6px;color:var(--inkVar);font-size:12px;flex:none}
+.tabs span.on{background:var(--secC);color:var(--inkSecC)}
+.tabs .ms{font-size:16px}
+
+.search{height:44px;border-radius:22px;background:var(--surfaceHigh);display:flex;align-items:center;gap:6px;padding:0 8px 0 16px}
+.search .ms{color:var(--inkVar)}
+.search input{flex:1;min-width:0;height:100%;border:0;background:none;color:var(--ink);font:14px var(--font);outline:none}
+.search input::placeholder{color:var(--outline)}
+.sortb{height:30px;border-radius:15px;background:var(--surfaceHighest);display:flex;align-items:center;gap:6px;padding:0 10px;color:var(--inkVar);font-size:12px;flex:none}
+.sortb .ms{font-size:17px}
+.tries{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 2px 0;color:var(--outline);font-size:12px}
+.try{height:26px;border:0;border-radius:13px;background:var(--surfaceC);padding:0 10px;cursor:pointer;color:var(--inkVar);font-size:12px}
+.try:hover{background:var(--surfaceHigh)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:4px;margin-top:12px;min-height:220px;align-content:start}
+.app{position:relative;border-radius:18px;padding:12px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;text-align:center;border:0;background:none}
+.app:hover{background:var(--surfaceHigh)}
+.app.sel{background:var(--surfaceHighest)}
+.app .ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff}
+.app .ic .ms{font-size:26px}
+.app .nm{font-size:12px;line-height:1.25;max-width:100%;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.app .nm mark{background:none;color:var(--primary);font-weight:500}
+.app .via{font-size:10.5px;color:var(--outline);margin-top:-4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app .via b{color:var(--inkVar);font-weight:500}
+.app .dot{position:absolute;top:8px;right:14px;width:16px;height:16px;border-radius:8px;background:var(--primaryC);color:var(--inkPrimaryC);display:grid;place-items:center}
+.app .dot .ms{font-size:11px}
+.app.flash{animation:flash .9s var(--emph)}
+@keyframes flash{0%{background:var(--primaryC)}100%{background:none}}
+.empty{grid-column:1/-1;color:var(--outline);text-align:center;padding:50px 0;line-height:1.6}
+.empty .ms{font-size:34px;display:block;margin-bottom:6px}
+
+/* menu contextuel (CtxMenu.qml) */
+.menu{position:absolute;width:250px;background:var(--surfaceC);border-radius:16px;padding:6px;box-shadow:0 8px 28px #0008;z-index:6;
+  transform-origin:top left;transition:transform .3s var(--emph),opacity .15s}
+.menu.closed{transform:scale(.7);opacity:0;pointer-events:none}
+.mt{padding:6px 10px 4px;color:var(--outline);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mi{height:36px;border-radius:12px;display:flex;align-items:center;gap:10px;padding:0 10px;cursor:pointer;white-space:nowrap}
+.mi:hover{background:var(--surfaceHigh)}
+.mi .ms{font-size:18px;color:var(--inkVar)}
+.mi.new{background:var(--primaryC);color:var(--inkPrimaryC)}
+.mi.new .ms{color:var(--inkPrimaryC)}
+.mi.new:hover{filter:brightness(1.1)}
+.mi.danger,.mi.danger .ms{color:var(--error)}
+.mi kbd{margin-left:auto}
+.sep{height:1px;background:var(--outlineVar);margin:4px 8px}
+
+/* feuille « Renommer » */
+.veil{position:absolute;inset:0;border-radius:28px;background:#0009;z-index:8;display:flex;align-items:flex-end;justify-content:center;padding:10px;
+  transition:opacity .2s}
+.veil.closed{opacity:0;pointer-events:none}
+.sheet{width:100%;max-width:460px;background:var(--surfaceC);border-radius:24px;padding:16px;transition:transform .35s var(--emph)}
+.veil.closed .sheet{transform:translateY(30px)}
+.sh{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.sh .ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;color:#fff}
+.sh .ic .ms{font-size:23px}
+.sh b{font-weight:500;font-size:15px;display:block}
+.sh small{color:var(--outline)}
+.lbl{display:block;color:var(--inkVar);font-size:12px;margin:0 0 6px 4px}
+.field{height:42px;border-radius:14px;background:var(--surfaceHighest);display:flex;align-items:center;padding:0 6px 0 12px;gap:6px}
+.field input{flex:1;min-width:0;height:100%;border:0;background:none;color:var(--ink);font:14px var(--font);outline:none}
+.field input::placeholder{color:var(--outline)}
+.field .x{width:30px;height:30px;border-radius:15px;border:0;background:none;display:grid;place-items:center;cursor:pointer;color:var(--inkVar)}
+.field .x:hover{background:var(--surfaceHigh)}
+.help{color:var(--outline);font-size:11.5px;margin:6px 4px 14px;line-height:1.45}
+.help b{color:var(--inkVar);font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:42px;border-radius:14px;background:var(--surfaceHighest);padding:6px}
+.chip{height:28px;border-radius:14px;background:var(--secC);color:var(--inkSecC);display:inline-flex;align-items:center;gap:2px;padding:0 4px 0 11px;font-size:12.5px}
+.chip button{width:22px;height:22px;border:0;border-radius:11px;background:none;display:grid;place-items:center;cursor:pointer;color:inherit}
+.chip button:hover{background:#fff2}
+.chip button .ms{font-size:15px}
+.chips input{flex:1;min-width:110px;height:28px;border:0;background:none;color:var(--ink);font:13px var(--font);outline:none;padding:0 6px}
+.chips input::placeholder{color:var(--outline)}
+.sugg{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.sugg button{height:26px;border-radius:13px;border:1px dashed var(--outlineVar);background:none;padding:0 10px;cursor:pointer;color:var(--inkVar);font-size:12px;display:inline-flex;align-items:center;gap:4px}
+.sugg button:hover{border-color:var(--primary);color:var(--primary)}
+.sugg .ms{font-size:14px}
+.acts{display:flex;gap:8px;align-items:center;margin-top:16px}
+.acts .grow{flex:1}
+.tb{height:38px;border-radius:19px;border:0;padding:0 16px;cursor:pointer;background:none;color:var(--primary);font-weight:500}
+.tb:hover{background:var(--surfaceHigh)}
+.tb.fill{background:var(--primary);color:var(--inkPrimary)}
+.tb.fill:hover{filter:brightness(1.07)}
+.tb.quiet{color:var(--inkVar);font-weight:400;display:inline-flex;align-items:center;gap:6px;padding:0 12px}
+.tb.quiet .ms{font-size:17px}
+.tb[disabled]{opacity:.4;pointer-events:none}
+
+.hint{position:absolute;left:18px;bottom:16px;right:18px;color:var(--inkVar);font-size:12.5px;line-height:1.5}
+.hint b{color:var(--ink);font-weight:500}
+
+/* comparatif */
+.cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:14px;max-width:1240px}
+.card{background:var(--surfaceC);border-radius:20px;padding:16px 18px;min-width:0}
+.card h3{margin:0 0 10px;font-weight:500;font-size:15px;display:flex;align-items:center;gap:8px}
+.card h3 .ms{color:var(--primary)}
+.card.reco{background:var(--primaryC);color:var(--inkPrimaryC)}
+.card.reco h3 .ms{color:var(--inkPrimaryC)}
+.card.reco code{color:#fff}
+.card ul{margin:0;padding-left:18px;line-height:1.6}
+.card li.p::marker{content:"+  ";color:var(--good)}
+.card li.m::marker{content:"–  ";color:var(--error)}
+.note{max-width:1240px;color:var(--inkVar);line-height:1.6;background:var(--surfaceLow);border-radius:16px;padding:12px 16px;margin-top:14px}
+.note b{color:var(--ink);font-weight:500}
+.note pre{margin:8px 0 0;overflow-x:auto;background:var(--surface);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--inkVar)}
+@media (max-width:560px){
+  .hidesm{display:none!important}
+  .desk{padding:46px 6px 96px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<h1>Renommer les applis · recherche plus juste</h1>
+<p class="lead">Certaines applis ont un nom qu’on ne tape jamais (« Outil Capture d’écran », « SteelSeries GG »,
+« Microsoft Teams (work or school) »). La maquette propose un nom affiché plus court et des mots-clés,
+modifiables par <b>clic droit › Renommer…</b> sur une appli (ou <kbd>F2</kbd> sur l’appli sélectionnée).
+Capture, Teams et Terminal sont déjà renommées à titre d’exemple. Tapez une recherche ou essayez les suggestions.</p>
+
+<div class="sim">
+  <span class="t">Variante</span>
+  <button class="btn" data-v="name">Nom seul</button>
+  <button class="btn" data-v="keys">Mots-clés seuls</button>
+  <button class="btn on" data-v="both">Les deux (recommandé)</button>
+  <span class="t">Exemples</span>
+  <button class="btn" id="reset"><span class="ms">restart_alt</span>Remettre les exemples</button>
+</div>
+
+<div class="desk">
+  <div class="panel" id="panel">
+    <div class="tabs">
+      <span class="hidesm"><span class="ms">home</span>Accueil</span>
+      <span class="on"><span class="ms">apps</span>Apps</span>
+      <span><span class="ms">music_note</span>Média</span>
+      <span class="hidesm"><span class="ms">tune</span>Contrôle</span>
+    </div>
+    <div class="search">
+      <span class="ms">search</span>
+      <input id="q" autocomplete="off" placeholder="Rechercher…   > commandes   = calcul" aria-label="Rechercher une appli">
+      <span class="sortb hidesm"><span class="ms">sort_by_alpha</span>Nom</span>
+    </div>
+    <div class="tries" id="tries"></div>
+    <div class="grid" id="grid"></div>
+
+    <div class="menu closed" id="menu"></div>
+
+    <div class="veil closed" id="veil">
+      <form class="sheet" id="sheet" autocomplete="off">
+        <div class="sh"><div class="ic" id="shIc"></div><div><b id="shT"></b><small id="shS"></small></div></div>
+        <div id="rowName">
+          <label class="lbl" for="fName">Nom affiché dans l’îlot</label>
+          <div class="field">
+            <input id="fName">
+            <button type="button" class="x" id="fNameClr" title="Revenir au nom d’origine"><span class="ms">undo</span></button>
+          </div>
+          <p class="help" id="nameHelp"></p>
+        </div>
+        <div id="rowKeys">
+          <label class="lbl" for="fKey">Mots-clés de recherche</label>
+          <div class="chips" id="chips"><input id="fKey" placeholder="Ajouter, puis Entrée"></div>
+          <div class="sugg" id="sugg"></div>
+          <p class="help">L’appli sort quand la recherche commence par un de ces mots. Ils ne s’affichent pas sous l’icône.</p>
+        </div>
+        <div class="acts">
+          <button type="button" class="tb quiet" id="restore"><span class="ms">settings_backup_restore</span>Tout rétablir</button>
+          <span class="grow"></span>
+          <button type="button" class="tb" id="cancel">Annuler</button>
+          <button type="submit" class="tb fill" id="save">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="hint" id="hint"></div>
+</div>
+
+<h2>Comparatif</h2>
+<div class="cmp">
+  <div class="card">
+    <h3><span class="ms">edit</span>Changer le nom affiché</h3>
+    <ul>
+      <li class="p">Le nom sous l’icône devient celui qu’on cherche : « Capture » au lieu de « Outil Capture d’écran ».</li>
+      <li class="p">Le tri par nom suit le nouveau nom.</li>
+      <li class="m">Un seul nom par appli : « Terminal » ou « PowerShell », pas les deux.</li>
+      <li class="m">Si l’ancien nom n’est plus cherché, l’habitude de taper « outil » se perd. D’où la règle : l’ancien nom marche toujours.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3><span class="ms">sell</span>Ajouter des mots-clés</h3>
+    <ul>
+      <li class="p">Plusieurs façons de trouver la même appli : <i>screenshot</i>, <i>snip</i>, <i>capture</i>.</li>
+      <li class="p">L’icône garde le nom de Windows : rien ne change à l’écran.</li>
+      <li class="m">Invisible : on oublie ce qu’on a mis. La ligne « via … » sous le résultat le rappelle.</li>
+      <li class="m">Un mot-clé trop court (« g ») ferait remonter l’appli partout. Minimum 2 lettres.</li>
+    </ul>
+  </div>
+  <div class="card reco">
+    <h3><span class="ms">thumb_up</span>Recommandation : les deux, dans une seule feuille</h3>
+    <ul>
+      <li><b>Clic droit › Renommer…</b> (et <kbd>F2</kbd>), entrée placée en tête du menu de l’appli et du menu d’un jeu.</li>
+      <li>Le nom d’origine reste cherchable. Un résultat trouvé par lui ou par un mot-clé affiche « via … ».</li>
+      <li>Un mot-clé compte un peu moins que le nom affiché, pour ne pas passer devant une appli qui porte vraiment ce nom.</li>
+      <li>« Tout rétablir » efface le nom et les mots-clés. Rien n’est changé dans le menu Démarrer de Windows.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="note">
+  <b>Côté technique (à vérifier avant d’écrire le code).</b>
+  Rien côté Rust : les noms et mots-clés vont dans <code>Ilot.folders</code>, déjà enregistré par <code>store_set</code>
+  (<code>saveFolders()</code>), comme <code>hidden</code>. Les clés sont les <code>id</code> d’appli ou de jeu, donc ils survivent à
+  <code>apps_refresh</code>. Une appli désinstallée laisse une entrée orpheline, sans effet.
+  Dans <code>AppsPage.qml</code>, une fonction <code>label(a)</code> remplace <code>a.name</code> pour l’affichage et le tri.
+  Dans <code>rank.mjs</code>, <code>search()</code> prend le meilleur <code>matchScore</code> entre le nom affiché, le nom d’origine
+  (−0,5) et chaque mot-clé (−0,5), et renvoie par où l’appli a été trouvée pour la ligne « via ». Les habitudes
+  (<code>usage.json</code>) sont par <code>id</code> : renommer ne les perd pas.
+  <pre>"folders": {
+  "hidden": [ … ],
+  "names": { "Microsoft.ScreenSketch_8wekyb3d8bbwe!App": "Capture" },
+  "keys":  { "Microsoft.ScreenSketch_8wekyb3d8bbwe!App": ["screenshot", "snip"] }
+}</pre>
+</div>
+
+<script>
+const APPS=[
+  {id:"snip",name:"Outil Capture d’écran",icon:"screenshot_region",c:"#2b7de9"},
+  {id:"code",name:"Visual Studio Code",icon:"code",c:"#1f6fbf"},
+  {id:"edge",name:"Microsoft Edge",icon:"language",c:"#1a9c8c"},
+  {id:"chrome",name:"Google Chrome",icon:"public",c:"#d9a520"},
+  {id:"discord",name:"Discord",icon:"forum",c:"#5865f2"},
+  {id:"steam",name:"Steam",icon:"stadia_controller",c:"#1b2838"},
+  {id:"spotify",name:"Spotify",icon:"music_note",c:"#1db954"},
+  {id:"gg",name:"SteelSeries GG",icon:"headphones",c:"#f26722"},
+  {id:"teams",name:"Microsoft Teams (work or school)",icon:"groups",c:"#5b5fc7"},
+  {id:"pwsh",name:"Windows PowerShell",icon:"terminal",c:"#2d3c8c"},
+  {id:"notepad",name:"Bloc-notes",icon:"description",c:"#3a8ee6"},
+  {id:"calc",name:"Calculatrice",icon:"calculate",c:"#4c5560"},
+  {id:"explorer",name:"Explorateur de fichiers",icon:"folder",c:"#e3a21a"},
+  {id:"taskmgr",name:"Gestionnaire des tâches",icon:"monitoring",c:"#2f7d5c"},
+  {id:"settings",name:"Paramètres",icon:"settings",c:"#5d5d6b"},
+  {id:"obs",name:"OBS Studio",icon:"videocam",c:"#302e31"},
+  {id:"rl",name:"Rocket League",icon:"sports_esports",c:"#2a66c9"},
+  {id:"paint",name:"Paint",icon:"palette",c:"#c0458a"}
+];
+const SAMPLE={
+  names:{snip:"Capture",teams:"Teams",pwsh:"Terminal"},
+  keys:{snip:["screenshot","snip"],gg:["sonar","casque"],pwsh:["powershell","cmd"],code:["vscode"],explorer:["fichiers"]}
+};
+const SUGG={snip:["impr écran","snip","capture"],code:["vscode","éditeur","code"],edge:["navigateur","internet"],chrome:["navigateur","web"],
+  discord:["vocal","chat"],steam:["jeux","launcher"],spotify:["musique"],gg:["sonar","casque","micro"],teams:["visio","cours"],
+  pwsh:["terminal","cmd","console"],notepad:["notepad","texte"],calc:["calcul"],explorer:["fichiers","dossiers"],
+  taskmgr:["processus","ctrl alt suppr"],settings:["réglages","windows"],obs:["stream","enregistrer"],rl:["rl","jeu"],paint:["dessin"]};
+const TRIES=["capture","screenshot","sonar","terminal","teams","vsc","outil"];
+
+let names={},keys={},variant="both",sel=0,view=[],editing=null,draftKeys=[];
+const $=id=>document.getElementById(id);
+const norm=s=>s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[’']/g," ");
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const useNames=()=>variant!=="keys", useKeys=()=>variant!=="name";
+const label=a=>useNames()&&names[a.id]||a.name;
+function loadSample(){names=JSON.parse(JSON.stringify(SAMPLE.names));keys=JSON.parse(JSON.stringify(SAMPLE.keys))}
+
+// rank.mjs : matchScore, inchangé
+function matchScore(n,s){
+  if(n.startsWith(s))return 6;
+  const words=n.split(/[\s\-_.()]+/).filter(Boolean);
+  if(words.some(w=>w.startsWith(s)))return 4.5;
+  if(s.length>=2&&words.map(w=>w[0]).join("").startsWith(s))return 4;
+  if(n.includes(s))return 3;
+  if(s.length>=3){let i=0;for(const c of n)if(c===s[i]&&++i===s.length)return 1}
+  return 0;
+}
+// meilleur des champs : nom affiché, nom d'origine (-0,5), mots-clés (-0,5)
+function best(a,s){
+  const shown=label(a);
+  let r={score:matchScore(norm(shown),s),via:null};
+  const alt=[];
+  if(shown!==a.name)alt.push({t:a.name,kind:"nom d’origine"});
+  if(useKeys())(keys[a.id]||[]).forEach(k=>alt.push({t:k,kind:"mot-clé"}));
+  for(const x of alt){const m=matchScore(norm(x.t),s);if(m&&m-.5>r.score)r={score:m-.5,via:x}}
+  return r;
+}
+function hl(text,s){
+  if(!s)return esc(text);
+  const n=norm(text),i=n.indexOf(s);
+  return i<0?esc(text):esc(text.slice(0,i))+"<mark>"+esc(text.slice(i,i+s.length))+"</mark>"+esc(text.slice(i+s.length));
+}
+function render(){
+  const s=norm($("q").value.trim());
+  const all=APPS.slice().sort((x,y)=>label(x).localeCompare(label(y),"fr"));
+  view=!s?all.map(a=>({a,via:null})):all.map(a=>({a,...best(a,s)})).filter(x=>x.score>0)
+    .sort((x,y)=>y.score-x.score||label(x.a).length-label(y.a).length);
+  sel=Math.min(sel,Math.max(0,view.length-1));
+  $("grid").innerHTML=view.length?view.map((x,i)=>{
+    const a=x.a;
+    return `<button class="app ${i===sel&&s?"sel":""}" data-id="${a.id}" title="${esc(a.name)}">
+      <span class="ic" style="background:${a.c}"><span class="ms">${a.icon}</span></span>
+      <span class="nm">${x.via?esc(label(a)):hl(label(a),s)}</span>
+      ${x.via?`<span class="via">via <b>${esc(x.via.t)}</b></span>`:""}</button>`}).join("")
+    :`<div class="empty"><span class="ms">search_off</span>Aucune appli pour « ${esc($("q").value.trim())} ».<br>Clic droit sur une appli › Renommer… pour lui ajouter ce mot.</div>`;
+  $("tries").innerHTML='<span>Essayez :</span>'+TRIES.map(t=>`<button class="try" data-t="${t}">${t}</button>`).join("");
+  $("hint").innerHTML={
+    name:"<b>Nom seul.</b> Le nom affiché change. L’ancien nom reste cherchable : tapez « outil ».",
+    keys:"<b>Mots-clés seuls.</b> Les icônes gardent le nom de Windows. Un résultat trouvé par un mot-clé l’indique sous l’icône.",
+    both:"<b>Les deux.</b> Clic droit sur une appli › <b>Renommer…</b>, ou sélectionnez-la au clavier et appuyez sur <kbd>F2</kbd>."
+  }[variant];
+}
+
+// ---------- menu contextuel
+function openMenu(id,x,y){
+  const a=APPS.find(z=>z.id===id),m=$("menu"),pr=$("panel").getBoundingClientRect();
+  m.innerHTML=`<div class="mt">${esc(label(a))}</div>
+    <div class="mi new" data-act="rename"><span class="ms">edit</span>Renommer…<kbd>F2</kbd></div>
+    <div class="mi"><span class="ms">folder_open</span>Ouvrir l’emplacement du fichier</div>
+    <div class="mi danger"><span class="ms">visibility_off</span>Masquer de l’îlot</div>
+    <div class="sep"></div>
+    <div class="mi"><span class="ms">check_box_outline_blank</span>Jeux</div>
+    <div class="mi"><span class="ms">check_box_outline_blank</span>Travail</div>
+    <div class="mi"><span class="ms">create_new_folder</span>Nouveau dossier…</div>`;
+  m.dataset.id=id;
+  const w=250,h=300;
+  m.style.left=Math.max(6,Math.min(x-pr.left,pr.width-w-6))+"px";
+  m.style.top=Math.max(6,Math.min(y-pr.top,pr.height-h))+"px";
+  m.classList.remove("closed");
+}
+const closeMenu=()=>$("menu").classList.add("closed");
+
+// ---------- feuille Renommer
+function openSheet(id){
+  closeMenu();
+  const a=APPS.find(z=>z.id===id);editing=a;
+  draftKeys=(keys[a.id]||[]).slice();
+  $("shIc").style.background=a.c;$("shIc").innerHTML=`<span class="ms">${a.icon}</span>`;
+  $("shT").textContent=useNames()?"Renommer l’appli":"Mots-clés de l’appli";
+  $("shS").textContent="Nom dans Windows : "+a.name;
+  $("fName").value=names[a.id]||"";$("fName").placeholder=a.name;
+  $("rowName").hidden=!useNames();$("rowKeys").hidden=!useKeys();
+  $("fKey").value="";
+  drawChips();syncName();
+  $("veil").classList.remove("closed");
+  setTimeout(()=>(useNames()?$("fName"):$("fKey")).focus(),60);
+}
+function closeSheet(){$("veil").classList.add("closed");editing=null;$("q").focus()}
+function syncName(){
+  const v=$("fName").value.trim();
+  $("fNameClr").style.visibility=v?"visible":"hidden";
+  $("nameHelp").innerHTML=v&&v!==editing.name
+    ?`Affiché « <b>${esc(v)}</b> ». « ${esc(editing.name)} » reste cherchable.`
+    :"Vide : l’îlot garde le nom de Windows.";
+  const dirty=v!==(names[editing.id]||"")||JSON.stringify(draftKeys)!==JSON.stringify(keys[editing.id]||[]);
+  $("save").disabled=!dirty;
+  $("restore").style.visibility=(names[editing.id]||(keys[editing.id]||[]).length)?"visible":"hidden";
+}
+function drawChips(){
+  const c=$("chips"),inp=$("fKey");
+  c.querySelectorAll(".chip").forEach(e=>e.remove());
+  draftKeys.forEach((k,i)=>{
+    const s=document.createElement("span");s.className="chip";
+    s.innerHTML=`${esc(k)}<button type="button" data-i="${i}" aria-label="Retirer ${esc(k)}"><span class="ms">close</span></button>`;
+    c.insertBefore(s,inp);
+  });
+  const sg=(SUGG[editing.id]||[]).filter(k=>!draftKeys.includes(k)&&norm(k)!==norm(editing.name));
+  $("sugg").innerHTML=sg.map(k=>`<button type="button" data-k="${esc(k)}"><span class="ms">add</span>${esc(k)}</button>`).join("");
+  if(editing)syncName();
+}
+function addKey(k){
+  k=k.trim().replace(/\s+/g," ");
+  if(k.length<2||draftKeys.some(x=>norm(x)===norm(k)))return;
+  draftKeys.push(k);drawChips();
+}
+
+// ---------- événements
+$("q").addEventListener("input",()=>{sel=0;render()});
+$("q").addEventListener("keydown",e=>{
+  const cols=Math.max(1,Math.round($("grid").clientWidth/100));
+  const mv={ArrowRight:1,ArrowLeft:-1,ArrowDown:cols,ArrowUp:-cols}[e.key];
+  if(mv!==undefined){sel=Math.max(0,Math.min(view.length-1,sel+mv));render();e.preventDefault()}
+  else if(e.key==="F2"&&view[sel]){e.preventDefault();openSheet(view[sel].a.id)}
+  else if(e.key==="Enter"&&view[sel]){flash(view[sel].a.id)}
+});
+function flash(id){const b=document.querySelector(`.app[data-id="${id}"]`);if(b){b.classList.remove("flash");void b.offsetWidth;b.classList.add("flash")}}
+$("grid").addEventListener("contextmenu",e=>{const b=e.target.closest(".app");if(!b)return;e.preventDefault();openMenu(b.dataset.id,e.clientX,e.clientY)});
+$("grid").addEventListener("click",e=>{const b=e.target.closest(".app");if(b){flash(b.dataset.id);closeMenu()}});
+let press;$("grid").addEventListener("pointerdown",e=>{const b=e.target.closest(".app");if(!b||e.pointerType==="mouse")return;
+  press=setTimeout(()=>openMenu(b.dataset.id,e.clientX,e.clientY),500)});
+["pointerup","pointercancel","pointermove"].forEach(t=>$("grid").addEventListener(t,()=>clearTimeout(press)));
+$("menu").addEventListener("click",e=>{const mi=e.target.closest(".mi");if(!mi)return;
+  if(mi.dataset.act==="rename")openSheet($("menu").dataset.id);else closeMenu()});
+document.addEventListener("click",e=>{if(!e.target.closest("#menu")&&!e.target.closest(".app"))closeMenu()});
+$("tries").addEventListener("click",e=>{const t=e.target.closest(".try");if(t){$("q").value=t.dataset.t;sel=0;render();$("q").focus()}});
+
+$("fName").addEventListener("input",syncName);
+$("fNameClr").addEventListener("click",()=>{$("fName").value="";syncName();$("fName").focus()});
+$("fKey").addEventListener("keydown",e=>{
+  if(e.key==="Enter"||e.key===","){e.preventDefault();addKey($("fKey").value);$("fKey").value=""}
+  else if(e.key==="Backspace"&&!$("fKey").value&&draftKeys.length){draftKeys.pop();drawChips()}
+});
+$("chips").addEventListener("click",e=>{const b=e.target.closest("button[data-i]");if(b){draftKeys.splice(+b.dataset.i,1);drawChips()}else $("fKey").focus()});
+$("sugg").addEventListener("click",e=>{const b=e.target.closest("button[data-k]");if(b)addKey(b.dataset.k)});
+$("cancel").addEventListener("click",closeSheet);
+$("veil").addEventListener("click",e=>{if(e.target===$("veil"))closeSheet()});
+$("restore").addEventListener("click",()=>{$("fName").value="";draftKeys=[];drawChips()});
+$("sheet").addEventListener("submit",e=>{
+  e.preventDefault();
+  if($("fKey").value.trim()){addKey($("fKey").value);$("fKey").value=""}
+  const id=editing.id,v=$("fName").value.trim();
+  if(useNames()){if(v&&v!==editing.name)names[id]=v;else delete names[id]}
+  if(useKeys()){if(draftKeys.length)keys[id]=draftKeys.slice();else delete keys[id]}
+  closeSheet();render();setTimeout(()=>flash(id),30);
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(editing)closeSheet();else closeMenu()}});
+
+document.querySelectorAll("[data-v]").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("[data-v]").forEach(x=>x.classList.toggle("on",x===b));
+  variant=b.dataset.v;closeMenu();if(editing)closeSheet();render();
+}));
+$("reset").addEventListener("click",()=>{loadSample();render()});
+
+loadSample();render();
+</script>

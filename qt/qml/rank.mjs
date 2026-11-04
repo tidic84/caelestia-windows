@@ -93,15 +93,24 @@ export function matchScore(n, s) {
 
 // Résultats d'une recherche, du plus pertinent au moins pertinent.
 // items : [{ id, name }], norm : normalisation des noms, s : recherche normalisée.
-export function search(u, items, s, norm, now) {
+// names(a) (facultatif) : [nom affiché, autres noms…] ; un autre nom (nom
+// d'origine d'une appli renommée, mot-clé) compte 0,5 de moins. via : objet
+// rempli id → autre nom qui a trouvé l'appli.
+export function search(u, items, s, norm, now, names, via) {
   const out = [];
   for (const a of items) {
-    const n = norm(a.name);
-    const m = matchScore(n, s);
-    if (!m) continue;
-    out.push({ a: a, len: n.length, score: m + 0.8 * Math.min(habit(u, a.id, now), 4) + learned(u, a.id, s) });
+    const list = names ? names(a) : [a.name];
+    const n = norm(list[0]);
+    let m = matchScore(n, s), by = '';
+    for (let i = 1; i < list.length; i++) {
+      const k = matchScore(norm(list[i]), s) - 0.5;
+      if (k > m) { m = k; by = list[i]; }
+    }
+    if (m <= 0) continue;
+    if (via && by) via[a.id] = by;
+    out.push({ a: a, t: list[0], len: n.length, score: m + 0.8 * Math.min(habit(u, a.id, now), 4) + learned(u, a.id, s) });
   }
-  out.sort((x, y) => y.score - x.score || x.len - y.len || x.a.name.localeCompare(y.a.name, 'fr'));
+  out.sort((x, y) => y.score - x.score || x.len - y.len || x.t.localeCompare(y.t, 'fr'));
   return out.map(x => x.a);
 }
 

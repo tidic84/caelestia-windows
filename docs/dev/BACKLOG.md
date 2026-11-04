@@ -13,6 +13,15 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🟢 **Renommer les applis (2026-11-04) : à essayer à la main**
+  - Pas testé dans l'îlot ouvert (feuille, F2, ligne « via … »).
+  - La ligne « via … » n'existe que sur les tuiles d'applis, pas sur les
+    jaquettes des jeux (place). Une tuile qui l'affiche a son icône ≈ 6 px
+    plus haut que ses voisines (colonne centrée).
+  - Pas de mots-clés suggérés (la maquette en invente, aucune source).
+  - Une appli désinstallée laisse son entrée dans `folders.names`/`keys`
+    (sans effet).
+
 - 🟢 **Réglages refaits (2026-10-29) : à confirmer par l'utilisateur**
   - Tant qu'un brouillon existe, les raccourcis d'onglets, Win+V et le
     dépôt de fichiers rouvrent Réglages (barre qui tremble) au lieu de leur

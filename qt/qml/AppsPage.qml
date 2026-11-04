@@ -35,9 +35,19 @@ Item {
         function onAppsChanged() { page.refreshSoon() }
         function onGamesChanged() { page.refreshSoon() }
         function onFoldersChanged() { page.refreshSoon() }
-        function onModeChanged() { if (Ilot.mode !== "open") ctx.hide() }
+        function onModeChanged() {
+            if (Ilot.mode !== "open") {
+                ctx.hide()
+                renameSheet.close()
+            }
+        }
     }
-    onShownChanged: if (shown) refresh()
+    onShownChanged: {
+        if (shown)
+            refresh()
+        else
+            renameSheet.close()
+    }
     Component.onCompleted: if (shown) refresh()
     onQChanged: {
         sel = 0
@@ -68,6 +78,20 @@ Item {
     function folderIcon(name) {
         const f = folderIcons.find(x => x[0].test(Ilot.norm(name)))
         return f ? f[1] : "folder"
+    }
+    // nom affiche (renomme dans l'ilot) et autres noms cherchables
+    function label(a) {
+        return (Ilot.folders.names || {})[a.id] || a.name
+    }
+    function searchNames(a) {
+        const shown = label(a)
+        return [shown].concat(shown !== a.name ? [a.name] : [], (Ilot.folders.keys || {})[a.id] || [])
+    }
+    // appli trouvee par un autre nom que celui affiche : id -> ce nom
+    property var vias: ({})
+    function rename(a) {
+        ctx.hide()
+        renameSheet.open(a.id, a.name, (Ilot.folders.names || {})[a.id] || "", (Ilot.folders.keys || {})[a.id] || [])
     }
     function isHidden(id) {
         return (Ilot.folders.hidden || []).includes(id)
@@ -116,7 +140,7 @@ Item {
     }
     function sortItems(list) {
         const late = a => a.added || Number.MAX_SAFE_INTEGER
-        const byName = (x, y) => x.name.localeCompare(y.name, "fr")
+        const byName = (x, y) => label(x).localeCompare(label(y), "fr")
         const by = {
             name: byName,
             "name-desc": (x, y) => byName(y, x),
@@ -228,7 +252,9 @@ Item {
         const folder = Ilot.folders.list.find(f => f.id === Ilot.folders.sel)
         const inGames = Ilot.folders.sel === games
         const pool = sortItems(inGames ? launcherItems() : folder ? folderItems(folder) : Ilot.apps.filter(a => !isHidden(a.id)))
-        view = !s ? pool : Rank.search(Ilot.usage, pool, s, Ilot.norm, Date.now())
+        const via = {}
+        view = !s ? pool : Rank.search(Ilot.usage, pool, s, Ilot.norm, Date.now(), searchNames, via)
+        vias = via
         // un calcul tape directement s'affiche en tete
         mathRow = Calc.looksLikeMath(t.trim()) ? Calc.calc(t.trim()) : null
         mathDone = false
@@ -377,6 +403,9 @@ Item {
             e.accepted = true
         } else if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && view[sel]) {
             launch(view[sel])
+            e.accepted = true
+        } else if (e.key === Qt.Key_F2 && q.trim() !== "" && view[sel]) {
+            rename(view[sel])
             e.accepted = true
         }
     }
@@ -790,6 +819,7 @@ Item {
             scale: dragMa.pressed && !dragging ? 0.94 : 1
             Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spring } }
             tip: (modelData.file ? modelData.file : modelData.name) + (modelData.added ? "\nAjoutée le " + page.fmtAdded(modelData.added) : "")
+            readonly property string via: page.vias[modelData.id] || ""
             Column {
                 anchors.centerIn: parent
                 width: parent.width - 12
@@ -813,7 +843,7 @@ Item {
                         color: Theme.tertiaryContainer
                         Txt {
                             anchors.centerIn: parent
-                            text: app.modelData.name[0] || "?"
+                            text: page.label(app.modelData)[0] || "?"
                             px: 17
                             weight: Font.DemiBold
                             color: Theme.inkTertiaryContainer
@@ -823,10 +853,20 @@ Item {
                 Txt {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
-                    text: app.modelData.name
+                    text: page.label(app.modelData)
                     px: 11.5
                     elide: Text.ElideRight
                     color: app.selected ? Theme.inkSecondaryContainer : Theme.ink
+                }
+                // trouvee par son nom d'origine ou un mot-cle
+                Txt {
+                    visible: app.via !== ""
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    text: "via " + app.via
+                    px: 9.5
+                    elide: Text.ElideRight
+                    color: Theme.outline
                 }
             }
             MouseArea {
@@ -923,7 +963,7 @@ Item {
                     color: Theme.tertiaryContainer
                     Txt {
                         anchors.centerIn: parent
-                        text: game.modelData.name[0] || "?"
+                        text: page.label(game.modelData)[0] || "?"
                         px: 24
                         weight: Font.DemiBold
                         color: Theme.inkTertiaryContainer
@@ -960,7 +1000,7 @@ Item {
                     spacing: 3
                     Txt {
                         width: parent.width
-                        text: game.modelData.name
+                        text: page.label(game.modelData)
                         px: 11.5
                         weight: Font.Medium
                         elide: Text.ElideRight
@@ -1142,6 +1182,27 @@ Item {
             e.accepted = false
         }
     }
+    RenameSheet {
+        id: renameSheet
+        anchors.fill: parent
+        onSaved: (id, name, keys) => {
+            const names = Object.assign({}, Ilot.folders.names || {})
+            const all = Object.assign({}, Ilot.folders.keys || {})
+            if (name)
+                names[id] = name
+            else
+                delete names[id]
+            if (keys.length)
+                all[id] = keys
+            else
+                delete all[id]
+            Ilot.folders.names = names
+            Ilot.folders.keys = all
+            page.save()
+            search.input.forceActiveFocus()
+        }
+        onVisibleChanged: if (!visible) search.input.forceActiveFocus()
+    }
     property point lastCtx: Qt.point(0, 0)
     function showCtx(x, y, entries) {
         lastCtx = Qt.point(x, y)
@@ -1169,7 +1230,8 @@ Item {
     function appMenu(a, p) {
         const cur = Ilot.folders.list.find(f => f.id === Ilot.folders.sel)
         const entries = [
-            { type: "title", label: a.name },
+            { type: "title", label: page.label(a) },
+            { icon: "edit", label: "Renommer…", run: () => page.rename(a) },
             { icon: "folder_open", label: "Ouvrir l’emplacement du fichier", run: () => page.openFolder(() =>
                 a.file ? Api.invoke("folder_open", { path: page.parentDir(a.file) }) : Api.invoke("app_folder", { id: a.id, name: a.name })) }
         ]
@@ -1209,8 +1271,9 @@ Item {
         // ajoute a la main (fichier depose ou appli)
         const extra = !g.source
         showCtx(p.x, p.y, [
-            { type: "title", label: g.name },
+            { type: "title", label: page.label(g) },
             { icon: "play_arrow", label: "Lancer", run: () => { ctx.hide(); page.launch(g) } },
+            { icon: "edit", label: "Renommer…", run: () => page.rename(g) },
             { icon: "folder_open", label: "Ouvrir le dossier du jeu", run: () => page.openFolder(() =>
                 g.file ? Api.invoke("folder_open", { path: page.parentDir(g.file) })
                     : extra ? Api.invoke("app_folder", { id: g.id, name: g.name })
@@ -1232,7 +1295,7 @@ Item {
     function hiddenMenu(p) {
         const list = (Ilot.folders.hidden || []).map(id => Ilot.apps.find(a => a.id === id)).filter(Boolean)
         const entries = [{ type: "title", label: list.length ? "Applis masquées" : "Aucune appli masquée" }]
-        list.forEach(a => entries.push({ icon: "visibility", label: a.name, run: () => {
+        list.forEach(a => entries.push({ icon: "visibility", label: page.label(a), run: () => {
             Ilot.folders.hidden = Ilot.folders.hidden.filter(x => x !== a.id)
             page.save()
             ctx.hide()
@@ -1251,7 +1314,7 @@ Item {
     function hiddenGamesMenu(p) {
         const list = (Ilot.folders.hiddenGames || []).map(id => Ilot.games.find(g => g.id === id)).filter(Boolean)
         const entries = [{ type: "title", label: list.length ? "Jeux supprimés de l’îlot" : "Aucun jeu supprimé" }]
-        list.forEach(g => entries.push({ icon: "visibility", label: g.name, run: () => {
+        list.forEach(g => entries.push({ icon: "visibility", label: page.label(g), run: () => {
             Ilot.folders.hiddenGames = Ilot.folders.hiddenGames.filter(x => x !== g.id)
             page.save()
             ctx.hide()

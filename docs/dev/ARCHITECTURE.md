@@ -134,7 +134,7 @@ Singletons    Api (invoke/call/listen) · Ilot (état global : réglages, thème
               Watch (jeux, absence, Valorant, extinction, caméra/micro, services) · Theme (Material You, polices, courbes)
 Fenêtres      Main (îlot) · Bar (écrans sans îlot) · Captions · TipWindow · PetWindow (promenade du compagnon)
 Îlot          Island · Pill · PillClock · Panel · BarContent · BarTask · TaskIcon · TaskPreview · QuickShare · FileDrop (pilule de dépôt des fichiers, `Watch.dropOpen`) · Convert (page de conversion, `Watch.convertOpen`, `files::file_convert`) · Ear
-Pages         HomePage · MediaPage · CtrlPage (+ Mixer : pastilles de sorties, applis groupées) · AppsPage · ClipsPage · WallsPage · MailPage · TasksPage · PcPage · ClaudeUsagePage
+Pages         HomePage · MediaPage · CtrlPage (+ Mixer : pastilles de sorties, applis groupées) · AppsPage (+ RenameSheet : nom affiché et mots-clés d'une appli) · ClipsPage · WallsPage · MailPage · TasksPage · PcPage · ClaudeUsagePage
               SoundsPage · AssistPage · SettingsPage (13 onglets groupés créés à la demande, brouillon Enregistrer / Annuler,
               thèmes prêts ; onglet Son : sorties affichées, noms choisis) · SettingsPreview (aperçus animés du brouillon)
 Cartes PC     PcCard · ServicesCard · HealthCard · ShutdownCard · SensCard
@@ -145,7 +145,7 @@ Décor         Aurora · WxFx (météo animée) · Glow · Eq · VizBars
 Composants    Btn · IconBtn · TextBtn · M3Switch · M3Slider · Seg · Field · Area · CtxMenu · Card · Chip · Empty
               Gauge · Spinner · Scroller · Tip · Txt · Ms · ClaudeMark · RoundImage · ArtImage · RoundArt · MediaControls · SeekBar · PlayBtn
               NotifRow · TimerBody
-Modules JS    calc · emoji · ical · rank (frécence du lanceur) · mcu (material-color-utilities)
+Modules JS    calc · emoji · ical · rank (frécence du lanceur ; autres noms à −0,5 et « via ») · mcu (material-color-utilities)
 ```
 
 **Packs de compagnon** (Réglages › Compagnon, `cfg.pet = "pack:<id>"`).

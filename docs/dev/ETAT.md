@@ -38,6 +38,30 @@ reprendre.
 
 ## Journal
 
+### 2026-11-04 : renommer les applis (nom affiché, mots-clés)
+
+Maquette validée par l'utilisateur (sans la pastille « modifiée ») :
+`docs/dev/maquettes/renommer-apps.html`, variante « les deux ».
+
+- **`qt/qml/RenameSheet.qml`** (nouveau) : feuille sur la page Apps, nom
+  affiché (vide = nom de Windows), mots-clés en puces (Entrée ou virgule,
+  Retour arrière retire le dernier, 2 lettres minimum), « Tout rétablir ».
+- **`AppsPage.qml`** : « Renommer… » en tête du clic droit d'une appli et
+  d'un jeu, F2 sur l'appli sélectionnée (recherche non vide). `label(a)`
+  remplace `a.name` pour l'affichage et le tri. Ligne « via … » sous une
+  tuile trouvée par le nom d'origine ou un mot-clé. Stockage :
+  `Ilot.folders.names` { id: nom } et `Ilot.folders.keys` { id: [mots] }
+  par `saveFolders()` ; rien côté Rust, rien de changé dans Windows.
+- **`rank.mjs`** : `search()` prend en option `names(a)` (nom affiché puis
+  autres noms, comptés 0,5 de moins) et `via`. Sans eux, même résultat
+  qu'avant.
+- **Vérifié** : `qt\build.cmd` OK ; qmllint sans nouvel avertissement réel ;
+  `search()` testé sous Node (« outil », « screen » trouvent l'appli
+  renommée, une appli sans nom ni mot-clé est classée comme avant). Relu par
+  un agent de relecture (l'agent `relecteur` n'existe pas sur le poste) :
+  rien de bloquant, 5 petits points corrigés.
+- **Non vérifié** : rien testé dans l'îlot ouvert. Pas commité.
+
 ### 2026-11-04 : disposition du clavier (barre + îlot)
 
 Maquette validée par l'utilisateur : `docs/dev/maquettes/clavier.html`

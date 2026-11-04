@@ -8,6 +8,7 @@ description à chaque version publiée sur GitHub.
 
 - **Disposition du clavier dans la barre** : une puce ⌨ **FR** / **EN** remplace l'indicateur de langue de la barre des tâches Windows, que l'îlot masque. Clic : disposition suivante (AZERTY ↔ QWERTY). Clic droit : la liste et un lien vers « Langues et claviers ». La puce n'apparaît que si plusieurs dispositions sont installées ; deux dispositions de même langue s'affichent **AZ** / **QW**.
 - **Annonce dans l'îlot** : à chaque changement de disposition, même par Win + Espace ou Alt + Maj, l'îlot affiche brièvement « Clavier QWERTY · Anglais (États-Unis) », comme pour Verr. Maj.
+- **Renommer les applis** : clic droit sur une appli ou un jeu › « Renommer… » (ou F2) pour lui donner un nom plus court et des mots-clés de recherche (« screenshot » pour l'Outil Capture d'écran, « sonar » pour SteelSeries GG…). Le nom de Windows reste cherchable ; une appli trouvée par lui ou par un mot-clé affiche « via … » sous son icône. Rien n'est changé dans Windows.
 
 ## 0.4.26 — 2026-11-03
 
