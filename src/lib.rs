@@ -22,6 +22,7 @@ mod health;
 mod host;
 mod google;
 mod img;
+mod kbd;
 mod lyrics;
 mod mail;
 mod media;
@@ -287,6 +288,8 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "session_action" => json(system::session_action(a!("action"))),
         "caffeine_set" => json(system::caffeine_set(app, a!("on"))),
         "caffeine_get" => json(system::caffeine_get()),
+        "kbd_get" => json(kbd::kbd_get()),
+        "kbd_set" => json(kbd::kbd_set(a!("id"))),
         "user_info" => json(system::user_info()),
         "motion_reduced" => json(system::motion_reduced()),
         "pet_packs" => json(pets::pet_packs()),
@@ -509,6 +512,7 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
     notif::watch(app);
     theme::watch(app);
     system::watch_keys(app);
+    kbd::watch(app);
     wall::watch_rotation(app);
     mail::watch(app);
     discord::start(app);

@@ -4,6 +4,11 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.27 — à venir
+
+- **Disposition du clavier dans la barre** : une puce ⌨ **FR** / **EN** remplace l'indicateur de langue de la barre des tâches Windows, que l'îlot masque. Clic : disposition suivante (AZERTY ↔ QWERTY). Clic droit : la liste et un lien vers « Langues et claviers ». La puce n'apparaît que si plusieurs dispositions sont installées ; deux dispositions de même langue s'affichent **AZ** / **QW**.
+- **Annonce dans l'îlot** : à chaque changement de disposition, même par Win + Espace ou Alt + Maj, l'îlot affiche brièvement « Clavier QWERTY · Anglais (États-Unis) », comme pour Verr. Maj.
+
 ## 0.4.26 — 2026-11-03
 
 - **Quick Share garde les fichiers** : quand l'îlot se replie pendant qu'on va chercher un autre fichier, ceux déjà ajoutés restent là ; le nouveau fichier déposé s'ajoute aux autres. Ils sont oubliés seulement quand on ferme Quick Share soi-même (bouton, Échap, autre onglet).

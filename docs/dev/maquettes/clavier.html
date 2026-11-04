@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Disposition du clavier</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,1,0">
+<style>
+:root{
+  --primary:#cfbdfe; --inkPrimary:#36265d; --primaryC:#4d3d75; --inkPrimaryC:#e9ddff;
+  --secC:#4a4458; --inkSecC:#e8def8; --terC:#633b48; --inkTerC:#ffd8e4;
+  --surface:#141218; --surfaceLow:#1d1b20; --surfaceC:#211f26; --surfaceHigh:#2b2930; --surfaceHighest:#36343b;
+  --ink:#e6e0e9; --inkVar:#cac4d0; --outline:#938f99; --outlineVar:#49454f; --error:#ffb4ab;
+  --emph:cubic-bezier(.05,.7,.1,1);
+}
+*{box-sizing:border-box}
+body{margin:0;background:#0b0a0d;color:var(--ink);font:13px Rubik,sans-serif;padding:20px 16px 48px}
+h1{font-weight:500;font-size:20px;margin:0 0 6px}
+h2{font-size:12px;font-weight:500;color:var(--outline);text-transform:uppercase;letter-spacing:.06em;margin:26px 0 8px 6px}
+.lead{color:var(--inkVar);max-width:1240px;line-height:1.5;margin:0 0 14px}
+.ms{font-family:"Material Symbols Rounded";font-size:19px;line-height:1;user-select:none;font-weight:normal;font-style:normal}
+button{font:inherit;color:inherit}
+.sim{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--surfaceC);border-radius:16px;padding:10px 14px;margin:0 0 18px;max-width:1240px}
+.sim .t{color:var(--inkVar);margin:0 4px 0 10px}
+.sim .t:first-child{margin-left:2px}
+.btn{height:34px;border-radius:12px;border:0;background:var(--surfaceHigh);display:inline-flex;align-items:center;gap:6px;padding:0 12px;cursor:pointer}
+.btn:hover{background:var(--surfaceHighest)}
+.btn.on{background:var(--primaryC);color:var(--inkPrimaryC)}
+.btn .ms{font-size:17px}
+kbd{font:500 11px Rubik,sans-serif;background:var(--surfaceHighest);border-radius:6px;padding:2px 6px;color:var(--inkVar)}
+
+/* ====================== bureau simulé */
+.desk{max-width:1240px;height:380px;border-radius:20px;position:relative;overflow:hidden;
+  background:radial-gradient(120% 90% at 20% 100%,#3a2d5c 0,#1b1527 55%,#0f0c15 100%)}
+.bar{position:absolute;left:0;right:0;top:0;height:40px;display:flex;align-items:center;padding:0 6px;gap:6px}
+.grp{height:30px;border-radius:15px;background:var(--surface);display:flex;align-items:center;padding:0 3px;flex:none}
+.grp.pad{padding:0 10px;gap:5px}
+.grp.btnish{cursor:pointer}
+.grp.btnish:hover{background:var(--surfaceLow)}
+.grp .ms{font-size:15px;color:var(--primary)}
+.grp b{font-weight:500;font-size:12px;font-variant-numeric:tabular-nums}
+.sb{height:24px;border-radius:12px;display:flex;align-items:center;gap:4px;padding:0 6px;cursor:pointer}
+.sb:hover{background:var(--surfaceHigh)}
+.sb .ms{font-size:15px;color:var(--primary)}
+.sb b{font-weight:500;font-size:12px}
+.ws{display:flex;gap:5px;padding:0 8px}
+.ws i{width:8px;height:8px;border-radius:4px;background:var(--outlineVar)}
+.ws i.on{width:20px;background:var(--primary)}
+.task{width:26px;height:24px;border-radius:12px;display:grid;place-items:center}
+.task span{width:16px;height:16px;border-radius:4px}
+.spacer{flex:1}
+
+/* puce clavier dans la barre */
+.kbd{gap:5px;padding:0 10px;position:relative;transition:background .25s}
+.kbd .lbl{display:inline-block;min-width:22px;text-align:center;transition:transform .35s var(--emph),opacity .2s}
+.kbd.flip .lbl{transform:translateY(-8px);opacity:0}
+.kbd.flash{background:var(--primaryC)}
+.kbd.flash .ms,.kbd.flash b{color:var(--inkPrimaryC)}
+.hide{display:none!important}
+
+/* infobulle */
+.tip{position:absolute;top:44px;background:var(--surfaceHighest);color:var(--ink);border-radius:8px;padding:5px 9px;font-size:11.5px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:5}
+.kbd:hover .tip{opacity:1}
+
+/* menu (clic droit / clic long) */
+.menu{position:absolute;top:44px;width:250px;background:var(--surfaceC);border-radius:16px;padding:6px;box-shadow:0 8px 28px #0008;z-index:6;
+  transform-origin:top center;transition:transform .3s var(--emph),opacity .15s}
+.menu.closed{transform:scaleY(.6);opacity:0;pointer-events:none}
+.mi{height:40px;border-radius:12px;display:flex;align-items:center;gap:10px;padding:0 10px;cursor:pointer}
+.mi:hover{background:var(--surfaceHigh)}
+.mi .tag{width:34px;height:24px;border-radius:8px;background:var(--surfaceHighest);display:grid;place-items:center;font-weight:600;font-size:11px;color:var(--inkVar)}
+.mi.on .tag{background:var(--primaryC);color:var(--inkPrimaryC)}
+.mi .tx{flex:1;line-height:1.2}
+.mi .tx small{display:block;color:var(--outline);font-size:11px}
+.mi .chk{font-size:18px;color:var(--primary);opacity:0}
+.mi.on .chk{opacity:1}
+.sep{height:1px;background:var(--outlineVar);margin:4px 8px}
+.mi.foot{height:34px;color:var(--inkVar)}
+.mi.foot .ms{font-size:17px}
+.mi.foot kbd{margin-left:auto}
+
+/* îlot */
+.isl{position:absolute;left:50%;top:5px;transform:translateX(-50%);background:#000;border-radius:16px;height:30px;
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:0 14px;min-width:150px;cursor:pointer;
+  transition:min-width .45s var(--emph),height .45s var(--emph),border-radius .45s var(--emph);z-index:4}
+.isl .clock{font-weight:500;font-variant-numeric:tabular-nums}
+.isl .act{display:none;align-items:center;gap:10px}
+.isl.toast{min-width:300px;height:40px;border-radius:20px}
+.isl.toast .clock{display:none}
+.isl.toast .act{display:flex}
+.isl .act .ms{font-size:20px;color:var(--primary)}
+.isl .act b{font-weight:500}
+.isl .act small{color:var(--inkVar);font-size:12px}
+.isl .act .tag{margin-left:6px;background:var(--primaryC);color:var(--inkPrimaryC);border-radius:8px;padding:3px 8px;font-weight:600;font-size:11px}
+
+/* panneau de l'îlot (variante îlot seul) */
+.panel{position:absolute;left:50%;top:5px;width:520px;transform:translateX(-50%);background:var(--surface);border-radius:28px;padding:12px;z-index:7;
+  transition:opacity .2s,transform .35s var(--emph)}
+.panel.closed{opacity:0;pointer-events:none;transform:translateX(-50%) scale(.92)}
+.tabs{display:flex;gap:4px;margin-bottom:10px}
+.tabs span{height:30px;border-radius:15px;padding:0 12px;display:flex;align-items:center;gap:6px;color:var(--inkVar);font-size:12px}
+.tabs span.on{background:var(--secC);color:var(--inkSecC)}
+.tabs .ms{font-size:16px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.tile{height:58px;border-radius:18px;background:var(--surfaceHigh);display:flex;align-items:center;gap:12px;padding:0 14px;cursor:pointer}
+.tile:hover{filter:brightness(1.08)}
+.tile.on{background:var(--primaryC);color:var(--inkPrimaryC)}
+.tile .ms{font-size:22px}
+.tile b{font-weight:500;display:block}
+.tile small{color:inherit;opacity:.75;font-size:11.5px}
+.tile.new{outline:2px dashed var(--primary);outline-offset:2px}
+.close{position:absolute;right:14px;top:14px;width:30px;height:30px;border-radius:15px;display:grid;place-items:center;cursor:pointer;color:var(--inkVar)}
+.close:hover{background:var(--surfaceHigh)}
+
+.hint{position:absolute;left:18px;bottom:16px;right:18px;color:var(--inkVar);font-size:12.5px;line-height:1.5}
+.hint b{color:var(--ink);font-weight:500}
+.arrow{position:absolute;color:var(--primary);font-size:12px;display:flex;align-items:center;gap:4px;pointer-events:none}
+
+/* comparatif */
+.cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;max-width:1240px}
+.card{background:var(--surfaceC);border-radius:20px;padding:16px 18px}
+.card h3{margin:0 0 10px;font-weight:500;font-size:15px;display:flex;align-items:center;gap:8px}
+.card h3 .ms{color:var(--primary)}
+.card.reco{background:var(--primaryC);color:var(--inkPrimaryC)}
+.card.reco h3 .ms{color:var(--inkPrimaryC)}
+.card ul{margin:0;padding-left:18px;line-height:1.6}
+.card li.p::marker{content:"+  ";color:#9ee6a8}
+.card li.m::marker{content:"–  ";color:var(--error)}
+.card.reco li::marker{color:var(--inkPrimaryC)}
+.note{max-width:1240px;color:var(--inkVar);line-height:1.6;background:var(--surfaceLow);border-radius:16px;padding:12px 16px;margin-top:14px}
+.note b{color:var(--ink);font-weight:500}
+@media (max-width:760px){
+  .hidesm{display:none!important}
+  .panel{width:calc(100% - 20px)}
+  .tiles{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<h1>Disposition du clavier · AZERTY / QWERTY</h1>
+<p class="lead">L’îlot masque la barre des tâches Windows, donc aussi son indicateur « FRA / ENG ». Cette maquette compare
+les deux emplacements possibles. Cliquez sur la puce de la barre ou sur l’îlot, ou simulez le raccourci Windows.</p>
+
+<div class="sim">
+  <span class="t">Variante</span>
+  <button class="btn" data-v="bar">Barre seule</button>
+  <button class="btn" data-v="island">Îlot seul</button>
+  <button class="btn on" data-v="both">Les deux (recommandé)</button>
+  <span class="t">Étiquette</span>
+  <button class="btn on" data-l="lang">FR / US</button>
+  <button class="btn" data-l="lay">AZ / QW</button>
+  <span class="t">Simuler</span>
+  <button class="btn" id="hotkey"><span class="ms">keyboard</span>Win + Espace</button>
+</div>
+
+<div class="desk" id="desk">
+  <div class="bar">
+    <div class="grp"><div class="ws"><i class="on"></i><i></i><i></i></div></div>
+    <div class="grp hidesm">
+      <div class="task"><span style="background:#4285f4"></span></div>
+      <div class="task"><span style="background:#e8a33d"></span></div>
+      <div class="task"><span style="background:#5865f2"></span></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="grp pad hidesm"><span class="ms">memory</span><b>12%</b><span class="ms" style="margin-left:4px">developer_board</span><b>41%</b></div>
+    <div class="grp"><div class="sb"><span class="ms">wifi</span></div><div class="sb"><span class="ms">bluetooth</span></div><div class="sb"><span class="ms">volume_up</span><b>48%</b></div></div>
+    <div class="grp btnish kbd" id="chip">
+      <span class="ms">keyboard</span><b class="lbl" id="chipLbl">FR</b>
+      <div class="tip" id="chipTip" style="right:0">Clic : changer · clic droit : liste</div>
+      <div class="menu closed" id="menu" style="right:0"></div>
+    </div>
+    <div class="grp pad btnish"><span class="ms">notifications_none</span></div>
+    <div class="grp pad btnish hidesm"><b>Mer. 4 nov.</b></div>
+    <div class="grp pad btnish"><span class="ms">power_settings_new</span></div>
+  </div>
+
+  <div class="isl" id="isl">
+    <span class="clock" id="clock">14:32</span>
+    <div class="act"><span class="ms">keyboard</span><b id="actT">Clavier QWERTY</b><small id="actS">Anglais (États-Unis)</small></div>
+  </div>
+
+  <div class="panel closed" id="panel">
+    <div class="close" id="pclose"><span class="ms">close</span></div>
+    <div class="tabs">
+      <span><span class="ms">home</span>Accueil</span>
+      <span><span class="ms">music_note</span>Média</span>
+      <span class="on"><span class="ms">tune</span>Contrôle</span>
+      <span class="hidesm"><span class="ms">content_paste</span>Presse-papiers</span>
+    </div>
+    <div class="tiles">
+      <div class="tile on"><span class="ms">wifi</span><div><b>Wi-Fi</b><small>Freebox-4E2A</small></div></div>
+      <div class="tile"><span class="ms">bluetooth</span><div><b>Bluetooth</b><small>Activé</small></div></div>
+      <div class="tile"><span class="ms">do_not_disturb_on</span><div><b>Ne pas déranger</b><small>Désactivé</small></div></div>
+      <div class="tile on new" id="tile"><span class="ms">keyboard</span><div><b id="tileT">Clavier AZERTY</b><small id="tileS">Français · clic pour changer</small></div></div>
+    </div>
+  </div>
+
+  <div class="hint" id="hint"></div>
+</div>
+
+<h2>Comparatif</h2>
+<div class="cmp">
+  <div class="card">
+    <h3><span class="ms">bottom_navigation</span>Dans la barre</h3>
+    <ul>
+      <li class="p">Toujours visible : remplace l’indicateur Windows que l’îlot masque.</li>
+      <li class="p">Un seul clic pour changer, sans ouvrir de panneau.</li>
+      <li class="p">C’est là qu’on le cherche (Windows, macOS et GNOME le mettent dans la barre).</li>
+      <li class="m">Une pastille de plus à droite. Inutile si une seule disposition est installée (alors on la masque).</li>
+      <li class="m">Aucun retour quand on change par <kbd>Win</kbd>+<kbd>Espace</kbd> ou <kbd>Alt</kbd>+<kbd>Maj</kbd> sans regarder la barre.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3><span class="ms">view_agenda</span>Dans l’îlot</h3>
+    <ul>
+      <li class="p">Une annonce animée au moment du changement, même déclenché au clavier (comme Verr. Maj).</li>
+      <li class="p">Ne prend aucune place dans la barre.</li>
+      <li class="m">L’état courant n’est pas visible au repos : on ne sait pas si on tape en AZERTY.</li>
+      <li class="m">Changer demande trois gestes : ouvrir l’îlot, onglet Contrôle, tuile.</li>
+      <li class="m">Une annonce qui arrive en pleine frappe peut gêner (à garder courte, 1,4 s).</li>
+    </ul>
+  </div>
+  <div class="card reco">
+    <h3><span class="ms">thumb_up</span>Recommandation : les deux, chacun son rôle</h3>
+    <ul>
+      <li><b>Barre = commande et état</b> : puce <i>FR</i> / <i>US</i>, clic pour passer à la suivante, clic droit pour la liste.
+        Masquée s’il n’y a qu’une disposition.</li>
+      <li><b>Îlot = retour</b> : annonce brève à chaque changement, réutilise <code>simpleActivity</code>, comme Verr. Maj.</li>
+      <li>Pas de tuile dans Contrôle : elle ferait doublon avec la barre.</li>
+      <li>Si la barre est désactivée (îlot seul, barre Windows visible), l’indicateur Windows reste là : l’annonce suffit.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="note">
+  <b>Côté technique (à vérifier avant d’écrire le code).</b>
+  Lire : <code>GetKeyboardLayout</code> du fil de la fenêtre au premier plan, et <code>GetKeyboardLayoutList</code> pour la liste.
+  Changer : <code>PostMessage(WM_INPUTLANGCHANGEREQUEST)</code> à la fenêtre au premier plan. Il ne faut pas que la barre lui prenne
+  le focus, sinon c’est la barre qui change de disposition. Détecter un changement fait au clavier : un sondage léger
+  (≈ 300 ms, seulement si plusieurs dispositions) ou le crochet clavier déjà en place pour <code>winkey</code>.
+  Le libellé vient du code de langue du HKL (<code>0x040C</code> → FR, <code>0x0409</code> → US). AZERTY ou QWERTY se déduit
+  de l’identifiant de disposition (<code>0000040C</code> → AZERTY, <code>00000409</code> → QWERTY).
+  Attention au cas « Français, clavier QWERTY » : même langue, deux dispositions. L’étiquette « AZ / QW » le distingue,
+  « FR / US » non.
+</div>
+
+<script>
+const layouts=[
+  {lang:"FR",lay:"AZ",name:"AZERTY",full:"Français (France)",kb:"Clavier français"},
+  {lang:"US",lay:"QW",name:"QWERTY",full:"Anglais (États-Unis)",kb:"Clavier américain"}
+];
+let cur=0, variant="both", lbl="lang", toastT=0;
+const $=id=>document.getElementById(id);
+const short=l=>lbl==="lang"?l.lang:l.lay;
+
+function buildMenu(){
+  $("menu").innerHTML=layouts.map((l,i)=>`<div class="mi ${i===cur?"on":""}" data-i="${i}">
+    <span class="tag">${short(l)}</span><span class="tx">${l.name}<small>${l.full}</small></span><span class="ms chk">check</span></div>`).join("")
+   +`<div class="sep"></div><div class="mi foot" data-set><span class="ms">settings</span>Langues et claviers… <kbd>Win+Espace</kbd></div>`;
+}
+function render(){
+  const l=layouts[cur];
+  $("chipLbl").textContent=short(l);
+  $("chipTip").textContent=`${l.name} · ${l.full} — clic : changer, clic droit : liste`;
+  $("tileT").textContent="Clavier "+l.name;
+  $("tileS").textContent=l.full.split(" ")[0]+" · clic pour changer";
+  $("chip").classList.toggle("hide",variant==="island");
+  $("hint").innerHTML={
+    bar:"<b>Barre seule.</b> La puce montre la disposition en cours. Clic : suivante. Clic droit : liste. Changer au clavier ne donne aucun retour, sauf la puce.",
+    island:"<b>Îlot seul.</b> Rien au repos. Cliquez sur l’îlot : onglet Contrôle, tuile Clavier. L’annonce apparaît à chaque changement.",
+    both:"<b>Les deux.</b> La puce donne l’état et la commande. L’îlot annonce chaque changement, y compris par <kbd>Win</kbd>+<kbd>Espace</kbd>."
+  }[variant];
+  buildMenu();
+}
+function toast(){
+  if(variant==="bar")return;
+  const l=layouts[cur];
+  $("actT").textContent="Clavier "+l.name;
+  $("actS").textContent=l.full;
+  $("isl").classList.add("toast");
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>$("isl").classList.remove("toast"),1400);
+}
+function setLayout(i){
+  if(i===cur)return;
+  cur=i;
+  const c=$("chip");
+  c.classList.add("flip");
+  setTimeout(()=>{render();c.classList.remove("flip");
+    c.classList.add("flash");setTimeout(()=>c.classList.remove("flash"),500)},160);
+  toast();
+}
+function next(){setLayout((cur+1)%layouts.length)}
+
+$("chip").addEventListener("click",e=>{
+  if(e.target.closest(".menu")){
+    const mi=e.target.closest(".mi[data-i]");
+    if(mi)setLayout(+mi.dataset.i);
+    $("menu").classList.add("closed");return;
+  }
+  next();
+});
+$("chip").addEventListener("contextmenu",e=>{e.preventDefault();buildMenu();$("menu").classList.toggle("closed")});
+document.addEventListener("click",e=>{if(!e.target.closest("#chip"))$("menu").classList.add("closed")});
+$("isl").addEventListener("click",()=>{if(variant==="island")$("panel").classList.remove("closed")});
+$("pclose").addEventListener("click",()=>$("panel").classList.add("closed"));
+$("tile").addEventListener("click",()=>{next();setTimeout(()=>$("panel").classList.add("closed"),250)});
+$("hotkey").addEventListener("click",next);
+document.querySelectorAll("[data-v]").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("[data-v]").forEach(x=>x.classList.toggle("on",x===b));
+  variant=b.dataset.v;$("panel").classList.add("closed");$("menu").classList.add("closed");render();
+}));
+document.querySelectorAll("[data-l]").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("[data-l]").forEach(x=>x.classList.toggle("on",x===b));
+  lbl=b.dataset.l;render();
+}));
+setInterval(()=>{const d=new Date();$("clock").textContent=d.toTimeString().slice(0,5)},10000);
+$("clock").textContent=new Date().toTimeString().slice(0,5);
+render();
+</script>
+</body>
+</html>

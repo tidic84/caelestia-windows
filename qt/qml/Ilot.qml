@@ -923,6 +923,24 @@ Item {
     // =========================================== reseau, cafeine
     property var net: ({ radios: { wifi: null, bluetooth: null }, ssid: "", bt_devices: [] })
     property bool caffeine: false
+
+    // =========================================== disposition du clavier
+    // { layouts: [{ id, short, name, lang }], cur } (src/kbd.rs)
+    property var kbd: ({ layouts: [], cur: "" })
+    readonly property var kbdCur: kbd.layouts.find(l => l.id === kbd.cur) || null
+    function kbdSet(id) {
+        Api.invoke("kbd_set", { id: id }).then(ok => {
+            if (!ok)
+                simpleActivity("keyboard", "Clavier inchangé", "Fenêtre protégée (administrateur)", { ms: 2500 })
+        })
+    }
+    function kbdNext() {
+        const l = kbd.layouts
+        if (l.length < 2)
+            return
+        const i = l.findIndex(x => x.id === kbd.cur)
+        kbdSet(l[(i + 1) % l.length].id)
+    }
     function toggleRadio(kind) {
         const key = kind === "wifi" ? "wifi" : "bluetooth"
         const on = !net.radios[key]
@@ -1457,6 +1475,9 @@ Item {
             case "caps":
                 root.simpleActivity(a.on ? "keyboard_capslock_badge" : "keyboard_capslock", a.on ? "Verr. Maj activé" : "Verr. Maj désactivé", "", { ms: 1400 })
                 break
+            case "kbd":
+                root.simpleActivity("keyboard", a.name ? "Clavier " + a.name : a.lang, a.name ? a.lang : "", { ms: 1400 })
+                break
             case "power":
                 root.simpleActivity(a.on ? "battery_charging_full" : "battery_full", a.on ? "En charge" : "Sur batterie", a.battery >= 0 ? a.battery + " %" : "")
                 break
@@ -1471,6 +1492,7 @@ Item {
         Api.listen("sys", r => { root.sys = r })
         Api.listen("net", n => { root.net = n })
         Api.listen("caffeine", c => { root.caffeine = c })
+        Api.listen("kbd", k => { root.kbd = k })
         Api.listen("notifs", l => { root.notifs = l })
         // notifications Windows : par la file de Watch (mode jeu, mode absent)
         Api.listen("notif", x => {
@@ -1534,6 +1556,7 @@ Item {
             winLight = Api.call("win_theme_get")
             cfg = Object.assign({}, cfg, Api.call("settings_get"))
             caffeine = Api.call("caffeine_get")
+            kbd = Api.call("kbd_get")
         } catch (e) {
             console.warn("démarrage", e)
         }

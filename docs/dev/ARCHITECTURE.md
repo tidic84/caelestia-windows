@@ -72,6 +72,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── prefs.rs      Raccourcis clavier globaux, export/import des réglages (seul test du projet)
 ├── events.rs     WinEvent, curseur, notifications presse-papiers, RegWatch (surveillance du registre)
 ├── img.rs        Cache des images image://ilot/
+├── kbd.rs        Disposition du clavier : liste, disposition en cours, changement (kbd_get, kbd_set), surveillance (événement kbd, activité kbd)
 ├── bar.rs        Barre façon Waybar, AppBar, masquage de la barre des tâches
 ├── winkey.rs     Touche Windows → lanceur (Scancode Map HKLM, admin), hook clavier, combos
 ├── media.rs      Lecteur (GSMTC)        ├── lyrics.rs  Paroles LRC (LRCLIB, NetEase)

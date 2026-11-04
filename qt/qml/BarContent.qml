@@ -396,6 +396,31 @@ Item {
                 }
             }
 
+            // disposition du clavier : remplace l'indicateur de la barre
+            // Windows, masquee par l'ilot (src/kbd.rs)
+            Group {
+                id: kbdChip
+                readonly property var cur: Ilot.kbdCur
+                visible: Ilot.kbd.layouts.length > 1
+                button: true
+                tip: (cur ? (cur.name ? cur.name + " · " : "") + cur.lang + "\n" : "") + "Clic : changer · clic droit : liste"
+                width: kbdRow.implicitWidth + 20
+                onClicked: Ilot.kbdNext()
+                onRightClicked: bar.kbdMenu(kbdChip)
+                Row {
+                    id: kbdRow
+                    anchors.centerIn: parent
+                    spacing: 5
+                    Ms { name: "keyboard"; size: 15; color: Theme.primary; anchors.verticalCenter: parent.verticalCenter }
+                    Txt {
+                        text: kbdChip.cur ? kbdChip.cur.short : "?"
+                        px: 12
+                        weight: Font.Medium
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+            }
+
             // notifications
             Group {
                 id: bell
@@ -519,6 +544,23 @@ Item {
                         Ilot.simpleActivity("error", "Fin de tâche refusée",
                             r.killed ? r.killed + " fermé(s), " + r.denied + " refusé(s)" : exe, { ms: 4000 })
                 })
+        } })
+        menu.show(item.mapToItem(bar, 0, 0).x, Ilot.barH + 4, list)
+    }
+    // liste des dispositions du clavier (clic droit sur la puce)
+    function kbdMenu(item) {
+        preview.hideNow()
+        const list = [{ type: "title", label: "Clavier" }]
+        for (const l of Ilot.kbd.layouts) {
+            const id = l.id
+            const on = id === Ilot.kbd.cur
+            list.push({ icon: on ? "check" : "keyboard", on: on,
+                label: (l.name ? l.name + " · " : "") + l.lang,
+                run: () => { menu.hide(); if (!on) Ilot.kbdSet(id) } })
+        }
+        list.push({ type: "sep" }, { icon: "settings", label: "Langues et claviers…", run: () => {
+            menu.hide()
+            Api.invoke("app_launch", { id: "ms-settings:regionlanguage" })
         } })
         menu.show(item.mapToItem(bar, 0, 0).x, Ilot.barH + 4, list)
     }

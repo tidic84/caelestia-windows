@@ -38,6 +38,53 @@ reprendre.
 
 ## Journal
 
+### 2026-11-04 : disposition du clavier (barre + îlot)
+
+Maquette validée par l'utilisateur : `docs/dev/maquettes/clavier.html`
+(variante « les deux » : la barre pour l'état et la commande, l'îlot pour
+l'annonce).
+
+- **Rust** `src/kbd.rs` (nouveau ; feature `Win32_Globalization`) :
+  - `kbd_get` renvoie `{ layouts: [{ id, short, name, lang }], cur }`.
+    `id` est le HKL en hexadécimal. `name` vaut AZERTY, QWERTY ou QWERTZ :
+    `MapVirtualKeyExW` lit les touches physiques 0x10 et 0x15. `lang`
+    vient de `LOCALE_SLOCALIZEDDISPLAYNAME`. `short` est le code de langue
+    (FR, EN), ou AZ / QW quand deux dispositions ont la même langue.
+  - `kbd_set(id)` envoie `WM_INPUTLANGCHANGEREQUEST` à la **dernière
+    fenêtre au premier plan qui n'est pas l'îlot**, car un clic sur la barre
+    met l'îlot au premier plan. Renvoie faux si Windows refuse (fenêtre
+    administrateur, UIPI).
+  - `watch` relit l'état toutes les 300 ms (toutes les 3 s s'il n'y a
+    qu'une disposition). Il émet `kbd` à chaque changement, et l'activité
+    `kbd` seulement si la disposition change **dans la même fenêtre**.
+    Avec « une disposition par appli », passer d'une fenêtre à l'autre
+    n'est donc pas annoncé.
+- **QML** :
+  - `Ilot.qml` : `kbd`, `kbdCur`, `kbdSet`, `kbdNext`, cas `kbd` des
+    activités (`simpleActivity`, 1,4 s).
+  - `BarContent.qml` : puce `kbdChip` entre le groupe Wi-Fi/volume et les
+    notifications. Elle est visible si plus d'une disposition est
+    installée. Le clic droit appelle `kbdMenu`, qui réutilise le `CtxMenu`
+    des applis.
+
+Vérifié :
+- `cargo clippy` sans avertissement dans `kbd.rs`, et `qt\build.cmd`
+  compile.
+- Un test temporaire (retiré) lit sur le poste : `EN · QWERTY · Anglais
+  (États-Unis)` et `FR · AZERTY · Français (France)`, avec FR en cours.
+- Capture de `qt\build\ilot.exe` : la puce « ⌨ FR » s'affiche bien dans
+  la barre. Pour la capture, `bar_autohide` était passé à false le temps
+  du test, puis `settings.json` a été remis.
+
+Non vérifié (à essayer à la main) :
+- Le clic sur la puce, qui change vraiment la disposition de l'appli au
+  premier plan.
+- L'annonce dans l'îlot, et Win + Espace.
+- Le menu du clic droit.
+- Le cas d'une fenêtre administrateur.
+- Pas de relecture par l'agent `relecteur`, absent du poste : relecture
+  faite par l'agent principal.
+
 ### 2026-11-03 : Quick Share garde ses fichiers, « Direct » à tort
 
 - **Quick Share** (`Watch.qml`, `onShareOpenChanged`) : les fichiers en
