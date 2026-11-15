@@ -4,6 +4,12 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.29 — 2026-11-15
+
+- **Le traducteur remarche** : Google bloquait les demandes de l'îlot (« trop de demandes »). La traduction passe maintenant par DeepL, plus précis. Google sert encore pour les langues que DeepL ne connaît pas (hindi), ou si DeepL est indisponible. Les sous-titres en direct traduisent la dernière ligne, toutes les 2 s au plus, pour ménager le quota.
+- **Lancer en tant qu'administrateur** : clic droit sur une appli de la page Apps (ou un .exe, .lnk, .bat déposé) › « Lancer en tant qu'administrateur », avec l'invite de Windows. Absent pour les applis du Microsoft Store, qui ne le permettent pas.
+- **Addon « Claude » plus patient** : quand l'API de Claude demande d'attendre, l'îlot attend vraiment avant de redemander. La page garde la dernière valeur connue (« mis à jour il y a 8 min ») au lieu d'une erreur. Les relevés en arrière-plan ont lieu toutes les 10 min.
+
 ## 0.4.28 — 2026-11-15
 
 - **Addon « Claude » avec Claude Desktop** : les limites de ton abonnement s'affichent aussi quand tu n'as que l'application Claude Desktop, sans Claude Code en ligne de commande. L'îlot lit la connexion de Desktop, sans rien changer chez lui. Il ne demande rien à saisir et ne te déconnecte pas.
