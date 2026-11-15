@@ -7,7 +7,7 @@
 //! met les memes hooks, avec le chemin /mnt/<lettre>/... d'ilot.exe (WSL sait
 //! lancer un .exe Windows, le JSON passe par stdin de la meme facon).
 //! Addon « Claude » : limites de l'abonnement (session de 5 h, semaine), lues
-//! avec le jeton OAuth de Claude Code (`usage`).
+//! avec le jeton OAuth de Claude Code ou de Claude Desktop (`usage`).
 
 use serde_json::{json, Value};
 use std::os::windows::process::CommandExt;
@@ -237,39 +237,86 @@ fn now_ms() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64)
 }
 
-/// Jeton OAuth de Claude Code encore valable : Windows, sinon les WSL demarres.
-/// On ne le rafraichit jamais (le jeton de rafraichissement changerait et
-/// Claude Code serait deconnecte) : relancer Claude Code suffit.
-fn token() -> Result<(String, String), String> {
-    let now = now_ms();
-    let mut best: Option<(u64, String, String)> = None;
-    let mut seen = false;
-    let win = windows().map(|t| t.path.with_file_name(".credentials.json")).ok();
-    // WSL seulement si le jeton de Windows ne sert pas (wsl.exe a lancer)
-    let mut files: Box<dyn Iterator<Item = PathBuf>> = Box::new(win.into_iter());
-    let mut tried_wsl = false;
-    loop {
-        let Some(f) = files.next() else {
-            if best.is_some() || tried_wsl {
-                break;
-            }
-            tried_wsl = true;
-            files = Box::new(wsl(true).into_iter().map(|t| t.path.with_file_name(".credentials.json")));
-            continue;
-        };
+const EXPIRED: &str = "Connexion expirée : relance Claude Code ou Claude Desktop";
+
+/// (expiration, jeton, abonnement) : garde le jeton valable qui dure le plus
+fn keep(best: &mut Option<(u64, String, String)>, now: u64, exp: u64, tok: &str, plan: &str) {
+    if exp > now + 60_000 && best.as_ref().is_none_or(|b| exp > b.0) {
+        *best = Some((exp, tok.to_string(), plan.to_string()));
+    }
+}
+
+/// Jetons de Claude Code (fichiers .credentials.json)
+fn cli(files: impl Iterator<Item = PathBuf>, now: u64, seen: &mut bool) -> Option<(u64, String, String)> {
+    let mut best = None;
+    for f in files {
         let Ok(text) = std::fs::read_to_string(&f) else { continue };
         let Ok(v) = serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) else { continue };
         let o = &v["claudeAiOauth"];
-        let (Some(tok), exp) = (o["accessToken"].as_str(), o["expiresAt"].as_u64().unwrap_or(0)) else { continue };
-        seen = true;
-        if exp > now + 60_000 && best.as_ref().is_none_or(|b| exp > b.0) {
-            best = Some((exp, tok.to_string(), o["subscriptionType"].as_str().unwrap_or("").to_string()));
+        let Some(tok) = o["accessToken"].as_str() else { continue };
+        *seen = true;
+        keep(&mut best, now, o["expiresAt"].as_u64().unwrap_or(0), tok, o["subscriptionType"].as_str().unwrap_or(""));
+    }
+    best
+}
+
+/// Jetons de Claude Desktop, qui n'ecrit pas .credentials.json. Ils sont dans
+/// %APPDATA%\Claude\config.json (oauth:tokenCacheV2, oauth:tokenCache),
+/// chiffres par Electron (safeStorage) : « v10 » + nonce (12) + AES-256-GCM.
+/// La cle est os_crypt.encrypted_key de « Local State » : « DPAPI » + DPAPI.
+/// Chaque entree est « acct:<compte>|<client>:...:https://api.anthropic.com:<scopes> » ;
+/// l'API d'utilisation veut le scope user:profile (les autres : 403).
+/// Lecture seule : Desktop rafraichit lui-meme ses jetons.
+fn desktop(now: u64, seen: &mut bool) -> Option<(u64, String, String)> {
+    use aes_gcm::aead::{Aead, KeyInit};
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    let dir = PathBuf::from(std::env::var("APPDATA").ok()?).join("Claude");
+    let read = |f: &str| -> Option<Value> {
+        serde_json::from_str(std::fs::read_to_string(dir.join(f)).ok()?.trim_start_matches('\u{feff}')).ok()
+    };
+    let cfg = read("config.json")?;
+    let state = read("Local State")?;
+    let ek = STANDARD.decode(state["os_crypt"]["encrypted_key"].as_str()?).ok()?;
+    let key = crate::mail::unprotect_raw(ek.strip_prefix(b"DPAPI")?)?;
+    let cipher = aes_gcm::Aes256Gcm::new_from_slice(&key).ok()?;
+    // compte connecte dans Desktop (d'anciens comptes peuvent rester en cache)
+    let acct = cfg["lastKnownAccountUuid"].as_str().map(|a| format!("acct:{a}|"));
+    let mut best = None;
+    for k in ["oauth:tokenCacheV2", "oauth:tokenCache"] {
+        let Some(b) = cfg[k].as_str().and_then(|s| STANDARD.decode(s).ok()) else { continue };
+        let Some(b) = b.strip_prefix(b"v10").filter(|b| b.len() > 12 + 16) else { continue };
+        let Ok(plain) = cipher.decrypt(b[..12].into(), &b[12..]) else { continue };
+        let Ok(Value::Object(m)) = serde_json::from_slice::<Value>(&plain) else { continue };
+        for (id, v) in &m {
+            if acct.as_ref().is_some_and(|a| !id.starts_with(a.as_str())) {
+                continue;
+            }
+            let profile = id
+                .split_once("https://api.anthropic.com:")
+                .is_some_and(|(_, scopes)| scopes.split_whitespace().any(|s| s == "user:profile"));
+            let Some(tok) = v["token"].as_str().filter(|_| profile) else { continue };
+            *seen = true;
+            keep(&mut best, now, v["expiresAt"].as_u64().unwrap_or(0), tok, v["subscriptionType"].as_str().unwrap_or(""));
         }
     }
+    best
+}
+
+/// Jeton OAuth encore valable : Claude Code sous Windows, sinon Claude
+/// Desktop, sinon Claude Code dans les WSL demarres (wsl.exe a lancer).
+/// On ne le rafraichit jamais (le jeton de rafraichissement changerait et
+/// Claude serait deconnecte) : relancer Claude Code ou Desktop suffit.
+fn token() -> Result<(String, String), String> {
+    let now = now_ms();
+    let mut seen = false;
+    let win = windows().map(|t| t.path.with_file_name(".credentials.json")).ok();
+    let best = cli(win.into_iter(), now, &mut seen)
+        .or_else(|| desktop(now, &mut seen))
+        .or_else(|| cli(wsl(true).into_iter().map(|t| t.path.with_file_name(".credentials.json")), now, &mut seen));
     match best {
         Some((_, tok, plan)) => Ok((tok, plan)),
-        None if seen => Err("Connexion de Claude Code expirée : relance Claude Code".into()),
-        None => Err("Claude Code n'est pas connecté à un abonnement Claude".into()),
+        None if seen => Err(EXPIRED.into()),
+        None => Err("Ni Claude Code ni Claude Desktop ne sont connectés à un abonnement Claude".into()),
     }
 }
 
@@ -283,7 +330,7 @@ fn usage_fetch() -> Result<Value, String> {
         .call();
     let v: Value = match r {
         Ok(r) => r.into_json().map_err(|e| e.to_string())?,
-        Err(ureq::Error::Status(401, _)) => return Err("Connexion de Claude Code expirée : relance Claude Code".into()),
+        Err(ureq::Error::Status(401, _)) => return Err(EXPIRED.into()),
         Err(ureq::Error::Status(429, _)) => return Err("Trop de demandes, nouvel essai dans une minute".into()),
         Err(ureq::Error::Status(c, _)) => return Err(format!("Erreur {c} de l'API Claude")),
         Err(_) => return Err("API Claude injoignable".into()),
