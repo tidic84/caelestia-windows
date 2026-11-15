@@ -358,6 +358,32 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             Behavior on opacity { NumberAnimation { duration: 350 } }
         }
+        // addon Batteries : souris, casque... a droite de l'heure (largeur
+        // comptee dans Ilot.sizeFor)
+        Repeater {
+            model: Ilot.battPill && !mini.lyOnly ? Ilot.periph : []
+            Row {
+                id: pbat
+                required property var modelData
+                readonly property bool low: modelData.level <= 15 && !modelData.charging
+                spacing: 3
+                anchors.verticalCenter: parent.verticalCenter
+                Ms {
+                    name: Ilot.periphIcon(pbat.modelData)
+                    size: 15
+                    color: pbat.low ? Theme.bad : Theme.primary
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Txt {
+                    text: pbat.modelData.level + (pbat.modelData.charging ? " %⚡" : " %")
+                    px: 12
+                    weight: Font.Medium
+                    tnum: true
+                    color: pbat.low ? Theme.bad : Theme.ink
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+        }
         // activite : telechargement Steam, jeu en cours, GPU charge
         Row {
             visible: Watch.actShown && !!Watch.chip && !mini.lyOnly
