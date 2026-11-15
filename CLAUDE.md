@@ -53,6 +53,12 @@ la garder sauvegardée**. Perdue, plus aucun îlot installé ne se met à jour
 seul (il faudrait une nouvelle clé dans le code et une installation à la
 main). Outil : `examples/sign.rs` (`keygen`, `pub`, `sign`).
 
+**Clé DeepL (traducteur, depuis la 0.4.29)** : `build.rs` l'intègre au binaire
+depuis `%USERPROFILE%\.ilot\deepl.key`, **hors du dépôt, ne jamais la
+commiter**. Sans ce fichier, un build compile normalement mais traduit par
+Google (bloqué par sa page anti-robots) : les releases doivent être faites
+sur un poste qui l'a. Après avoir créé le fichier : `cargo clean -p ilot`.
+
 **Seul Tidic publie les versions** (une ou deux par jour au plus) : une
 seule clé, la sienne. Les collaborateurs n'en ont pas besoin pour
 contribuer (commit, PR, `install.ps1`).

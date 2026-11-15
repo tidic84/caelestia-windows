@@ -320,8 +320,17 @@ fn token() -> Result<(String, String), String> {
     }
 }
 
-fn usage_fetch() -> Result<Value, String> {
-    let (tok, plan) = token()?;
+/// Releve rate. `Busy` (429, avec l'attente du Retry-After en s) et `Net`
+/// laissent afficher la derniere valeur connue ; `Auth` (pas connecte,
+/// connexion expiree) reste une erreur.
+enum Fail {
+    Auth(String),
+    Busy(Option<u64>),
+    Net(String),
+}
+
+fn usage_fetch() -> Result<Value, Fail> {
+    let (tok, plan) = token().map_err(Fail::Auth)?;
     let r = crate::http()
         .get("https://api.anthropic.com/api/oauth/usage")
         .set("Authorization", &format!("Bearer {tok}"))
@@ -329,11 +338,13 @@ fn usage_fetch() -> Result<Value, String> {
         .timeout(std::time::Duration::from_secs(10))
         .call();
     let v: Value = match r {
-        Ok(r) => r.into_json().map_err(|e| e.to_string())?,
-        Err(ureq::Error::Status(401, _)) => return Err(EXPIRED.into()),
-        Err(ureq::Error::Status(429, _)) => return Err("Trop de demandes, nouvel essai dans une minute".into()),
-        Err(ureq::Error::Status(c, _)) => return Err(format!("Erreur {c} de l'API Claude")),
-        Err(_) => return Err("API Claude injoignable".into()),
+        Ok(r) => r.into_json().map_err(|e| Fail::Net(e.to_string()))?,
+        Err(ureq::Error::Status(401, _)) => return Err(Fail::Auth(EXPIRED.into())),
+        Err(ureq::Error::Status(429, r)) => {
+            return Err(Fail::Busy(r.header("retry-after").and_then(|s| s.trim().parse().ok())))
+        }
+        Err(ureq::Error::Status(c, _)) => return Err(Fail::Net(format!("Erreur {c} de l'API Claude"))),
+        Err(_) => return Err(Fail::Net("API Claude injoignable".into())),
     };
     // pourcentage (0..100) et remise a zero (ISO 8601), null si absent
     let lim = |k: &str| match v.get(k) {
@@ -411,7 +422,7 @@ fn iso_ms(s: &str) -> Option<u64> {
     u64::try_from(secs).ok().map(|x| x * 1000)
 }
 
-/// Releve toutes les 5 min tant que l'addon « Claude » est active : le
+/// Releve toutes les 10 min tant que l'addon « Claude » est active : le
 /// graphique a un historique meme quand la page reste fermee.
 pub fn watch(app: crate::host::AppHandle) {
     std::thread::spawn(move || {
@@ -420,22 +431,77 @@ pub fn watch(app: crate::host::AppHandle) {
             if crate::settings::addon_on(&app, "cusage") {
                 let _ = usage(None);
             }
-            std::thread::sleep(std::time::Duration::from_secs(300));
+            std::thread::sleep(std::time::Duration::from_secs(600));
         }
     });
 }
 
+/// Apres un 429 : aucune demande avant cet instant, et l'attente suivante
+/// quand l'API ne donne pas de Retry-After (doublee a chaque 429)
+static WAIT: std::sync::Mutex<Option<(std::time::Instant, u64)>> = std::sync::Mutex::new(None);
+
+/// Derniere valeur bonne (sans l'historique), gardee sur disque pour
+/// s'afficher aussi apres un redemarrage
+const LAST: &str = "claude-usage-last";
+
+/// Derniere valeur connue, marquee `stale` : { why: "busy" | "net", retry: ms
+/// (busy), msg (net) }. Rien de connu : l'erreur `none`.
+fn stale(why: Value, none: String) -> Result<Value, String> {
+    let Some(mut v) = crate::store::read::<Value>(LAST).filter(Value::is_object) else {
+        return Err(none);
+    };
+    v["hist"] = crate::store::read::<Value>("claude-usage").unwrap_or_else(|| json!({}));
+    v["stale"] = why;
+    Ok(v)
+}
+
+/// Attente avant le prochain essai, en ms depuis 1970 et en minutes arrondies
+fn retry_at(t: std::time::Instant) -> (u64, u64) {
+    let left = t.saturating_duration_since(std::time::Instant::now());
+    (now_ms() + left.as_millis() as u64, left.as_secs().div_ceil(60).max(1))
+}
+
 /// Limites de l'abonnement Claude (session de 5 h, semaine), comme `/usage`
 /// dans Claude Code. Gardees 1 min (`fresh` : 10 s) pour menager l'API.
+/// Apres un 429, plus aucune demande avant la fin du delai (Retry-After,
+/// sinon 5 min doublees jusqu'a 1 h) : la derniere valeur connue est rendue.
 pub fn usage(fresh: Option<bool>) -> Result<Value, String> {
-    let keep = std::time::Duration::from_secs(if fresh.unwrap_or(false) { 10 } else { 60 });
+    use std::time::{Duration, Instant};
+    let keep = Duration::from_secs(if fresh.unwrap_or(false) { 10 } else { 60 });
     if let Some((at, r)) = USAGE.lock().unwrap().as_ref() {
         if at.elapsed() < keep {
             return r.clone();
         }
     }
-    let r = usage_fetch();
-    *USAGE.lock().unwrap() = Some((std::time::Instant::now(), r.clone()));
+    let busy = |t: Instant| {
+        let (ms, min) = retry_at(t);
+        stale(json!({ "why": "busy", "retry": ms }), format!("Trop de demandes : nouvel essai dans {min} min"))
+    };
+    let wait = *WAIT.lock().unwrap();
+    let r = match wait {
+        Some((t, _)) if Instant::now() < t => busy(t),
+        _ => match usage_fetch() {
+            Ok(v) => {
+                *WAIT.lock().unwrap() = None;
+                let mut last = v.clone();
+                if let Some(o) = last.as_object_mut() {
+                    o.remove("hist");
+                }
+                crate::store::write(LAST, &last);
+                Ok(v)
+            }
+            Err(Fail::Auth(e)) => Err(e),
+            Err(Fail::Busy(after)) => {
+                let backoff = wait.map_or(300, |(_, b)| (b * 2).min(3600));
+                // Retry-After borne (1 min - 1 jour) : jamais de debordement d'Instant
+                let t = Instant::now() + Duration::from_secs(after.map_or(backoff, |a| a.clamp(60, 86_400)));
+                *WAIT.lock().unwrap() = Some((t, backoff));
+                busy(t)
+            }
+            Err(Fail::Net(e)) => stale(json!({ "why": "net", "msg": e.clone() }), e),
+        },
+    };
+    *USAGE.lock().unwrap() = Some((Instant::now(), r.clone()));
     r
 }
 

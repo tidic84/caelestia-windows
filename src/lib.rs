@@ -346,6 +346,7 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "apps_get" => json(apps::apps_get(app.state())),
         "apps_refresh" => json(apps::apps_refresh(app)),
         "app_launch" => json(apps::app_launch(a!("id"))),
+        "app_launch_admin" => json(apps::app_launch_admin(a!("id"))),
         "games_get" => json(games::games_get(app.state())),
         "games_refresh" => json(games::games_refresh(app)),
         "game_launch" => json(games::game_launch(app.state(), a!("id"))),

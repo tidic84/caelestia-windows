@@ -258,6 +258,14 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   interne à Desktop et n'est pas documenté. S'il change (clés sans `acct:`,
   autre chiffrement), l'addon affiche « Ni Claude Code ni Claude Desktop… ».
   Sans `lastKnownAccountUuid`, il accepte tous les comptes en cache.
+- 🟡 Traducteur DeepL : la clé intégrée sert à tous les utilisateurs et
+  s'extrait du zip de release, pour un quota de 500 000 caractères par mois en tout.
+  Les sous-titres en consomment environ 150 000 à 270 000 par heure de parole,
+  même en économie. Après un 456, Google prend le relais, s'il n'est pas bloqué.
+  Pistes : ne traduire que les lignes terminées ; une clé par utilisateur dans
+  les réglages.
+- 🟢 « Lancer en tant qu'administrateur » : un AUMID sans « ! » qui ne peut
+  pas être élevé ne lance rien, sans message.
 
 ## Alerte « partie trouvée » (hors Valorant)
 

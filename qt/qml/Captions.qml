@@ -36,10 +36,13 @@ Window {
         shown = true
         hideTimer.restart()
     }
+    // traduction par DeepL (src/translate.rs, quota mensuel) : seulement la
+    // derniere ligne, toutes les 2 s au plus
+    property bool eco: false
     Timer {
         id: gap
         // une traduction toutes les 0,6 s au plus : le texte change en continu
-        interval: 600
+        interval: w.eco ? 2000 : 600
         onTriggered: {
             w.busy = false
             w.translate()
@@ -49,9 +52,11 @@ Window {
         if (busy || !pending)
             return
         busy = true
-        const text = pending
+        const lines = pending.split("\n").filter(l => l.trim() !== "")
+        const text = eco && lines.length ? lines[lines.length - 1] : pending
         pending = ""
         Api.invoke("translate", { text: text, from: "", to: to }).then(r => {
+            w.eco = r.engine === "deepl"
             // deja en francais : pas de doublon
             if (r.detected === w.to) {
                 w.tr = text

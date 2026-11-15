@@ -65,6 +65,37 @@ du CLI était expiré depuis le 2026-10-24.
 - **Non vérifié** : la page Claude dans l'îlot lui-même, et Desktop installé
   autrement (MSIX ici : les données sont bien dans le vrai `%APPDATA%`).
   Pas de version ni de changelog.
+- **Ensuite : 429 de l'API d'utilisation** (proposé par un collaborateur).
+  `usage()` respecte `Retry-After` (borné de 1 min à 1 jour). Sans cet en-tête,
+  il attend 5 min, puis double à chaque 429, jusqu'à 1 h. Pendant ce délai, aucune
+  demande ne part. La dernière valeur bonne est gardée dans le store
+  `claude-usage-last` et rendue avec `stale: { why: busy|net, retry|msg }` ;
+  une erreur de connexion reste une erreur. Relevés en arrière-plan : toutes les
+  10 min. Page : « mis à jour il y a X min » et une ligne grise au lieu de
+  l'erreur rouge. Vérifié : un 429 simulé (test temporaire, retiré), la
+  compilation, `cargo test`, la relecture (remarques appliquées). La page
+  n'a pas été vue en vrai pendant un 429.
+- **Traducteur « trop de demandes »** : Google renvoie sa page anti-robots
+  (429 « Sorry… ») au client de l'îlot (TLS de Windows), pas à curl. Ce
+  n'est donc pas une question de nombre de demandes. On ne contourne pas ce
+  filtre. Choix de l'utilisateur : DeepL (API Free), clé intégrée au build.
+  - `build.rs` lit `%USERPROFILE%\.ilot\deepl.key` (hors dépôt, comme
+    `release.key`) et passe la clé par `cargo:rustc-env`. Sans ce fichier,
+    le traducteur reste sur Google.
+  - `translate.rs` : DeepL si les deux langues sont connues (sinon Google, par exemple pour le hindi).
+    Chaque moteur a sa propre attente après un 429. Sur 456 (quota) ou 403 (clé),
+    DeepL est mis en pause 1 h et Google prend le relais. `engine` est ajouté
+    à la réponse.
+  - `Captions.qml` : avec DeepL, seulement la dernière ligne, toutes les 2 s au plus.
+  - Vérifié : vrais appels DeepL (fr, en, zh ; hindi vers Google ; même langue
+    sans appel), clé présente dans `ilot_core.dll` et absente des fichiers
+    suivis, relu.
+  - Non vérifié : les sous-titres en vrai.
+- **Lancer en tant qu'administrateur** (page Apps, clic droit d'une appli ou
+  d'un fichier .exe/.lnk/.bat/.cmd déposé) : `app_launch_admin`, verbe
+  « runas » (invite UAC). Masqué pour les applis du Store (« ! » dans
+  l'AUMID), les pages des Paramètres et les éléments `shell:`. Compilé et relu.
+  Pas testé à la main : il faut répondre à l'UAC.
 - Hooks : ils marchent déjà dans l'onglet Code de Desktop, qui lit
   `~/.claude/settings.json`. Le chat de Desktop n'a pas de hooks. Sur le poste,
   les hooks pointent vers `qt\build\ilot.exe` : couper puis remettre l'option
