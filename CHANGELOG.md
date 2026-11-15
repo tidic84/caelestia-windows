@@ -4,6 +4,11 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.28 — 2026-11-15
+
+- **Addon « Claude » avec Claude Desktop** : les limites de ton abonnement s'affichent aussi quand tu n'as que l'application Claude Desktop, sans Claude Code en ligne de commande. L'îlot lit la connexion de Desktop, sans rien changer chez lui. Il ne demande rien à saisir et ne te déconnecte pas.
+- **Nouvel addon « Batteries »** (Réglages › Addons, désactivé par défaut) : la batterie de la souris et du casque sans fil, dans l'accueil sous ton nom et dans la pilule à droite de l'heure. Marche avec les souris Logitech (récepteur Lightspeed / Unifying ou en direct) et le casque EPOS H3PRO. Le pourcentage passe en rouge sous 15 %, ⚡ pendant la charge. « Allumé depuis » passe sous la date, dans le panneau de l'heure.
+
 ## 0.4.27 — 2026-11-05
 
 - **Disposition du clavier dans la barre** : une puce ⌨ **FR** / **EN** remplace l'indicateur de langue de la barre des tâches Windows, que l'îlot masque. Clic : disposition suivante (AZERTY ↔ QWERTY). Clic droit : la liste et un lien vers « Langues et claviers ». La puce n'apparaît que si plusieurs dispositions sont installées ; deux dispositions de même langue s'affichent **AZ** / **QW**.
