@@ -3233,7 +3233,7 @@ Item {
                         TextBtn {
                             icon: "check"
                             text: "Tout activer"
-                            disabled: Ilot.addons.every(a => Ilot.hasTab(a.id))
+                            disabled: Ilot.addons.every(a => Ilot.addonOn(a.id))
                             onClicked: Ilot.setCfg({ addons: Ilot.addons.map(a => a.id) })
                         }
                         TextBtn {
@@ -3268,7 +3268,7 @@ Item {
                                     title: addon.modelData.label
                                     sub: addon.modelData.desc
                                     toggle: true
-                                    checked: Ilot.hasTab(addon.modelData.id)
+                                    checked: Ilot.addonOn(addon.modelData.id)
                                     onToggled: on => Ilot.setAddon(addon.modelData.id, on)
                                 }
                                 // parties de l'addon (Assistant : traduction, Claude) ;
@@ -3283,7 +3283,7 @@ Item {
                                         sub: modelData.sub
                                         toggle: true
                                         checked: on
-                                        disabled: !Ilot.hasTab(addon.modelData.id)
+                                        disabled: !Ilot.addonOn(addon.modelData.id)
                                             || (on && addon.modelData.parts.filter(p => page.cfg[p.key] !== false).length < 2)
                                         key: modelData.key
                                         onToggled: v => page.set({ [modelData.key]: v })

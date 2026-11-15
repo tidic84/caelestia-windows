@@ -89,6 +89,8 @@ pub struct Resources {
     uptime: u64,
     /// tous les disques (C:, D:...), par lettre
     disks: Vec<DiskInfo>,
+    /// batterie de la souris, du casque... (periph.rs, relue chaque minute)
+    periph: Vec<crate::periph::Periph>,
 }
 
 #[derive(Serialize, Clone)]
@@ -159,6 +161,7 @@ pub fn watch(app: AppHandle) {
                 charging: ps.ACLineStatus == 1,
                 uptime: System::uptime(),
                 disks: all,
+                periph: crate::periph::current(),
             };
             // branchement / debranchement du chargeur (portables)
             if !no_batt {

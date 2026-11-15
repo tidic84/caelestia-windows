@@ -59,10 +59,41 @@ Item {
                     weight: Font.Medium
                     elide: Text.ElideRight
                 }
-                Txt {
-                    text: Ilot.sys ? "Allumé depuis " + Ilot.fmtUptime(Ilot.sys.uptime) : ""
-                    px: 12
-                    color: Theme.inkVariant
+                // addon Batteries : souris, casque... (periph.rs) ; « Allume
+                // depuis » est sous la date, dans le panneau de l'heure
+                Row {
+                    visible: Ilot.battHome
+                    spacing: 10
+                    Repeater {
+                        model: Ilot.battHome ? Ilot.periph : []
+                        Btn {
+                            id: pb
+                            required property var modelData
+                            readonly property bool low: modelData.level <= 15 && !modelData.charging
+                            width: pbRow.implicitWidth
+                            height: 16
+                            cursor: Qt.ArrowCursor
+                            tip: modelData.name + " : " + modelData.level + " %" + (modelData.charging ? " (en charge)" : "")
+                            Row {
+                                id: pbRow
+                                spacing: 3
+                                anchors.verticalCenter: parent.verticalCenter
+                                Ms {
+                                    name: Ilot.periphIcon(pb.modelData)
+                                    size: 14
+                                    color: pb.low ? Theme.bad : Theme.inkVariant
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Txt {
+                                    text: pb.modelData.level + (pb.modelData.charging ? " %⚡" : " %")
+                                    px: 12
+                                    tnum: true
+                                    color: pb.low ? Theme.bad : Theme.inkVariant
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -157,14 +188,30 @@ Item {
                     color: Theme.alpha(Theme.inkPrimaryContainer, 0.7)
                 }
             }
-            Txt {
-                width: clockCard.width - 28
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.Wrap
-                text: Ilot.capitalize(Ilot.fmt(Ilot.now, "dddd d MMMM"))
-                px: 12
-                opacity: 0.85
-                color: Theme.inkPrimaryContainer
+            Column {
+                spacing: 4
+                anchors.horizontalCenter: parent.horizontalCenter
+                Txt {
+                    width: clockCard.width - 28
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    text: Ilot.capitalize(Ilot.fmt(Ilot.now, "dddd d MMMM"))
+                    px: 12
+                    opacity: 0.85
+                    color: Theme.inkPrimaryContainer
+                }
+                // depuis le dernier demarrage (avant dans la carte utilisateur)
+                Txt {
+                    width: clockCard.width - 28
+                    visible: !!Ilot.sys
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.Wrap
+                    // colonne etroite : la duree sur sa propre ligne, jamais coupee
+                    text: Ilot.sys ? "Allumé depuis\n" + Ilot.fmtUptime(Ilot.sys.uptime) : ""
+                    px: 11
+                    opacity: 0.65
+                    color: Theme.inkPrimaryContainer
+                }
             }
         }
     }
