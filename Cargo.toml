@@ -39,6 +39,8 @@ cbc = { version = "0.1", features = ["alloc"] }
 aes-gcm = "0.10"
 rand = "0.8"
 mdns-sd = "0.13"
+# batterie des peripheriques sans fil (periph.rs), backend Windows en pur Rust
+hidapi = { version = "2.6", default-features = false, features = ["windows-native"] }
 symphonia = { version = "0.5", default-features = false, features = ["mp3", "aac", "isomp4", "flac", "vorbis", "ogg", "wav", "pcm", "adpcm"] }
 windows = { version = "0.61", features = [
   "Devices_Bluetooth",

@@ -30,6 +30,7 @@ mod net;
 mod notif;
 mod pc;
 mod pdh;
+mod periph;
 mod pets;
 mod prefs;
 mod privacy;
@@ -504,6 +505,7 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
     }
     media::watch(app);
     system::watch(app);
+    periph::watch(app);
     system::watch_clipboard(app);
     we::watch(app);
     audio::watch_volume(app);

@@ -243,16 +243,32 @@ Item {
                   { key: "assist_claude", label: "Claude", sub: "Questions envoyées à l'application Claude" }] },
         { id: "cusage", icon: "auto_awesome", label: "Claude", page: "ClaudeUsagePage", tip: "Utilisation de Claude",
           desc: "Limites de ton abonnement Claude : session de 5 h et semaine, avec leur remise à zéro (connexion de Claude Code)" },
+        // sans onglet (noTab) : seulement l'accueil et la pilule (periph.rs)
+        { id: "batt", icon: "battery_full", label: "Batteries", noTab: true,
+          desc: "Batterie de la souris et du casque sans fil (Logitech, EPOS H3PRO), relue chaque minute",
+          parts: [{ key: "batt_home", label: "Dans l'accueil", sub: "Sous ton nom, dans la carte du haut" },
+                  { key: "batt_pill", label: "Dans la pilule", sub: "À droite de l'heure, quand l'îlot est replié" }] },
         { id: "walls", icon: "wallpaper", label: "Fonds", page: "WallsPage",
           desc: "Vos fonds d'écran et ceux de Wallpaper Engine ; choisir un fond recalcule les couleurs" },
         { id: "settings", icon: "settings", label: "", tip: "Réglages", page: "SettingsPage", core: true }
     ]
     readonly property var addons: catalog.filter(t => !t.core)
     // onglets affiches : essentiels + addons actives
-    readonly property var tabItems: catalog.filter(t => t.core || (cfg.addons || []).indexOf(t.id) >= 0)
+    readonly property var tabItems: catalog.filter(t => !t.noTab && (t.core || (cfg.addons || []).indexOf(t.id) >= 0))
     readonly property var tabs: tabItems.map(t => t.id)
     function hasTab(id) {
         return tabs.indexOf(id) >= 0
+    }
+    // addon active, avec ou sans onglet (Batteries n'en a pas)
+    function addonOn(id) {
+        return (cfg.addons || []).indexOf(id) >= 0
+    }
+    // addon Batteries : [{ kind, name, level, charging }] (champ periph de « sys »)
+    readonly property var periph: addonOn("batt") && sys && sys.periph ? sys.periph : []
+    readonly property bool battHome: periph.length > 0 && cfg.batt_home !== false
+    readonly property bool battPill: periph.length > 0 && cfg.batt_pill !== false
+    function periphIcon(p) {
+        return p.kind === "mouse" ? "mouse" : p.kind === "headset" ? "headphones" : "bolt"
     }
     function setAddon(id, on) {
         const list = (cfg.addons || []).filter(a => a !== id)
@@ -388,6 +404,9 @@ Item {
         // compagnon, activite (telechargement, jeu), Discord, voyant, extinction
         w += (Watch.petShown ? 24 : 0) + (Watch.actShown ? 72 : 0) + (Watch.dcShown ? 26 : 0)
             + (Watch.privShown ? 18 : 0) + (Watch.offShown ? 62 : 0) + (Watch.ccWide ? (Watch.ccText.length > 4 ? 90 : 80) : 0)
+        // addon Batteries : icone + « 59 % » par appareil (Pill.qml)
+        if (battPill)
+            w += periph.reduce((n, p) => n + (p.charging ? 62 : 52), 0)
         return { w: w, h: 30 }
     }
     // rayon des coins bas
