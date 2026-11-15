@@ -254,6 +254,10 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   `idle_prompt` (≈ 1 min). Sans elle, elle s'arrête au bout de 3 h.
 - 🟢 `ilot.exe --claude` lancé à la main depuis mintty (Git Bash) attend
   stdin. Ce n'est pas un problème avec Claude Code, qui ferme stdin.
+- 🟢 Jeton de Claude Desktop (`claude.rs`, `desktop()`) : le format est
+  interne à Desktop et n'est pas documenté. S'il change (clés sans `acct:`,
+  autre chiffrement), l'addon affiche « Ni Claude Code ni Claude Desktop… ».
+  Sans `lastKnownAccountUuid`, il accepte tous les comptes en cache.
 
 ## Alerte « partie trouvée » (hors Valorant)
 

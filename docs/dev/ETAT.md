@@ -38,6 +38,38 @@ reprendre.
 
 ## Journal
 
+### 2026-11-15 : addon « Claude » avec Claude Desktop seul
+
+Problème : l'addon ne lisait que `~/.claude/.credentials.json` (Claude Code
+en ligne de commande). Claude Desktop n'écrit pas ce fichier : il donne le
+jeton à ses sessions Code directement (`CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH`).
+Sans le CLI, l'addon affichait « pas connecté ». Sur le poste, le fichier
+du CLI était expiré depuis le 2026-10-24.
+
+- **`src/claude.rs`** : `desktop()` lit les jetons de Desktop dans
+  `%APPDATA%\Claude\config.json` (`oauth:tokenCacheV2`, puis
+  `oauth:tokenCache`). Ils sont chiffrés par Electron (« v10 » + nonce + AES-256-GCM),
+  avec la clé `os_crypt.encrypted_key` de `Local State` (« DPAPI » + DPAPI).
+  Il ne garde que les jetons du compte `lastKnownAccountUuid` qui ont le
+  scope `user:profile` : les autres reçoivent 403 de `/api/oauth/usage`.
+  Lecture seule, jamais de rafraîchissement. Ordre : CLI Windows → Desktop
+  → CLI WSL. `token()` réécrit autour de `cli()` / `keep()`, même logique.
+  Messages : « Connexion expirée : relance Claude Code ou Claude Desktop ».
+- **`src/mail.rs`** : `unprotect_raw()` (DPAPI sur octets), `unprotect()`
+  l'utilise.
+- **`Ilot.qml`** : description de l'addon (« … ou de Claude Desktop »).
+- **Vérifié** : déchiffrement et API testés sur le poste (PowerShell puis
+  test Rust temporaire, retiré) : jeton Desktop trouvé, plan Pro, HTTP 200.
+  `cargo clippy` (rien de nouveau), `cargo test` OK, `qt\build.cmd` OK.
+  Relu par un agent `relecteur` : rien à corriger.
+- **Non vérifié** : la page Claude dans l'îlot lui-même, et Desktop installé
+  autrement (MSIX ici : les données sont bien dans le vrai `%APPDATA%`).
+  Pas de version ni de changelog.
+- Hooks : ils marchent déjà dans l'onglet Code de Desktop, qui lit
+  `~/.claude/settings.json`. Le chat de Desktop n'a pas de hooks. Sur le poste,
+  les hooks pointent vers `qt\build\ilot.exe` : couper puis remettre l'option
+  dans l'appli installée.
+
 ### 2026-11-04 : renommer les applis (nom affiché, mots-clés)
 
 Maquette validée par l'utilisateur (sans la pastille « modifiée ») :

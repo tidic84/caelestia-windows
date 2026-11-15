@@ -96,12 +96,17 @@ pub(crate) fn protect(plain: &str) -> Option<String> {
 
 pub(crate) fn unprotect(enc: &str) -> Option<String> {
     let data = base64::engine::general_purpose::STANDARD.decode(enc).ok()?;
+    String::from_utf8(unprotect_raw(&data)?).ok()
+}
+
+/// DPAPI (compte courant) sur des octets bruts : aussi la cle de Claude Desktop (claude.rs)
+pub(crate) fn unprotect_raw(data: &[u8]) -> Option<Vec<u8>> {
     let mut out = CRYPT_INTEGER_BLOB::default();
     unsafe {
-        CryptUnprotectData(&blob(&data), None, None, None, None, CRYPTPROTECT_UI_FORBIDDEN, &mut out)
+        CryptUnprotectData(&blob(data), None, None, None, None, CRYPTPROTECT_UI_FORBIDDEN, &mut out)
             .ok()?;
     }
-    String::from_utf8(take(out)).ok()
+    Some(take(out))
 }
 
 // ------------------------------------------------------------------ comptes

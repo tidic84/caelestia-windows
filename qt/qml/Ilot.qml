@@ -242,7 +242,7 @@ Item {
           parts: [{ key: "assist_tr", label: "Traduction", sub: "Traduction de textes et sous-titres en direct" },
                   { key: "assist_claude", label: "Claude", sub: "Questions envoyées à l'application Claude" }] },
         { id: "cusage", icon: "auto_awesome", label: "Claude", page: "ClaudeUsagePage", tip: "Utilisation de Claude",
-          desc: "Limites de ton abonnement Claude : session de 5 h et semaine, avec leur remise à zéro (connexion de Claude Code)" },
+          desc: "Limites de ton abonnement Claude : session de 5 h et semaine, avec leur remise à zéro (connexion de Claude Code ou de Claude Desktop)" },
         // sans onglet (noTab) : seulement l'accueil et la pilule (periph.rs)
         { id: "batt", icon: "battery_full", label: "Batteries", noTab: true,
           desc: "Batterie de la souris et du casque sans fil (Logitech, EPOS H3PRO), relue chaque minute",
