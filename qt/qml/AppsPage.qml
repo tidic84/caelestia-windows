@@ -1235,6 +1235,18 @@ Item {
             { icon: "folder_open", label: "Ouvrir l’emplacement du fichier", run: () => page.openFolder(() =>
                 a.file ? Api.invoke("folder_open", { path: page.parentDir(a.file) }) : Api.invoke("app_folder", { id: a.id, name: a.name })) }
         ]
+        // en administrateur (invite UAC) : pas pour les applis du Store (« ! » dans l'AUMID),
+        // les pages des Parametres ni les elements du Panneau de configuration
+        const admin = a.file ? /\.(exe|lnk|bat|cmd)$/i.test(a.file)
+            : !a.id.includes("!") && !a.id.startsWith("ms-settings:") && !a.id.startsWith("shell:")
+        if (admin)
+            entries.splice(1, 0, { icon: "shield", label: "Lancer en tant qu’administrateur", run: () => {
+                ctx.hide()
+                Ilot.noteLaunch(a.id, page.q.trim())
+                Api.invoke("app_launch_admin", { id: a.file || a.id })
+                search.text = ""
+                Ilot.setMode("collapsed")
+            } })
         if (cur && cur.apps.includes(a.id)) {
             entries.push({ icon: "remove_circle_outline", label: "Retirer de « " + cur.name + " »", run: () => {
                 cur.apps = cur.apps.filter(x => x !== a.id)

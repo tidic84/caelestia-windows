@@ -367,3 +367,37 @@ pub fn app_launch(id: String) {
         .creation_flags(CREATE_NO_WINDOW)
         .spawn();
 }
+
+/// « Lancer en tant qu'administrateur » (clic droit de la page Apps) : verbe
+/// « runas », comme le menu Demarrer, donc avec l'invite UAC. `id` : AUMID
+/// d'une appli (via shell:AppsFolder) ou chemin d'un fichier depose (.exe,
+/// .lnk...). Les applis du Store n'ont pas ce verbe : rien ne se lance.
+pub fn app_launch_admin(id: String) {
+    // chemin de fichier (C:\...) ou outil de System32 : lpFile ; sinon l'element de AppsFolder
+    let file = id.get(1..3) == Some(":\\") || id.starts_with(r"\\");
+    std::thread::spawn(move || {
+        crate::com_init_sta();
+        unsafe {
+            let mut pidl = std::ptr::null_mut();
+            if !file && SHParseDisplayName(&HSTRING::from(format!("shell:AppsFolder\\{id}")), None, &mut pidl, 0, None).is_err() {
+                return;
+            }
+            let path = HSTRING::from(id.as_str());
+            let mut info = SHELLEXECUTEINFOW {
+                cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+                // NOASYNC : le thread (et son STA) s'arrete juste apres ; attend la reponse a l'UAC
+                fMask: if file { SEE_MASK_NOASYNC } else { SEE_MASK_INVOKEIDLIST | SEE_MASK_NOASYNC },
+                lpVerb: w!("runas"),
+                lpFile: if file { PCWSTR(path.as_ptr()) } else { PCWSTR::null() },
+                lpIDList: pidl as _,
+                nShow: SW_SHOWNORMAL.0,
+                ..Default::default()
+            };
+            // UAC refusee (ERROR_CANCELLED) : rien a faire
+            let _ = ShellExecuteExW(&mut info);
+            if !pidl.is_null() {
+                CoTaskMemFree(Some(pidl as _));
+            }
+        }
+    });
+}

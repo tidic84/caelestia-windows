@@ -14,6 +14,7 @@ Item {
 
     function load(fresh) {
         busy = true
+        now = Date.now()
         Api.invoke("cc_usage", { fresh: fresh }).then(v => {
             page.usage = v
             page.err = ""
@@ -23,6 +24,21 @@ Item {
             page.busy = false
         })
     }
+    function hm(ms) {
+        const d = new Date(ms)
+        return Ilot.pad(d.getHours()) + ":" + Ilot.pad(d.getMinutes())
+    }
+    // derniere valeur connue (usage.stale, apres un 429 ou sans reseau)
+    function ago(ms) {
+        const min = Math.max(0, Math.round((page.now - ms) / 60000))
+        return min < 1 ? "mis à jour à l'instant"
+            : min < 60 ? "mis à jour il y a " + min + " min"
+            : min < 2880 ? "mis à jour il y a " + Math.floor(min / 60) + " h"
+            : "mis à jour il y a " + Math.floor(min / 1440) + " j"
+    }
+    readonly property string staleText: !usage || !usage.stale ? ""
+        : usage.stale.why === "busy" ? "L'API Claude limite les demandes : dernière valeur connue, nouvel essai vers " + hm(usage.stale.retry) + "."
+        : (usage.stale.msg || "API Claude injoignable") + " : dernière valeur connue."
     Component.onCompleted: if (shown) load(false)
     onShownChanged: if (shown) load(false)
     Timer {
@@ -130,7 +146,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: !!page.usage
                 text: page.usage ? (page.usage.plan ? "Abonnement " + page.usage.plan.charAt(0).toUpperCase() + page.usage.plan.slice(1) + " · " : "")
-                    + "relevé à " + Ilot.pad(new Date(page.usage.at).getHours()) + ":" + Ilot.pad(new Date(page.usage.at).getMinutes()) : ""
+                    + (page.usage.stale ? page.ago(page.usage.at) : "relevé à " + page.hm(page.usage.at)) : ""
                 px: 12
                 color: Theme.inkVariant
             }
@@ -351,7 +367,7 @@ Item {
                 }
                 Txt {
                     width: parent.width
-                    text: "L'historique se remplit au fil des relevés (toutes les 5 min tant que l'addon est activé)."
+                    text: "L'historique se remplit au fil des relevés (toutes les 10 min tant que l'addon est activé)."
                     px: 11.5
                     color: Theme.inkVariant
                     wrapMode: Text.Wrap
@@ -365,6 +381,14 @@ Item {
             text: page.err
             px: 12
             color: Theme.error
+            wrapMode: Text.Wrap
+        }
+        Txt {
+            visible: page.staleText !== "" && page.err === ""
+            width: parent.width
+            text: page.staleText
+            px: 12
+            color: Theme.inkVariant
             wrapMode: Text.Wrap
         }
 

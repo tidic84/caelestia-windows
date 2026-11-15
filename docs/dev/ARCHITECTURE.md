@@ -49,6 +49,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ## Racine
 
 ```text
+├── build.rs      Intègre la clé DeepL (%USERPROFILE%\.ilot\deepl.key, hors dépôt) au binaire
 ├── Cargo.toml / Cargo.lock  Crate "ilot" : lib ilot_core en cdylib (windows, serde, ureq, rusqlite, image, symphonia, prost, p256…)
 ├── install.ps1     Compile (qt\build.cmd), copie dans %LOCALAPPDATA%\Programs\Ilot (robocopy /MIR), raccourci Démarrage, lance
 ├── uninstall.ps1   Arrête ilot.exe, supprime le raccourci et le dossier installé (garde %LOCALAPPDATA%\Ilot et la clé Run)
@@ -102,7 +103,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── soundboard.rs Soundboard vers câble virtuel ├── decode.rs  Décodage audio (symphonia)
 ├── captions.rs   Sous-titres (LiveCaptions via UI Automation)
 ├── claude.rs     Hooks Claude Code dans ~/.claude/settings.json, Windows et WSL (installer, retirer, état) ; limites de l'abonnement (addon Claude)
-├── translate.rs  Traduction Google « gtx »
+├── translate.rs  Traduction : DeepL si la clé est intégrée (build.rs), sinon Google « gtx »
 ├── mail.rs       IMAP (mots de passe DPAPI)    ├── google.rs  OAuth 2 Gmail (PKCE)
 ├── update.rs     Mises à jour GitHub Releases (toutes les 6 h), signature exigée (SIGN_KEY)
 └── quickshare/   Quick Share (d'après NearDrop)
