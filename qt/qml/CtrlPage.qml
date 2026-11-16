@@ -51,13 +51,33 @@ Item {
     }
     function enter() {
         Api.invoke("net_get").then(n => { Ilot.net = n })
+        // l'un apres l'autre : un ecran DDC/CI refuse deux requetes rapprochees
         Api.invoke("brightness_get").then(b => {
             page.bright = b
-            if (b)
+            if (b && !page.brightMulti)
                 brightSlider.value = Math.round(b.level * 100)
-        })
+            page.loadBrightList()
+        }, () => page.loadBrightList())
         refreshOut()
         mixerView.refresh()
+    }
+    function loadBrightList() {
+        Api.invoke("brightness_list").then(l => {
+            const ok = (l || []).filter(s => s.level !== null && s.level !== undefined)
+            page.brightBase = null
+            if (ok.length < 2) {
+                page.brightScreens = []
+                if (page.bright)
+                    brightSlider.value = Math.round(page.bright.level * 100)
+                return
+            }
+            const saved = Ilot.ui.brightTarget
+            const here = ok.find(s => s.here)
+            page.brightTarget = saved === "all" || ok.some(s => s.id === saved) ? saved
+                : (here ? here.id : ok[0].id)
+            page.brightScreens = ok
+            brightSlider.value = page.brightValue()
+        })
     }
 
     // ------------------------------------------------- sortie, melangeur
@@ -80,21 +100,68 @@ Item {
     // ------------------------------------------------------ luminosite
     property var bright: null
     property bool brightBusy: false
+    // [{ screen?, level }] : screen absent = ecran de l'ilot
     property var brightPending: null
+    // plusieurs ecrans reglables : pastilles 1 · 2 · tous (sinon [])
+    property var brightScreens: []
+    property string brightTarget: ""
+    readonly property bool brightMulti: brightScreens.length >= 2
+    readonly property bool brightShown: !!bright || brightMulti
+    function brightValue() {
+        const l = brightScreens
+        if (brightTarget === "all")
+            return Math.round(l.reduce((a, s) => a + s.level, 0) / l.length * 100)
+        const s = l.find(x => x.id === brightTarget)
+        return s ? Math.round(s.level * 100) : 0
+    }
+    // « tous » : niveaux au debut du reglage, pour garder l'ecart meme apres
+    // une butee (0 ou 100) ; remis a zero a chaque changement de cible
+    property var brightBase: null
+    function pickBright(id) {
+        brightBase = null
+        brightTarget = id
+        Ilot.saveUi({ brightTarget: id })
+        brightSlider.value = brightValue()
+    }
+    function moveBright(v) {
+        if (!brightMulti) {
+            brightPending = [{ level: v / 100 }]
+        } else if (brightTarget === "all") {
+            // meme ecart ajoute a chaque ecran : garde leur difference
+            if (!brightBase)
+                brightBase = { mean: brightValue() / 100, levels: brightScreens.map(s => s.level) }
+            const d = v / 100 - brightBase.mean
+            brightScreens.forEach((s, i) => { s.level = Math.max(0, Math.min(1, brightBase.levels[i] + d)) })
+            brightPending = brightScreens.map(s => ({ screen: s.id, level: s.level }))
+        } else {
+            const s = brightScreens.find(x => x.id === brightTarget)
+            if (!s)
+                return
+            s.level = v / 100
+            brightBase = null
+            brightPending = [{ screen: s.id, level: s.level }]
+        }
+        pushBright()
+    }
     // DDC/CI est lent : on n'envoie que la derniere valeur demandee
     function pushBright() {
         if (brightBusy || brightPending === null)
             return
         brightBusy = true
-        const v = brightPending
+        const jobs = brightPending
         brightPending = null
-        Api.invoke("brightness_set", { level: v }).then(() => {
-            page.brightBusy = false
-            page.pushBright()
-        }, () => {
-            page.brightBusy = false
-            page.pushBright()
-        })
+        const next = i => {
+            if (i >= jobs.length) {
+                page.brightBusy = false
+                page.pushBright()
+                return
+            }
+            const a = { level: jobs[i].level }
+            if (jobs[i].screen)
+                a.screen = jobs[i].screen
+            Api.invoke("brightness_set", a).then(() => next(i + 1), () => next(i + 1))
+        }
+        next(0)
     }
 
     // ----------------------------------------------------------- Wi-Fi
@@ -317,25 +384,73 @@ Item {
 
             // luminosite (ecran compatible DDC/CI ou portable)
             Card {
-                visible: !!page.bright
+                visible: page.brightShown
                 width: parent.width
                 height: 40
                 radius: height / 2
                 Ms {
+                    visible: !page.brightMulti
                     x: 16
                     anchors.verticalCenter: parent.verticalCenter
                     name: "brightness_6"
                     color: Theme.inkVariant
                 }
+                // plusieurs ecrans : choix de l'ecran regle (retenu dans ui.json)
+                Rectangle {
+                    id: brightChips
+                    visible: page.brightMulti
+                    x: 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: chipRow.width + 4
+                    height: 32
+                    radius: height / 2
+                    color: Theme.surfaceHigh
+                    Row {
+                        id: chipRow
+                        x: 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+                        Repeater {
+                            model: page.brightMulti ? page.brightScreens.map(s => ({
+                                id: s.id, label: String(s.num),
+                                tip: s.name + (s.here ? " · îlot ici" : "")
+                            })).concat([{ id: "all", label: "", tip: "Tous les écrans (garde l'écart)" }]) : []
+                            Btn {
+                                id: chip
+                                required property var modelData
+                                readonly property bool on: modelData.id === page.brightTarget
+                                width: 28
+                                height: 28
+                                radius: height / 2
+                                color: on ? Theme.primary : hovered ? Theme.surfaceHighest : "transparent"
+                                Behavior on color { ColorAnimation { duration: 200 } }
+                                tip: modelData.tip
+                                onClicked: page.pickBright(modelData.id)
+                                Txt {
+                                    visible: chip.modelData.label !== ""
+                                    anchors.centerIn: parent
+                                    text: chip.modelData.label
+                                    px: 12
+                                    weight: Font.DemiBold
+                                    color: chip.on ? Theme.inkPrimary : Theme.inkVariant
+                                }
+                                Ms {
+                                    visible: chip.modelData.label === ""
+                                    anchors.centerIn: parent
+                                    name: "select_all"
+                                    size: 16
+                                    color: chip.on ? Theme.inkPrimary : Theme.inkVariant
+                                }
+                            }
+                        }
+                    }
+                }
                 M3Slider {
                     id: brightSlider
-                    x: 16 + 20 + 12
+                    x: page.brightMulti ? brightChips.x + brightChips.width + 10 : 16 + 20 + 12
                     width: parent.width - x - 12 - 28 - 18
                     anchors.verticalCenter: parent.verticalCenter
-                    onMoved: v => {
-                        page.brightPending = v / 100
-                        page.pushBright()
-                    }
+                    onMoved: v => page.moveBright(v)
                 }
                 Txt {
                     anchors.right: parent.right
@@ -353,7 +468,7 @@ Item {
             // sortie audio et melangeur
             Card {
                 width: parent.width
-                height: parent.height - tiles.height - 10 - (page.bright ? 50 : 0)
+                height: parent.height - tiles.height - 10 - (page.brightShown ? 50 : 0)
                 Btn {
                     id: outBtn
                     x: 8

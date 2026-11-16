@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Luminosité multi-écran</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,1,0">
+<style>
+:root{
+  --primary:#cfbdfe; --inkPrimary:#36265d; --primaryC:#4d3d75; --inkPrimaryC:#e9ddff;
+  --secC:#4a4458; --inkSecC:#e8def8;
+  --surface:#141218; --surfaceLow:#1d1b20; --surfaceC:#211f26; --surfaceHigh:#2b2930; --surfaceHighest:#36343b;
+  --ink:#e6e0e9; --inkVar:#cac4d0; --outline:#938f99; --outlineVar:#49454f;
+  --emph:cubic-bezier(.05,.7,.1,1);
+}
+*{box-sizing:border-box}
+body{margin:0;background:#0b0a0d;color:var(--ink);font:13px Rubik,sans-serif;padding:20px 12px 48px}
+h1{font-weight:500;font-size:20px;margin:0 0 6px}
+.intro{color:var(--inkVar);max-width:1000px;line-height:1.5;margin:0 0 20px;font-size:12.5px}
+.intro b{color:var(--ink);font-weight:500}
+.grid{display:flex;flex-wrap:wrap;gap:28px 16px;align-items:flex-start}
+.opt{width:494px}
+.opt h2{font-size:14px;font-weight:500;margin:0 0 3px;display:flex;gap:8px;align-items:center}
+.tag{font-size:11px;background:var(--primaryC);color:var(--inkPrimaryC);padding:2px 8px;border-radius:99px;font-weight:400}
+.opt p{color:var(--inkVar);margin:0 0 8px;line-height:1.45;font-size:12px;min-height:52px}
+.opt p.cons{min-height:0;margin:8px 0 0;color:var(--outline)}
+.island{background:var(--surface);border-radius:28px;padding:12px;width:494px}
+.page{height:420px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+.ms{font-family:"Material Symbols Rounded";font-size:20px;line-height:1;user-select:none;font-weight:normal;font-style:normal}
+
+/* tuiles (comme CtrlPage) */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex:none}
+.tile{height:52px;border-radius:20px;background:var(--surfaceC);display:flex;align-items:center;gap:8px;padding:0 10px;overflow:hidden}
+.tile.on{background:var(--primary);color:var(--inkPrimary)}
+.tile .ms{font-size:22px}
+.tile div{min-width:0}
+.tile b{display:block;font-weight:500;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile small{display:block;font-size:11px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* carte luminosite */
+.card{background:var(--surfaceC);border-radius:20px}
+.bright{height:40px;border-radius:20px;display:flex;align-items:center;padding:0 0 0 16px;gap:12px;flex:none;position:relative}
+.bright>.ms{color:var(--inkVar)}
+.bright .v{width:28px;text-align:right;color:var(--inkVar);font-variant-numeric:tabular-nums;font-size:12px;flex:none}
+.bright .more{width:34px;height:40px;display:grid;place-items:center;border-left:1px solid #e6e0e92e;color:var(--ink);cursor:pointer;border-radius:0 20px 20px 0;flex:none;transition:background .2s}
+.bright .more:hover{background:#e6e0e914}
+.bright .more .ms{transition:transform .3s var(--emph)}
+
+/* curseur M3 */
+.sl{position:relative;flex:1;height:24px;cursor:pointer;touch-action:none;min-width:40px}
+.sl .tr{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:12px;border-radius:99px;background:var(--surfaceHighest);overflow:hidden}
+.sl .fi{height:100%;background:var(--primary);border-radius:99px 0 0 99px}
+.sl .th{position:absolute;top:50%;transform:translate(-50%,-50%);width:10px;height:26px;display:flex;justify-content:center;align-items:center;background:var(--bg,var(--surfaceC))}
+.sl .th i{display:block;width:4px;height:20px;border-radius:2px;background:var(--primary)}
+.sl.off{pointer-events:none}.sl.off .fi,.sl.off .th i{background:var(--outline)}
+
+/* carte audio (simplifiee) */
+.audio{flex:1;min-height:0;padding:8px;display:flex;flex-direction:column;gap:6px;transition:flex .3s}
+.out{height:38px;border-radius:14px;background:var(--surfaceHigh);display:flex;align-items:center;gap:10px;padding:0 12px;flex:none}
+.out .ms{color:var(--inkVar);font-size:19px}
+.out b{font-weight:500;flex:1}
+.mix{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:2px}
+.app{display:flex;align-items:center;gap:8px;height:34px;padding:0 6px;flex:none}
+.app .b{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:600;color:#fff;flex:none}
+.app .n{width:110px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app .sl{--bg:var(--surfaceC)}
+
+/* ligne d'ecran */
+.scr{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px 0 10px}
+.badge{width:26px;height:26px;border-radius:8px;background:var(--surfaceHigh);display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--inkVar);flex:none;position:relative}
+.badge.here{background:var(--primaryC);color:var(--inkPrimaryC)}
+.scr .nm{width:122px;min-width:0;flex:none;line-height:1.15}
+.scr .nm b{display:block;font-weight:500;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scr .nm small{display:block;font-size:10.5px;color:var(--outline);white-space:nowrap}
+.scr .v{width:28px;text-align:right;color:var(--inkVar);font-variant-numeric:tabular-nums;font-size:12px;flex:none}
+.scr.dim .nm b{color:var(--outline)}
+
+/* interrupteur */
+.sw{width:40px;height:24px;border-radius:12px;background:var(--surfaceHighest);border:2px solid var(--outline);position:relative;cursor:pointer;flex:none;transition:.2s}
+.sw i{position:absolute;top:50%;left:5px;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--outline);transition:.25s var(--emph)}
+.sw.on{background:var(--primary);border-color:var(--primary)}
+.sw.on i{left:20px;width:16px;height:16px;background:var(--inkPrimary)}
+.link{display:flex;align-items:center;gap:10px;height:38px;padding:0 14px 0 10px;color:var(--inkVar);font-size:12px}
+.link .ms{width:26px;text-align:center;font-size:18px;flex:none}
+.link span:not(.ms){flex:1}
+
+/* A : depliable */
+.A .bright{transition:height .3s var(--emph),border-radius .3s;height:40px;flex-direction:column;align-items:stretch;padding:0;overflow:hidden}
+.A .bright .row{display:flex;align-items:center;gap:12px;height:40px;padding-left:16px;flex:none}
+.A .bright .row>.ms{color:var(--inkVar)}
+.A .bright.open{height:170px}
+.A .bright.open .more .ms{transform:rotate(180deg)}
+.A .exp{border-top:1px solid var(--outlineVar);margin:0 8px;padding-top:2px}
+
+/* B : feuille */
+.sheet{position:absolute;inset:0;background:var(--surface);display:flex;flex-direction:column;gap:8px;transform:translateY(16px);opacity:0;pointer-events:none;transition:.3s var(--emph)}
+.sheet.on{transform:none;opacity:1;pointer-events:auto}
+.shead{display:flex;align-items:center;gap:6px;height:36px}
+.ib{width:36px;height:36px;border-radius:18px;display:grid;place-items:center;cursor:pointer;color:var(--inkVar)}
+.ib:hover{background:var(--surfaceHigh)}
+.shead b{font-weight:500;font-size:15px;flex:1}
+.layout{height:132px;border-radius:20px;background:var(--surfaceC);position:relative;flex:none}
+.mon{position:absolute;border-radius:8px;background:var(--surfaceHigh);border:2px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;transition:.2s;overflow:hidden}
+.mon:hover{background:var(--surfaceHighest)}
+.mon.sel{border-color:var(--primary)}
+.mon .glow{position:absolute;inset:0;background:var(--primary);pointer-events:none;transition:opacity .1s}
+.mon b{position:relative;font-size:16px;font-weight:600}
+.mon small{position:relative;font-size:10.5px;color:var(--inkVar)}
+.mon .pin{position:absolute;top:5px;right:6px;font-size:14px;color:var(--primary)}
+.slist{display:flex;flex-direction:column;gap:4px}
+.slist .scr{background:var(--surfaceC);border-radius:20px}
+.slist .scr.sel{box-shadow:inset 0 0 0 2px var(--primaryC)}
+.note{font-size:11px;color:var(--outline);padding:0 12px;line-height:1.4}
+
+/* C : pastilles de choix */
+.chips{display:flex;gap:2px;background:var(--surfaceHigh);border-radius:14px;padding:2px;flex:none}
+.chip{height:28px;min-width:28px;padding:0 7px;border-radius:12px;display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--inkVar);cursor:pointer;transition:.2s}
+.chip:hover{background:var(--surfaceHighest)}
+.chip.on{background:var(--primary);color:var(--inkPrimary)}
+.chip .ms{font-size:16px}
+.C .bright{padding-left:6px}
+
+/* D : deux demi-curseurs */
+.D .bright{padding:0 14px 0 8px;gap:8px}
+.half{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+.D .sep{width:1px;height:22px;background:var(--outlineVar)}
+.D .badge{width:24px;height:24px}
+
+.tip{position:absolute;background:var(--surfaceHighest);color:var(--ink);font-size:11px;padding:4px 8px;border-radius:8px;white-space:nowrap;pointer-events:none;opacity:0;transition:.15s;top:-28px;left:50%;transform:translateX(-50%)}
+.chip:hover .tip,.badge:hover .tip{opacity:1}
+</style>
+</head>
+<body>
+<h1>Luminosité avec deux écrans — 4 façons</h1>
+<p class="intro">Ton poste : <b>1 · MSI G2412F</b> (principal, paysage) et <b>2 · G2490W1G4</b> (à gauche, portrait). L'îlot est sur l'écran 1.
+Tout est cliquable : curseurs, flèches, pastilles, interrupteurs. La colonne de droite de la page Contrôle (250 px) n'est pas dessinée.
+Avec <b>un seul écran réglable</b>, les quatre variantes redeviennent le curseur actuel.</p>
+
+<div class="grid" id="grid"></div>
+
+<template id="tiles">
+  <div class="tiles">
+    <div class="tile on"><span class="ms">wifi</span><div><b>Wi-Fi</b><small>Livebox-8A3C</small></div></div>
+    <div class="tile"><span class="ms">bluetooth</span><div><b>Bluetooth</b><small>Désactivé</small></div></div>
+    <div class="tile"><span class="ms">coffee</span><div><b>Caféine</b><small>Veille normale</small></div></div>
+    <div class="tile"><span class="ms">do_not_disturb_on</span><div><b>Ne pas déranger</b><small>Désactivé</small></div></div>
+    <div class="tile on"><span class="ms">dark_mode</span><div><b>Mode sombre</b><small>Auto (sombre)</small></div></div>
+    <div class="tile"><span class="ms">timer</span><div><b>Minuteur</b><small>Arrêté</small></div></div>
+  </div>
+</template>
+<template id="audio">
+  <div class="card audio">
+    <div class="out"><span class="ms">speaker</span><b>Casque Shure</b><span class="ms">unfold_more</span></div>
+    <div class="mix">
+      <div class="app"><span class="b" style="background:#5865f2">D</span><span class="n">Discord</span><div class="sl" data-v="80"></div></div>
+      <div class="app"><span class="b" style="background:#1db954">S</span><span class="n">Spotify</span><div class="sl" data-v="45"></div></div>
+      <div class="app"><span class="b" style="background:#e8710a">C</span><span class="n">Chrome</span><div class="sl" data-v="62"></div></div>
+      <div class="app"><span class="b" style="background:#0e7cc2">R</span><span class="n">Rocket League</span><div class="sl" data-v="70"></div></div>
+      <div class="app"><span class="b" style="background:#6c6c6c">W</span><span class="n">Sons système</span><div class="sl" data-v="30"></div></div>
+    </div>
+  </div>
+</template>
+
+<script>
+const SCREENS=[
+  {id:1,name:"MSI G2412F",sub:"Principal · îlot ici",here:true,v:72},
+  {id:2,name:"G2490W1G4",sub:"À gauche · portrait",here:false,v:55},
+];
+const VARIANTS=[
+ {k:"A",title:"Dépliable",tag:"recommandée",
+  desc:"Le curseur reste là où il est et règle l'écran de l'îlot. La flèche à droite déplie un curseur par écran et l'option « Lier ». Le mélangeur perd un peu de hauteur tant que c'est ouvert.",
+  cons:"− Le mélangeur rétrécit quand c'est déplié (il retrouve sa place en repliant)."},
+ {k:"B",title:"Feuille",
+  desc:"Même geste que Wi-Fi, Bluetooth ou Sortie audio : le chevron ouvre une feuille « Luminosité » avec le plan des écrans tel que Windows les dispose. On clique un écran sur le plan, ou on règle sa ligne.",
+  cons:"− Un clic de plus pour régler l'autre écran ; + le plan évite de confondre les écrans."},
+ {k:"C",title:"Pastilles",
+  desc:"Hauteur inchangée : des pastilles 1 · 2 · « tous » choisissent ce que le curseur règle. Le choix est retenu.",
+  cons:"− On ne voit qu'une valeur à la fois ; « tous » cache l'écart entre les écrans."},
+ {k:"D",title:"Deux demi-curseurs",
+  desc:"Les deux écrans côte à côte dans la même pilule, sans clic en plus. Le numéro à gauche de chaque curseur dit lequel est lequel.",
+  cons:"− Curseurs courts (moins précis) ; à 3 écrans, il faut revenir à une autre variante."},
+];
+
+function slider(el,v,on){
+  el.innerHTML='<div class="tr"><div class="fi"></div></div><div class="th"><i></i></div>';
+  el._v=v;el._on=on||(()=>{});
+  const set=(x,emit)=>{x=Math.max(0,Math.min(100,Math.round(x)));el._v=x;
+    el.querySelector('.fi').style.width=x+'%';el.querySelector('.th').style.left=`calc(${x/100}*(100% - 4px) + 2px)`;if(emit)el._on(x)};
+  el.set=set;set(v,false);
+  el.addEventListener('pointerdown',e=>{el.setPointerCapture(e.pointerId);const r=el.getBoundingClientRect();
+    const mv=ev=>set((ev.clientX-r.left)/r.width*100,true);mv(e);
+    const up=()=>{el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up)};
+    el.addEventListener('pointermove',mv);el.addEventListener('pointerup',up)});
+  return el;
+}
+function sw(el,on,cb){el.innerHTML='<i></i>';el.classList.toggle('on',on);el.onclick=()=>{el.classList.toggle('on');cb&&cb(el.classList.contains('on'))};return el}
+
+function build(V){
+  const st={v:SCREENS.map(s=>s.v),link:false,target:0,open:false,sheet:false};
+  const opt=document.createElement('div');opt.className='opt '+V.k;
+  opt.innerHTML=`<h2>${V.k} · ${V.title}${V.tag?` <span class="tag">${V.tag}</span>`:''}</h2><p>${V.desc}</p>
+    <div class="island"><div class="page"></div></div><p class="cons">${V.cons}</p>`;
+  const page=opt.querySelector('.page');
+  page.append(document.getElementById('tiles').content.cloneNode(true));
+  const b=document.createElement('div');b.className='card bright';page.append(b);
+  page.append(document.getElementById('audio').content.cloneNode(true));
+  page.querySelectorAll('.app .sl').forEach(s=>slider(s,+s.dataset.v));
+  const sliders=[];          // tous les curseurs d'ecran, pour les synchroniser
+  const reg=(el,i,lab)=>{sliders.push({el,i,lab});return el};
+  const setScreen=(i,x,from)=>{
+    if(st.link){const d=x-st.v[i];st.v=st.v.map(v=>Math.max(0,Math.min(100,v+d)))}else st.v[i]=x;
+    sliders.forEach(s=>{const val=s.i==='all'?Math.round(st.v.reduce((a,c)=>a+c)/st.v.length):st.v[s.i];
+      if(s.el!==from)s.el.set(val,false);if(s.lab)s.lab.textContent=val;});
+    page.querySelectorAll('.glow').forEach((g,k)=>g.style.opacity=st.v[k]/100*.22);
+  };
+  const scrRow=(s,i)=>{const r=document.createElement('div');r.className='scr';
+    r.innerHTML=`<span class="badge ${s.here?'here':''}">${s.id}</span><div class="nm"><b>${s.name}</b><small>${s.sub}</small></div><div class="sl"></div><span class="v">${st.v[i]}</span>`;
+    const lab=r.querySelector('.v');reg(slider(r.querySelector('.sl'),st.v[i],x=>setScreen(i,x,r.querySelector('.sl'))),i,lab);return r};
+  const linkRow=()=>{const r=document.createElement('div');r.className='link';
+    r.innerHTML='<span class="ms">link</span><span>Lier les écrans (garde l\'écart)</span><div class="sw"></div>';
+    sw(r.querySelector('.sw'),st.link,on=>st.link=on);return r};
+
+  if(V.k==='A'){
+    b.innerHTML=`<div class="row"><span class="ms">brightness_6</span><div class="sl"></div><span class="v"></span><div class="more" title="Un curseur par écran"><span class="ms">expand_more</span></div></div><div class="exp"></div>`;
+    const sl=b.querySelector('.row .sl'),lab=b.querySelector('.row .v');lab.textContent=st.v[0];
+    reg(slider(sl,st.v[0],x=>setScreen(0,x,sl)),0,lab);
+    const exp=b.querySelector('.exp');SCREENS.forEach((s,i)=>exp.append(scrRow(s,i)));exp.append(linkRow());
+    b.querySelector('.more').onclick=()=>b.classList.toggle('open');
+  }
+  if(V.k==='B'){
+    b.innerHTML=`<span class="ms">brightness_6</span><div class="sl"></div><span class="v"></span><div class="more" title="Luminosité par écran"><span class="ms">chevron_right</span></div>`;
+    const sl=b.querySelector('.sl'),lab=b.querySelector('.v');lab.textContent=st.v[0];
+    reg(slider(sl,st.v[0],x=>setScreen(0,x,sl)),0,lab);
+    const sh=document.createElement('div');sh.className='sheet';
+    sh.innerHTML=`<div class="shead"><div class="ib back"><span class="ms">arrow_back</span></div><b>Luminosité</b><div class="ib" title="Paramètres d'affichage de Windows"><span class="ms">settings</span></div></div>
+      <div class="layout">
+        <div class="mon" data-i="1" style="left:calc(50% - 132px);top:12px;width:62px;height:108px"><div class="glow"></div><b>2</b><small>${st.v[1]} %</small></div>
+        <div class="mon sel" data-i="0" style="left:calc(50% - 62px);top:34px;width:150px;height:84px"><div class="glow"></div><span class="ms pin">location_on</span><b>1</b><small>${st.v[0]} %</small></div>
+      </div><div class="slist"></div>
+      <div class="note">Écran sans DDC/CI : grisé avec « Activer DDC/CI dans le menu de l'écran ».</div>`;
+    page.append(sh);
+    const list=sh.querySelector('.slist');
+    const rows=SCREENS.map((s,i)=>{const r=scrRow(s,i);list.append(r);return r});list.append(linkRow());
+    const mons=[...sh.querySelectorAll('.mon')];
+    const pick=i=>{mons.forEach(m=>m.classList.toggle('sel',+m.dataset.i===i));rows.forEach((r,k)=>r.classList.toggle('sel',k===i))};
+    mons.forEach(m=>m.onclick=()=>pick(+m.dataset.i));pick(0);
+    // les pourcentages du plan suivent les curseurs
+    mons.forEach(m=>sliders.push({i:+m.dataset.i,el:{set(){}} ,lab:m.querySelector('small'),pct:true}));
+    const old=setScreen;
+    b.querySelector('.more').onclick=()=>sh.classList.add('on');
+    sh.querySelector('.back').onclick=()=>sh.classList.remove('on');
+  }
+  if(V.k==='C'){
+    b.innerHTML=`<div class="chips"><div class="chip on" data-t="0">1<span class="tip">MSI G2412F (îlot ici)</span></div><div class="chip" data-t="1">2<span class="tip">G2490W1G4</span></div><div class="chip" data-t="all"><span class="ms">select_all</span><span class="tip">Tous (garde l'écart)</span></div></div><div class="sl"></div><span class="v" style="margin-right:18px"></span>`;
+    const sl=b.querySelector('.sl'),lab=b.querySelector('.v');lab.textContent=st.v[0];
+    const entry={el:slider(sl,st.v[0],x=>{if(entry.i==='all'){const avg=st.v.reduce((a,c)=>a+c)/st.v.length;st.link=true;setScreen(0,st.v[0]+(x-avg),sl);st.link=false}else setScreen(entry.i,x,sl)}),i:0,lab};
+    sliders.push(entry);
+    b.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{b.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');
+      entry.i=c.dataset.t==='all'?'all':+c.dataset.t;const val=entry.i==='all'?Math.round(st.v.reduce((a,c)=>a+c)/2):st.v[entry.i];sl.set(val,false);lab.textContent=val});
+  }
+  if(V.k==='D'){
+    b.innerHTML='';
+    SCREENS.forEach((s,i)=>{
+      if(i)b.insertAdjacentHTML('beforeend','<div class="sep"></div>');
+      const h=document.createElement('div');h.className='half';
+      h.innerHTML=`<span class="badge ${s.here?'here':''}">${s.id}<span class="tip">${s.name}</span></span><div class="sl"></div><span class="v" style="width:24px;text-align:right;color:var(--inkVar);font-size:12px;font-variant-numeric:tabular-nums">${st.v[i]}</span>`;
+      const sl=h.querySelector('.sl');reg(slider(sl,st.v[i],x=>setScreen(i,x,sl)),i,h.querySelector('.v'));b.append(h);
+    });
+  }
+  // pourcentages du plan (B) : texte "NN %"
+  const _set=setScreen;
+  sliders.filter(s=>s.pct).forEach(s=>{const lab=s.lab;s.lab={set textContent(v){lab.textContent=v+' %'}}});
+  setScreen(0,st.v[0],null);
+  return opt;
+}
+VARIANTS.forEach(V=>document.getElementById('grid').append(build(V)));
+</script>
+</body>
+</html>

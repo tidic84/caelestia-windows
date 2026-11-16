@@ -81,7 +81,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 │                 = IAudioPolicyConfigFactory non documentée), OSD volume, visualiseur
 ├── boost.rs      Volume > 100 % via Equalizer APO
 ├── system.rs     Ressources, batterie, historique presse-papiers, caféine, profil, actions de session
-├── display.rs    Luminosité (WMI, DDC/CI) + OSD
+├── display.rs    Luminosité (WMI, DDC/CI) par écran (`brightness_list`) + OSD
 ├── net.rs        Wi-Fi, Bluetooth, réseau
 ├── bt.rs         Sélecteur Bluetooth : appairés, recherche (DeviceWatcher), appairage,
 │                 connexion des casques (IKsControl KSPROPSETID_BtAudio), oubli

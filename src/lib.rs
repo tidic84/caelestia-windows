@@ -313,7 +313,8 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
         "boost_set" => json(boost::boost_set(a!("gain"))),
         // ecran, reseau
         "brightness_get" => json(display::brightness_get(w.clone())),
-        "brightness_set" => json(display::brightness_set(w.clone(), a!("level"))),
+        "brightness_set" => json(display::brightness_set(w.clone(), a!("level"), a!("screen"))),
+        "brightness_list" => json(display::brightness_list(w.clone())),
         "net_get" => json(net::net_get()),
         "radios_get" => json(net::radios_get()),
         "radio_set" => json(net::radio_set(a!("kind"), a!("on"))),
