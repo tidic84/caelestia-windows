@@ -4,6 +4,10 @@ Une section `## <version> — <date>` par version, la plus récente en haut.
 Ce fichier est embarqué dans l'îlot (Réglages › Mises à jour) et sert de
 description à chaque version publiée sur GitHub.
 
+## 0.4.30 — 2026-11-16
+
+- **Addon « Claude » avec Claude Desktop du Microsoft Store** : l'îlot trouve maintenant la connexion de Desktop installé depuis le Store, qui range ses données ailleurs. Si la connexion de Claude Code est limitée (« trop de demandes ») ou expirée, l'îlot essaie celle de Desktop avant d'abandonner. Une connexion expirée laisse affichée la dernière valeur connue.
+
 ## 0.4.29 — 2026-11-15
 
 - **Le traducteur remarche** : Google bloquait les demandes de l'îlot (« trop de demandes »). La traduction passe maintenant par DeepL, plus précis. Google sert encore pour les langues que DeepL ne connaît pas (hindi), ou si DeepL est indisponible. Les sous-titres en direct traduisent la dernière ligne, toutes les 2 s au plus, pour ménager le quota.

@@ -38,6 +38,20 @@ reprendre.
 
 ## Journal
 
+### 2026-11-16 : PR n°6 (jeton Desktop du Store), release 0.4.30
+
+- **PR n°6** (mrcouscous49-ui), `src/claude.rs` : `desktop()` cherche aussi
+  `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude` et
+  `%LOCALAPPDATA%\Claude-Data\*` (Desktop du Store). `tokens()` renvoie tous
+  les jetons valables, et `usage_fetch()` les essaie l'un après l'autre (un 429
+  ou un 401 passe au suivant). `Fail::Auth` affiche la dernière valeur connue.
+- Vérifié : fusion en avance rapide, `qtuild.cmd`, `cargo test`, clippy.
+  Un test temporaire a trouvé le jeton de Desktop (`%APPDATA%`) et le relevé
+  a répondu 200. Relu : on peut merger, avec des remarques mineures
+  (`BACKLOG.md`). Le chemin `Claude-Data` n'existe pas sur ce poste : il a été
+  vérifié par le collaborateur.
+- 0.4.30 publiée.
+
 ### 2026-11-15 : addon « Claude » avec Claude Desktop seul
 
 Problème : l'addon ne lisait que `~/.claude/.credentials.json` (Claude Code

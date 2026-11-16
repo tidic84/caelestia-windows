@@ -258,6 +258,11 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   interne à Desktop et n'est pas documenté. S'il change (clés sans `acct:`,
   autre chiffrement), l'addon affiche « Ni Claude Code ni Claude Desktop… ».
   Sans `lastKnownAccountUuid`, il accepte tous les comptes en cache.
+- 🟢 Addon Claude (PR n°6) :
+  - une connexion expirée s'affiche en gris comme une valeur ancienne, avec
+    deux « : » à la suite. Piste : `why: "auth"` et texte en `Theme.error` ;
+  - un jeton en 429 est redemandé à chaque relevé tant que l'autre répond ;
+  - un 403 ou un 5xx n'essaie pas le jeton suivant.
 - 🟡 Traducteur DeepL : la clé intégrée sert à tous les utilisateurs et
   s'extrait du zip de release, pour un quota de 500 000 caractères par mois en tout.
   Les sous-titres en consomment environ 150 000 à 270 000 par heure de parole,
