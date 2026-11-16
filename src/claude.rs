@@ -267,10 +267,39 @@ fn cli(files: impl Iterator<Item = PathBuf>, now: u64, seen: &mut bool) -> Optio
 /// Chaque entree est « acct:<compte>|<client>:...:https://api.anthropic.com:<scopes> » ;
 /// l'API d'utilisation veut le scope user:profile (les autres : 403).
 /// Lecture seule : Desktop rafraichit lui-meme ses jetons.
+/// Selon la version, le dossier est %APPDATA%\Claude, celui du paquet MSIX
+/// (%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude) ou
+/// %LOCALAPPDATA%\Claude-Data\<paquet> (les deux premiers ne gardent alors
+/// qu'un fichier .user-data-left).
 fn desktop(now: u64, seen: &mut bool) -> Option<(u64, String, String)> {
+    let mut dirs = Vec::new();
+    if let Ok(a) = std::env::var("APPDATA") {
+        dirs.push(PathBuf::from(a).join("Claude"));
+    }
+    if let Ok(l) = std::env::var("LOCALAPPDATA") {
+        let l = PathBuf::from(l);
+        let sub = |d: PathBuf, pre: &str| -> Vec<PathBuf> {
+            std::fs::read_dir(d).into_iter().flatten().flatten().map(|e| e.path())
+                .filter(|p| p.is_dir() && p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.to_ascii_lowercase().starts_with(pre)))
+                .collect()
+        };
+        dirs.extend(sub(l.join("Packages"), "claude_").into_iter().map(|p| p.join("LocalCache").join("Roaming").join("Claude")));
+        dirs.extend(sub(l.join("Claude-Data"), ""));
+    }
+    let mut best: Option<(u64, String, String)> = None;
+    for d in dirs {
+        if let Some(b) = desktop_in(&d, now, seen) {
+            if best.as_ref().is_none_or(|x| b.0 > x.0) {
+                best = Some(b);
+            }
+        }
+    }
+    best
+}
+
+fn desktop_in(dir: &Path, now: u64, seen: &mut bool) -> Option<(u64, String, String)> {
     use aes_gcm::aead::{Aead, KeyInit};
     use base64::{engine::general_purpose::STANDARD, Engine};
-    let dir = PathBuf::from(std::env::var("APPDATA").ok()?).join("Claude");
     let read = |f: &str| -> Option<Value> {
         serde_json::from_str(std::fs::read_to_string(dir.join(f)).ok()?.trim_start_matches('\u{feff}')).ok()
     };
@@ -302,35 +331,56 @@ fn desktop(now: u64, seen: &mut bool) -> Option<(u64, String, String)> {
     best
 }
 
-/// Jeton OAuth encore valable : Claude Code sous Windows, sinon Claude
-/// Desktop, sinon Claude Code dans les WSL demarres (wsl.exe a lancer).
-/// On ne le rafraichit jamais (le jeton de rafraichissement changerait et
-/// Claude serait deconnecte) : relancer Claude Code ou Desktop suffit.
-fn token() -> Result<(String, String), String> {
+/// Jetons OAuth encore valables, dans l'ordre d'essai : Claude Code sous
+/// Windows, Claude Desktop, sinon Claude Code dans les WSL demarres (wsl.exe
+/// a lancer). Plusieurs : si l'API refuse l'un (429, 401), on essaie le
+/// suivant. On ne les rafraichit jamais (le jeton de rafraichissement
+/// changerait et Claude serait deconnecte) : relancer Claude Code ou Desktop suffit.
+fn tokens() -> Result<Vec<(String, String)>, String> {
     let now = now_ms();
     let mut seen = false;
     let win = windows().map(|t| t.path.with_file_name(".credentials.json")).ok();
-    let best = cli(win.into_iter(), now, &mut seen)
-        .or_else(|| desktop(now, &mut seen))
-        .or_else(|| cli(wsl(true).into_iter().map(|t| t.path.with_file_name(".credentials.json")), now, &mut seen));
-    match best {
-        Some((_, tok, plan)) => Ok((tok, plan)),
-        None if seen => Err(EXPIRED.into()),
-        None => Err("Ni Claude Code ni Claude Desktop ne sont connectés à un abonnement Claude".into()),
+    let mut all: Vec<(String, String)> = [cli(win.into_iter(), now, &mut seen), desktop(now, &mut seen)]
+        .into_iter().flatten().map(|(_, t, p)| (t, p)).collect();
+    all.dedup_by(|a, b| a.0 == b.0);
+    if all.is_empty() {
+        all.extend(cli(wsl(true).into_iter().map(|t| t.path.with_file_name(".credentials.json")), now, &mut seen).map(|(_, t, p)| (t, p)));
+    }
+    match all.is_empty() {
+        false => Ok(all),
+        true if seen => Err(EXPIRED.into()),
+        true => Err("Ni Claude Code ni Claude Desktop ne sont connectés à un abonnement Claude".into()),
     }
 }
 
 /// Releve rate. `Busy` (429, avec l'attente du Retry-After en s) et `Net`
-/// laissent afficher la derniere valeur connue ; `Auth` (pas connecte,
-/// connexion expiree) reste une erreur.
+/// laissent afficher la derniere valeur connue, comme `Auth` (pas connecte,
+/// connexion expiree) quand une valeur est connue.
 enum Fail {
     Auth(String),
     Busy(Option<u64>),
     Net(String),
 }
 
+/// Essaie chaque jeton : le premier qui repond l'emporte ; tous refuses :
+/// « trop de demandes » si l'un l'a dit, sinon la derniere erreur
 fn usage_fetch() -> Result<Value, Fail> {
-    let (tok, plan) = token().map_err(Fail::Auth)?;
+    let mut fail = None;
+    for (tok, plan) in tokens().map_err(Fail::Auth)? {
+        match usage_with(&tok, &plan) {
+            Ok(v) => return Ok(v),
+            Err(Fail::Net(e)) => return Err(Fail::Net(e)),
+            Err(f) => {
+                if !matches!(fail, Some(Fail::Busy(_))) {
+                    fail = Some(f);
+                }
+            }
+        }
+    }
+    Err(fail.unwrap_or_else(|| Fail::Auth(EXPIRED.into())))
+}
+
+fn usage_with(tok: &str, plan: &str) -> Result<Value, Fail> {
     let r = crate::http()
         .get("https://api.anthropic.com/api/oauth/usage")
         .set("Authorization", &format!("Bearer {tok}"))
@@ -490,7 +540,8 @@ pub fn usage(fresh: Option<bool>) -> Result<Value, String> {
                 crate::store::write(LAST, &last);
                 Ok(v)
             }
-            Err(Fail::Auth(e)) => Err(e),
+            // connexion expiree (Claude Code ferme depuis plus de 8 h) : derniere valeur connue
+            Err(Fail::Auth(e)) => stale(json!({ "why": "net", "msg": e.clone() }), e),
             Err(Fail::Busy(after)) => {
                 let backoff = wait.map_or(300, |(_, b)| (b * 2).min(3600));
                 // Retry-After borne (1 min - 1 jour) : jamais de debordement d'Instant
