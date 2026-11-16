@@ -114,6 +114,13 @@ Ne pas commiter `dist\`, le zip, le `.sig` ni `notes.md`.
 - **Tests de `tasks.rs`** : ne jamais passer à `task_kill` tous les membres
   d'un groupe, qui peut contenir des processus du poste. Ne viser que les pid
   lancés par le test.
+- **`Instant::now() - Duration` interdit** : `Instant` part de l'allumage du
+  PC, et la tâche planifiée lance l'appli ~20 s après. Utiliser
+  `checked_sub(...).unwrap_or(now)`. Une panique dans `ilot_start` avorte
+  (0xC0000409) : minidumps dans `%LOCALAPPDATA%\CrashDumps`, lisibles avec
+  `lldb -c <dmp>` (LLVM installé).
+- **Activer le démarrage auto depuis `qt\build\ilot.exe`** fait pointer la
+  tâche `Ilot` vers la build de test : le refaire depuis l'appli installée.
 - **Ne pas passer `panic = "abort"`** : `ilot_invoke` rattrape les paniques
   avec `catch_unwind`.
 - **Voir l'îlot ouvert sans souris** : arrêter l'appli installée, lancer

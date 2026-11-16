@@ -205,7 +205,11 @@ impl Default for Qs {
         const ALPHA: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
         let eid: String = conn::random::<4>().iter().map(|b| ALPHA[*b as usize % ALPHA.len()] as char).collect();
         let info = endpoint_info(&cfg.name);
-        let past = Instant::now() - Duration::from_secs(60);
+        // `Instant` part du demarrage du PC sous Windows : la soustraction
+        // panique (et `ilot_start`, extern "C", avorte) si le PC tourne
+        // depuis moins de 60 s, cas du lancement par la tache planifiee
+        let now = Instant::now();
+        let past = now.checked_sub(Duration::from_secs(60)).unwrap_or(now);
         Qs(Arc::new(Mutex::new(Inner {
             cfg,
             eid,

@@ -38,6 +38,34 @@ reprendre.
 
 ## Journal
 
+### 2026-11-16 : luminosité par écran (pastilles 1 · 2 · tous)
+
+- Maquette `docs/dev/maquettes/luminosite.html` (4 variantes) ; choix de
+  l'utilisateur : **C, pastilles** dans la pilule de la page Contrôle.
+- Rust (`display.rs`) : `brightness_list` (EnumDisplayMonitors, nom EDID par
+  `QueryDisplayConfig`, WMI si sortie interne, sinon DDC/CI) ;
+  `brightness_set` prend un `screen` facultatif (absent : comportement
+  d'origine, écran de l'îlot).
+- QML (`CtrlPage.qml`) : avec 2 écrans réglables ou plus, des pastilles
+  choisissent la cible, retenue dans `ui.json` (`brightTarget`). « Tous »
+  ajoute le même écart à chaque écran. Avec 0 ou 1 écran réglable, l'UI est
+  inchangée.
+- Vérifié : clippy, build complet, capture réelle (2 écrans DDC détectés),
+  clic sur la pastille 2 puis sur le curseur → G2490W1G4 passe de 0 à 55,
+  MSI inchangé, choix enregistré ; valeurs d'origine remises.
+- Relecture (agent `relecteur`) : 4 points corrigés. `brightness_list` est
+  lancée après `brightness_get`, car un écran DDC refuse deux requêtes
+  rapprochées. Le curseur est recalé quand on repasse à un seul écran.
+  `QueryDisplayConfig` est relancée sur `ERROR_INSUFFICIENT_BUFFER`. En mode
+  « tous », l'écart est gardé même après une butée (`brightBase`).
+- Build OK après ces corrections, mais **pas revérifié en vrai** : aux
+  essais suivants, l'îlot de test restait fermé à la capture, même sans
+  clic. L'utilisateur était actif sur le PC (vocal en cours) : à refaire
+  quand le poste est libre.
+- Pas testé : le mode « tous » au clic, un portable (WMI + écran externe).
+- Pas de commit, en attente de l'accord de l'utilisateur. CHANGELOG à
+  compléter à la prochaine version.
+
 ### 2026-11-16 : PR n°6 (jeton Desktop du Store), release 0.4.30
 
 - **PR n°6** (mrcouscous49-ui), `src/claude.rs` : `desktop()` cherche aussi
@@ -210,6 +238,38 @@ Non vérifié (à essayer à la main) :
 Vérifié : `qt\build.cmd` compile. Non vérifié en vrai (aucun lancement,
 aucune capture). Relu dans la session, pas par `relecteur`, qui n'est pas
 installé.
+### 2026-11-02 / 03 : compagnon cygne (hors dépôt), plan « pilule masquée »
+
+- **Cygne** : nouveau compagnon, fabriqué hors du dépôt dans `%USERPROFILE%\.ilot\cygne\`.
+  **Tout l'état est dans `~/.ilot/cygne/LISEZMOI.md`.**
+  - Cygne construit en Python dans Blender 5.2, puis peint par script.
+  - Choix de l'utilisateur : style « lac vert » (n° 3), un seul cygne, ni ornements ni
+    nénuphars, animations repos et battement d'ailes, de vraies ailes faites de plumes.
+  - Méthode qu'il exige : agents en parallèle (repli, ailes, peinture), fusion, puis
+    jugement par un agent « directeur artistique », jusqu'à ce qu'il soit satisfait.
+  - Dernière version : `m4`, notée 6,5/10 au repos et 5,5/10 au battement (pas satisfait).
+    Passe 4 arrêtée en cours de route.
+  - Rien d'intégré à l'îlot, rien commité.
+- **Pilule masquée par raccourci** (demande de l'utilisateur : « je parle de la pilule
+  seulement », Ctrl+Alt+B, état mémorisé après redémarrage). Plan proposé, **en attente de
+  son accord**, détaillé dans `BACKLOG.md`. Rien n'est codé.
+- Changements trouvés au début de la session, non commités, et laissés tels quels :
+  `CLAUDE.md`, `ETAT.md`, `src/quickshare/mod.rs`.
+
+### 2026-11-01 : l'îlot ne démarrait plus avec le PC (0.4.25)
+
+- Cause : `Qs::default()` (`src/quickshare/mod.rs`) faisait
+  `Instant::now() - Duration::from_secs(60)`. Sous Windows, `Instant` part
+  de l'allumage : lancée par la tâche planifiée ~20-30 s après le boot,
+  l'appli paniquait dans `ilot_start` (extern "C") → abort 0xC0000409.
+  Avec l'ancienne clé `Run` (2-3 min de retard), le bug ne se voyait pas.
+- Trouvé par les minidumps `%LOCALAPPDATA%\CrashDumps\ilot.exe.*.dmp`
+  (lldb + `llvm-objdump` : message et `Location` passés à l'appel de panique).
+- Correctif : `checked_sub(...).unwrap_or(now)`. Compilé, `cargo test` OK,
+  relu ; le message de panique n'est plus dans la DLL. **Non testé par un
+  vrai redémarrage.**
+- La tâche `Ilot` du poste pointait vers `qt\build\ilot.exe` (option
+  réactivée depuis une build de test) : remise sur l'appli installée.
 
 ### 2026-10-30 (soir) : pack Zekrom livré avec l'appli
 

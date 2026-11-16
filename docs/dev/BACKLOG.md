@@ -22,6 +22,27 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   - Une appli désinstallée laisse son entrée dans `folders.names`/`keys`
     (sans effet).
 
+- 🟢 **Pilule masquée par raccourci (demandé le 2026-11-02, plan en attente de l'accord
+  de l'utilisateur)**. Ctrl+Alt+B masque ou réaffiche **la pilule seulement** ; la barre
+  ne change pas. L'état est mémorisé dans `Ilot.ui.pillHidden` (`ui.json`). But : ne pas
+  gêner la navigation dans le navigateur. Repérage fait par un agent :
+  - `Island.qml:36-42` : réutiliser l'animation de sortie du plein écran avec
+    `Ilot.fullscreen || Ilot.pillHidden`. Le chemin C++ (`WinCtl::setHidden`) ne se
+    réutilise pas, car il cache aussi la barre.
+  - `Main.qml:166-187` `updateHit()` : ne pas pousser `hoverZone` ni l'îlot quand
+    `pillHidden && mode !== "open"`, pour que les clics passent. Faire de même dans
+    `updateBackdrop`. Ajouter `onPillHiddenChanged` aux `Connections` de la l.210.
+  - `Ilot.qml:545` `showActivity` et `Watch.notify` (l.21) : aucune activité tant que la
+    pilule est masquée.
+  - `Watch.qml:1144` : action `pill_hide`, avec un OSD de confirmation.
+  - `SettingsPage.qml:1067` `keyActions` : ajouter l'action.
+  - `src/prefs.rs` : ajouter `pill_hide` à l'exclusion de `fire` (l.139), pour ne pas voler
+    le focus. Poser Ctrl+Alt+KeyB par défaut sans écraser les raccourcis existants
+    (aujourd'hui, il n'existe aucun défaut ; prévoir un marqueur « défauts posés »).
+  - Les ouvertures explicites (touche Windows, `toggle`, Ctrl+Alt+Espace) ouvrent quand
+    même le panneau.
+  - Question ouverte : faut-il aussi masquer le compagnon qui se promène ?
+
 - 🟢 **Réglages refaits (2026-10-29) : à confirmer par l'utilisateur**
   - Tant qu'un brouillon existe, les raccourcis d'onglets, Win+V et le
     dépôt de fichiers rouvrent Réglages (barre qui tremble) au lieu de leur
