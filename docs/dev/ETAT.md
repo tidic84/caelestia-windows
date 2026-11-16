@@ -63,8 +63,10 @@ reprendre.
   clic. L'utilisateur était actif sur le PC (vocal en cours) : à refaire
   quand le poste est libre.
 - Pas testé : le mode « tous » au clic, un portable (WMI + écran externe).
-- Pas de commit, en attente de l'accord de l'utilisateur. CHANGELOG à
-  compléter à la prochaine version.
+- Commité et poussé sur la 0.4.30 (rebase de 17 commits), installé sur le
+  poste par `install.ps1`. **Pas publié** : la clé `release.key` n'est pas
+  sur ce PC (c'est Tidic qui publie). CHANGELOG à compléter avec la
+  prochaine version.
 
 ### 2026-11-16 : PR n°6 (jeton Desktop du Store), release 0.4.30
 
