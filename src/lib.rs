@@ -5,6 +5,7 @@
 //! la fonction passee a `ilot_start`.
 
 mod activity;
+mod akira;
 mod apps;
 mod audio;
 mod bar;
@@ -275,6 +276,11 @@ fn call(w: &WebviewWindow, cmd: &str, a: &Value) -> Result<Value, String> {
             }
             json(())
         }
+        // addon Akira (assistante vocale AkiraVoice)
+        "akira_status" => json(akira::akira_status(app)),
+        "akira_send" => json(akira::akira_send(app, a!("cmd"))),
+        "akira_restart" => json(akira::akira_restart(app)),
+        "akira_log" => json(akira::akira_log()),
         // lecteur
         "media_get" => json(media::media_get()),
         "media_art" => json(media::media_art()),
@@ -526,6 +532,7 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
     health::watch(app);
     status::watch(app);
     claude::watch(app);
+    akira::init(app);
     privacy::watch(app);
     update::watch(app);
     quickshare::init(app.state());
@@ -535,6 +542,7 @@ pub extern "C" fn ilot_start(emit: host::EmitFn) {
 #[no_mangle]
 pub extern "C" fn ilot_shutdown() {
     bar::restore(&AppHandle);
+    akira::shutdown(&AppHandle);
 }
 
 /// Appelle une commande. Renvoie `{"ok": <resultat>}` ou `{"err": "..."}`

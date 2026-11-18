@@ -393,6 +393,146 @@ Item {
         ccRefresh()
     }
 
+    // ================================================== Akira
+    // addon Akira (src/akira.rs) : l'ilot lance l'assistante vocale
+    // AkiraVoice, qui envoie son etat (evenement `akira`, voir
+    // AkiraVoice/akira/bridge.py). Pendant une conversation : sphere, etat et
+    // sous-titre dans la pilule ; onglet Akira pour le reste.
+    readonly property bool akOn: Ilot.addonOn("akira")
+    // { running, online, error, dir } (processus, connexion)
+    property var akStatus: ({ running: false, online: false, error: "", dir: "" })
+    readonly property bool akOnline: akOn && !!akStatus.online
+    // veille, ecoute, reflexion, parole
+    property string akState: "veille"
+    readonly property bool akLive: akOnline && akState !== "veille"
+    // sphere a cote de l'heure (Reglages > Addons > Akira)
+    readonly property bool akMini: akOnline && cfg.akira_pill !== false
+    // { backend, model, wake, hotkey, tools, delegation }
+    property var akInfo: null
+    // derniere phrase entendue, reponse en cours (ou derniere)
+    property string akYou: ""
+    property string akAi: ""
+    // outil en cours : { name, at }
+    property var akTool: null
+    // taches Claude lancees par Akira : [{ id, project, instruction, model, status, started, finished }]
+    property var akTasks: []
+    property int akLatency: 0
+    // cout de la conversation en cours, et depuis le lancement d'Akira ($)
+    property real akSession: 0
+    property real akSpent: 0
+    // historique de la conversation : [{ kind: you|ai|tool|sys, text }], 80 au plus
+    property var akLog: []
+    readonly property var akStates: ({
+        veille: { label: "En veille", short: "Veille" },
+        ecoute: { label: "Écoute", short: "Écoute" },
+        reflexion: { label: "Réflexion", short: "Réflexion" },
+        parole: { label: "Parole", short: "Akira" }
+    })
+    // noms des outils d'Akira (AkiraVoice/akira/tools)
+    readonly property var akTools: ({
+        etat_projets_claude: { label: "État des projets Claude", icon: "terminal" },
+        lancer_tache_claude: { label: "Lancer une tâche Claude", icon: "terminal" },
+        reprendre_session_claude: { label: "Répondre à une session Claude", icon: "terminal" },
+        taches_claude: { label: "Tâches Claude", icon: "terminal" },
+        ouvrir_page_web: { label: "Ouvrir une page", icon: "search" },
+        navigateur: { label: "Navigateur", icon: "search" },
+        ouvrir_fichier: { label: "Ouvrir un fichier", icon: "description" },
+        lister_dossier: { label: "Lister un dossier", icon: "folder_open" },
+        ouvrir_application: { label: "Ouvrir une application", icon: "apps" },
+        regler_volume: { label: "Volume", icon: "volume_up" },
+        controle_media: { label: "Lecture", icon: "play_arrow" },
+        verrouiller_ecran: { label: "Verrouiller l'ordinateur", icon: "power_settings_new" },
+        chercher_mails: { label: "Mails", icon: "mail" },
+        lire_mail: { label: "Lire un mail", icon: "mail" },
+        envoyer_mail: { label: "Envoyer un mail", icon: "mail" },
+        chercher_fichiers_drive: { label: "Google Drive", icon: "folder_open" },
+        lire_fichier_drive: { label: "Lire un fichier Drive", icon: "description" },
+        lire_feuille: { label: "Lire une feuille", icon: "description" },
+        modifier_feuille: { label: "Modifier une feuille", icon: "description" },
+        ecrire_document: { label: "Écrire un document", icon: "description" },
+        terminer_conversation: { label: "Fin de la conversation", icon: "check" }
+    })
+    function akToolInfo(name) {
+        return akTools[name] || { label: String(name || "").replace(/_/g, " "), icon: "build" }
+    }
+    // sous-titre de la pilule
+    readonly property string akCaption: akState === "parole" ? (akAi || "…")
+        : akTool ? akToolInfo(akTool.name).label + "…"
+        : akState === "reflexion" ? (akYou || "Je réfléchis…")
+        : (akYou || "Je t'écoute…")
+    readonly property int akRunning: akTasks.filter(t => t.status === "en cours").length
+    function akToggle() {
+        return Api.invoke("akira_send", { cmd: "toggle" })
+    }
+    function akPush(kind, text) {
+        if (!text)
+            return
+        akLog = akLog.concat([{ kind: kind, text: text }]).slice(-80)
+    }
+    function onAkira(e) {
+        if (!e || typeof e.ev !== "string")
+            return
+        switch (e.ev) {
+        case "status":
+            akStatus = e
+            if (!e.online) {
+                akState = "veille"
+                akTool = null
+            }
+            break
+        case "info":
+            akInfo = e
+            break
+        case "state":
+            if (!akStates[e.state])
+                return
+            // nouvelle phrase : l'ancienne ne reste pas affichee
+            if (e.state === "ecoute" && e.speaking)
+                akYou = ""
+            if (e.state === "veille")
+                akTool = null
+            akState = e.state
+            break
+        case "you":
+            akYou = String(e.text || "")
+            akPush("you", akYou)
+            break
+        case "ai":
+            akAi = String(e.text || "")
+            if (e.final)
+                akPush("ai", akAi + (e.cut ? " …" : ""))
+            break
+        case "tool":
+            if (e.phase === "start") {
+                akTool = { name: String(e.name || ""), at: Date.now() }
+                akPush("tool", akToolInfo(e.name).label)
+            } else {
+                akTool = null
+            }
+            break
+        case "tasks":
+            akTasks = Array.isArray(e.list) ? e.list : []
+            break
+        case "latency":
+            akLatency = Number(e.ms) || 0
+            break
+        case "cost":
+            akSession = Number(e.session) || 0
+            break
+        case "spent":
+            akSpent = Number(e.usd) || 0
+            break
+        case "session":
+            if (e.on) {
+                akYou = ""
+                akAi = ""
+            } else {
+                akPush("sys", "Fin de la conversation" + (e.secs ? " · " + Ilot.fmtTime(Number(e.secs)) : ""))
+            }
+            break
+        }
+    }
+
     // ================================================== Valorant
     // src/valorant.rs (evenement `valorant`, null quand le jeu est ferme) :
     // file d'attente, partie trouvee (notification), selection des agents
@@ -1098,6 +1238,8 @@ Item {
         })
         Api.listen("valorant", v => w.onValo(v))
         Api.listen("claude", e => w.onClaude(e))
+        Api.listen("akira", e => w.onAkira(e))
+        Api.invoke("akira_status").then(s => { if (s) w.akStatus = s })
         Api.listen("match-found", name => {
             // Valorant suivi a part (src/valorant.rs)
             if (w.valo && w.cfg.valorant !== false)

@@ -103,7 +103,8 @@ Item {
         id: mini
         anchors.centerIn: parent
         spacing: 10
-        readonly property bool on: pill.collapsed && !pill.actOn
+        // conversation avec Akira : sa couche (akBox) prend la place
+        readonly property bool on: pill.collapsed && !pill.actOn && !Watch.akLive
         // paroles affichees : seulement le disque et la ligne chantee
         readonly property bool lyOnly: Ilot.lyPillW > 0
         opacity: on ? 1 : 0
@@ -342,6 +343,13 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             Behavior on opacity { NumberAnimation { duration: 350 } }
         }
+        // addon Akira : sa sphere, en veille (largeur comptee dans Ilot.sizeFor)
+        AkiraOrb {
+            visible: Watch.akMini && !mini.lyOnly
+            width: 20
+            height: 20
+            anchors.verticalCenter: parent.verticalCenter
+        }
         PillClock {
             visible: !mini.lyOnly
             anchors.verticalCenter: parent.verticalCenter
@@ -487,7 +495,7 @@ Item {
         anchors.fill: parent
         anchors.leftMargin: 10
         anchors.rightMargin: 12
-        opacity: pill.peek ? 1 : 0
+        opacity: pill.peek && !Watch.akLive ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 250 } }
         transform: Translate {
@@ -786,6 +794,121 @@ Item {
                     px: 12
                     weight: Font.Medium
                     color: Theme.tertiary
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------- conversation avec Akira
+    // sphere, etat (Ecoute, Reflexion, Akira) et sous-titre en direct ; clic :
+    // onglet Akira (Ilot.pillClicked). Une activite (volume...) passe devant.
+    Item {
+        id: akBox
+        readonly property bool on: (pill.collapsed || pill.peek) && !pill.actOn && Watch.akLive
+        anchors.fill: parent
+        anchors.leftMargin: 8
+        anchors.rightMargin: 18
+        opacity: on ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity {
+            SequentialAnimation {
+                PauseAnimation { duration: akBox.on ? 120 : 0 }
+                NumberAnimation { duration: 250 }
+            }
+        }
+        // dernier etat garde pendant le fondu de sortie
+        property string mood: "ecoute"
+        readonly property string live: Watch.akState
+        onLiveChanged: if (live !== "veille") mood = live
+
+        AkiraOrb {
+            id: akOrb
+            mood: akBox.mood
+            width: 40
+            height: 40
+            anchors.verticalCenter: parent.verticalCenter
+        }
+        Column {
+            anchors.left: akOrb.right
+            anchors.leftMargin: 10
+            anchors.right: akViz.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+            Row {
+                spacing: 6
+                // point qui clignote (micro), cercle qui tourne (reflexion), point fixe
+                Item {
+                    width: 10
+                    height: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    Rectangle {
+                        id: akDot
+                        visible: akBox.mood !== "reflexion"
+                        anchors.centerIn: parent
+                        width: 7
+                        height: 7
+                        radius: 4
+                        color: akBox.mood === "ecoute" ? Theme.mic : Theme.primary
+                        SequentialAnimation on opacity {
+                            running: akBox.on && akBox.mood === "ecoute" && !Theme.reduced
+                            loops: Animation.Infinite
+                            onRunningChanged: if (!running) akDot.opacity = 1
+                            NumberAnimation { to: 0.35; duration: 600 }
+                            NumberAnimation { to: 1; duration: 600 }
+                        }
+                    }
+                    Spinner {
+                        visible: akBox.mood === "reflexion"
+                        anchors.centerIn: parent
+                        size: 10
+                        stroke: 2
+                    }
+                }
+                Txt {
+                    text: (Watch.akStates[akBox.mood] || {}).short || ""
+                    px: 11
+                    weight: Font.DemiBold
+                    color: Theme.primary
+                    font.capitalization: Font.AllUppercase
+                    font.letterSpacing: 0.9
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+            // la fin du texte reste visible pendant qu'il s'allonge
+            Txt {
+                width: parent.width
+                text: Watch.akCaption
+                px: 13.5
+                elide: Text.ElideLeft
+                maximumLineCount: 1
+            }
+        }
+        // barres qui suivent l'etat (parole : voix ; ecoute : agitation ;
+        // reflexion : vague qui passe), sur l'horloge d'ambiance
+        Row {
+            id: akViz
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 3
+            Repeater {
+                model: 7
+                Rectangle {
+                    required property int index
+                    readonly property real k: {
+                        const t = Ilot.amb / 1000
+                        const m = akBox.mood
+                        if (m === "parole")
+                            return Math.max(0.1, (0.55 + 0.45 * Math.sin(t * 7.3 + index * 0.9) * Math.sin(t * 2.1 + index)))
+                        if (m === "reflexion")
+                            return 0.12 + 0.5 * Math.exp(-Math.pow(((t * 3) % 7) - index, 2) * 0.6)
+                        return 0.12 + 0.3 * Math.abs(Math.sin(t * 4 + index * 1.3))
+                    }
+                    width: 3
+                    height: 4 + 20 * k
+                    radius: 2
+                    color: Theme.primary
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }

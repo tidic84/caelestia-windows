@@ -103,6 +103,8 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ├── soundboard.rs Soundboard vers câble virtuel ├── decode.rs  Décodage audio (symphonia)
 ├── captions.rs   Sous-titres (LiveCaptions via UI Automation)
 ├── claude.rs     Hooks Claude Code dans ~/.claude/settings.json, Windows et WSL (installer, retirer, état) ; limites de l'abonnement (addon Claude)
+├── akira.rs      Addon Akira : lance AkiraVoice (python -m akira, Job tué avec l'îlot, journal akira.log),
+│                 écoute 127.0.0.1 avec jeton, relaie ses lignes JSON (événement `akira`), commandes akira_*
 ├── translate.rs  Traduction : DeepL si la clé est intégrée (build.rs), sinon Google « gtx »
 ├── mail.rs       IMAP (mots de passe DPAPI)    ├── google.rs  OAuth 2 Gmail (PKCE)
 ├── update.rs     Mises à jour GitHub Releases (toutes les 6 h), signature exigée (SIGN_KEY)
@@ -117,7 +119,7 @@ seulement à l'exécution, dans le journal `ILOT_QT_LOG`.
 ```text
 ├── CMakeLists.txt  Module QML "Ilot" (glob qml/*), singletons Theme/Ilot/Api/Watch, shader, polices, compile_commands.json
 ├── build.cmd       cargo build --release → CMake/Ninja (MSVC via vswhere) → windeployqt
-├── ilot.rc, fonts/ (Rubik, Material Symbols), shaders/round.frag (image arrondie en une passe), shaders/claude.frag (animation Claude Code), shaders/vizbars.frag (visualiseur de l'onglet Média), shaders/wave.frag (barre de progression ondulée), shaders/cookie.frag (bouton lecture festonné), shaders/scallop.frag (pochette festonnée), shaders/ring.frag (anneau de spectre)
+├── ilot.rc, fonts/ (Rubik, Material Symbols), shaders/round.frag (image arrondie en une passe), shaders/claude.frag (animation Claude Code), shaders/akira.frag (sphère d'Akira), shaders/vizbars.frag (visualiseur de l'onglet Média), shaders/wave.frag (barre de progression ondulée), shaders/cookie.frag (bouton lecture festonné), shaders/scallop.frag (pochette festonnée), shaders/ring.frag (anneau de spectre)
 └── src/
     ├── main.cpp      Démarrage, instance unique, journal ILOT_QT_LOG
     ├── core.h        Prototypes C du cœur Rust
@@ -140,6 +142,7 @@ Pages         HomePage · MediaPage · CtrlPage (+ Mixer : pastilles de sorties,
               thèmes prêts ; onglet Son : sorties affichées, noms choisis) · SettingsPreview (aperçus animés du brouillon)
 Cartes PC     PcCard · ServicesCard · HealthCard · ShutdownCard · SensCard
 Addon Claude  UsageChart (graphique de ClaudeUsagePage)
+Addon Akira   AkiraPage (onglet « scène ») · AkiraOrb (sphère, shader akira.frag) ; état dans Watch (ak*), couche akBox de Pill
 Compagnon     Pet (10 espèces, expressions, tours) · PetBust (buste d'un pack dans la pilule et l'aperçu)
               PackStage (promenade d'un pack) · SpritePet (lecteur de sprites) · PetFx (effets des attaques)
 Décor         Aurora · WxFx (météo animée) · Glow · Eq · VizBars
@@ -201,3 +204,28 @@ QML, sans code Rust.
   `CtrlPage.shownDevices` (feuille « Sortie audio »). Ils doivent rester
   cohérents avec `SettingsPage.outRows` (même ordre, même numérotation, même
   règle automatique). La soundboard n'est pas filtrée.
+
+**Addon Akira** (Réglages › Addons, `cfg.addons` contient `akira`, dossier
+dans `cfg.akira_dir`). Addon **secret** (`secret: true` dans `Ilot.catalog`) :
+absent de la liste tant qu'on n'a pas tapé « akira » dans la recherche des
+Réglages (`Ilot.addonShown`, `unlockAddon`, `ui.json` → `unlocked`). AkiraVoice est un projet Python à part
+(`C:\Users\tidic\Documents\AkiraVoice`, son module `akira/bridge.py`).
+- **Lancement** (`src/akira.rs`, thread `supervise`, chaque seconde) :
+  `<dossier>\.venv\Scripts\python.exe -m akira`, sans fenêtre, dans un Job
+  « tué à la fermeture ». Sortie dans `%LOCALAPPDATA%\Ilot\akira.log`. Addon
+  coupé ou dossier changé : `{"cmd":"quit"}`, puis le Job est tué au bout de
+  4 s. Arrêt inattendu : nouvel essai après 3 s, ou espacé de 10 s à 5 min
+  s'il plante au démarrage.
+- **Canal** : l'îlot écoute sur `127.0.0.1:<port libre>` et passe
+  `AKIRA_ILOT` et `AKIRA_ILOT_TOKEN` (jeton aléatoire) à Akira. Première ligne
+  `{"hello": jeton}`, sinon la connexion est fermée. Ensuite, des lignes JSON :
+  - Akira → îlot (`{"ev": …}`, émis tels quels, événement `akira`) : `info`,
+    `state` (veille, ecoute, reflexion, parole), `you`, `ai` (`final`, `cut`),
+    `tool` (`phase` start/end), `tasks`, `latency`, `cost`, `spent`, `session` ;
+  - l'îlot ajoute `status` (`running`, `online`, `error`, `dir`) ;
+  - îlot → Akira : `{"cmd":"toggle"}` (bouton micro : réveil ou veille, seule
+    commande permise par `akira_send`), `{"cmd":"quit"}`.
+- **Interface** : `Watch.onAkira` tient l'état (`akState`, `akLive`,
+  `akCaption`, `akLog`…). Pendant une conversation (`akLive`), la pilule
+  repliée ou survolée prend la taille `Ilot.akSize` (couche `akBox`), et
+  l'horloge d'ambiance tourne même sans souris.

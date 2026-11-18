@@ -42,6 +42,7 @@ qt_add_shaders(ilot "shaders"
     PREFIX "/"
     FILES shaders/round.frag shaders/claude.frag shaders/vizbars.frag
           shaders/wave.frag shaders/cookie.frag shaders/scallop.frag shaders/ring.frag
+          shaders/akira.frag
 )
 
 # coeur Rust (cargo build --release a la racine du depot)

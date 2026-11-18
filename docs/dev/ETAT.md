@@ -38,6 +38,105 @@ reprendre.
 
 ## Journal
 
+### 2026-11-18 (fin) : Drive, Docs et Sheets dans Akira
+
+- **AkiraVoice** : `akira/tools/gdocs_tools.py` (`chercher_fichiers_drive`,
+  `lire_fichier_drive`, `lire_feuille`, `modifier_feuille`,
+  `ecrire_document`). `gauth.py` : autorisations par service (`SERVICES`,
+  gardées dans le jeton, outils seulement pour les services accordés),
+  appel commun `requester` (verrou d'au plus 20 s, réponse de 2 Mo au plus,
+  erreurs Google lisibles, « API non activée »). Drive en lecture seule ;
+  écritures Sheets / Docs avec le même jeton et le même oui que les mails,
+  relues en entier (10 lignes ou 1 500 caractères au plus), formules
+  neutralisées, alerte si le fichier est à quelqu'un d'autre, pas de double
+  écriture après un délai dépassé. Libellés dans `Watch.akTools`.
+- **Vérifié** : `pytest` (155 passés, faux Google sans réseau), îlot
+  recompilé, Akira relancée par l'îlot après un arrêt forcé. Relu par
+  l'agent relecteur, ses 9 points corrigés.
+- **Non vérifié** : tout ce qui demande le vrai compte Google (connexion,
+  API à activer dans Google Cloud : Gmail, Drive, Docs, Sheets).
+
+### 2026-11-18 (suite) : addon Akira secret, Gmail dans Akira
+
+- **Addon secret** (comme le compagnon Zekrom) : `secret: true` dans
+  `Ilot.catalog`. Il n'est dans Réglages › Addons (et sa section Akira
+  n'apparaît) qu'une fois débloqué : taper « akira » dans la recherche des
+  Réglages et choisir le résultat (`Ilot.unlockAddon`, `ui.json` →
+  `unlocked`). Un addon secret déjà actif reste affiché ; le couper ne le
+  recache pas.
+- **Gmail dans AkiraVoice** (choix de l'utilisateur : Gmail seulement pour
+  commencer, lecture + envoi avec son oui) : `akira/gauth.py` (OAuth bureau
+  PKCE, jeton DPAPI, `--google-login` / `--google-logout`),
+  `akira/tools/gmail_tools.py` (`chercher_mails`, `lire_mail`,
+  `envoyer_mail`). Libellés des outils dans `Watch.akTools`.
+- **Confirmations** (`registry.Confirmations`) : envoyer un mail, lancer ou
+  reprendre Claude Code demandent un jeton à usage unique, lié à l'action, et
+  une phrase de l'utilisateur entre la question et l'appel confirmé
+  (`SessionStats.user_turns`, compté au début de chaque phrase). Un mail
+  piégé ne peut donc rien envoyer ni lancer.
+- **Vérifié** : `pytest` d'AkiraVoice (144 passés, faux Gmail sans réseau,
+  DPAPI réel), compilation de l'îlot, démarrage sans erreur QML, Akira en
+  ligne (« Gmail pas connecté »). Relu par l'agent relecteur ; corrigé :
+  contournement de la confirmation, `confirme` en texte, double envoi après
+  un délai dépassé, HTML lent, erreurs Google mal traduites, destinataire
+  pris dans les mails reçus, plusieurs destinataires, `state` OAuth,
+  dépendances, addon qui disparaissait une fois coupé.
+- **Non vérifié** : la connexion Google réelle (il faut le client OAuth de
+  l'utilisateur, README d'AkiraVoice, section Gmail) et un vrai mail
+  lu ou envoyé à la voix ; le déblocage par la recherche n'a pas été cliqué
+  (l'addon est déjà actif sur ce poste). L'îlot de test (`qt\build`) tourne
+  à la place de l'installé, réglages d'avant l'essai dans le dossier de
+  travail de la session (`settings.avant-essai.json`), mises à jour passées
+  de « auto » à « prévenir » pour l'essai.
+
+### 2026-11-18 : addon Akira (assistante vocale AkiraVoice), non publié
+
+- **Demande** : intégrer Akira dans l'îlot d'après la maquette
+  `AkiraVoice/mockup/ilot-akira.html`. Choix de l'utilisateur : pilule et
+  onglet « Scène » (sans saisie au clavier pour l'instant), canal TCP local
+  avec jeton, sphère en shader QML, l'îlot lance Akira (addon).
+- **Îlot** :
+  - `src/akira.rs` : lancement et supervision, Job, connexion, commandes
+    `akira_*` (protocole dans `ARCHITECTURE.md`) ; `akira::shutdown` dans
+    `ilot_shutdown` ; feature `Win32_System_JobObjects` ;
+  - `prefs.rs` : l'import d'une sauvegarde ignore `akira_dir` (sinon un
+    fichier reçu ferait lancer un programme) ;
+  - QML : `AkiraOrb` + `shaders/akira.frag`, `AkiraPage`, section Akira de
+    `Watch`, catalogue / tailles / horloge d'ambiance dans `Ilot`, couche
+    `akBox` et sphère à côté de l'heure dans `Pill`, Réglages › Addons ›
+    Akira (dossier, état, relancer, sphère, journal).
+- **AkiraVoice** (`C:\Users\tidic\Documents\AkiraVoice`, pas un dépôt git) :
+  `akira/bridge.py` (nouveau), appels `bridge.emit` dans `app.py`,
+  `monitor.py`, `registry.py`, `manager.py`, `session.py` ;
+  `tests/test_bridge.py` ; section « Dans l'îlot » du README. Lancée à la
+  main (sans les variables de l'îlot), Akira se comporte comme avant.
+- **Vérifié** : `qt\build.cmd` (avec `vcvars64 -vcvars_ver=14.44`), clippy
+  sans avertissement nouveau, `pytest` d'AkiraVoice (131 passés, pont
+  compris). Sphère vue en WebGL : même GLSL, généré depuis `akira.frag`, car
+  le banc `qml.exe` hors écran ne dessine pas les shaders. Relu par l'agent
+  relecteur, corrigé : import de sauvegarde, arrêt propre, lancement
+  suspendu puis Job, attente remise à zéro au changement de dossier, délai
+  d'écriture, état émis sous le verrou, connexions bornées, journal lu par
+  la fin, historique qui suit.
+- **Testé dans le vrai îlot** (`qt\build\ilot.exe`, réglages sauvegardés
+  puis remis ; scripts dans le dossier de travail de la session) :
+  - Akira lancée par l'îlot et en ligne en 6 s environ (`akira.log` :
+    « Lancée par l'îlot ») ; sphère à côté de l'heure ;
+  - onglet Akira : « Gemini Live · Kore », « En veille », consigne de
+    réveil, tâches, coût, micro ;
+  - clic sur le micro : conversation ouverte, « Écoute », bouton « Remettre
+    Akira en veille », pilule en conversation (sphère, « ÉCOUTE », « Je
+    t'écoute… », barres) ; retour en veille après 30 s de silence ;
+  - îlot tué : le Job emporte le lanceur du venv et le vrai Python ;
+    Quitter (bouton du panneau) : « Arrêtée par l'îlot », rien ne reste.
+  - Corrigé après le test : la consigne de veille restait affichée pendant
+    l'écoute.
+- **Non vérifié** : une vraie réponse parlée (sous-titre de la réponse,
+  outil en cours, latence, coût), les tâches Claude, l'historique ouvert,
+  la section Akira des Réglages. Pour ouvrir l'onglet pendant un test :
+  `locked: true // TEMP-TEST` dans `Ilot.qml` (sinon le panneau ouvert par
+  `ILOT_QT_SHOT_TAB` se referme en perdant le focus).
+
 ### 2026-11-16 : PR n°6 (jeton Desktop du Store), release 0.4.30
 
 - **PR n°6** (mrcouscous49-ui), `src/claude.rs` : `desktop()` cherche aussi

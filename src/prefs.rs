@@ -235,7 +235,13 @@ pub fn settings_import(app: AppHandle) -> Result<bool, String> {
     }
     // sauvegarde de l'ancienne interface : pas de reglages generaux
     if v["settings"].is_object() {
-        crate::settings::settings_set(app, v["settings"].clone());
+        let mut s = v["settings"].clone();
+        // dossier d'Akira : l'ilot y lance un programme. Jamais repris d'un
+        // fichier recu ; on le choisit soi-meme (Reglages > Addons)
+        if let Some(o) = s.as_object_mut() {
+            o.remove("akira_dir");
+        }
+        crate::settings::settings_set(app, s);
     }
     Ok(true)
 }

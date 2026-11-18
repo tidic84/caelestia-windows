@@ -243,6 +243,33 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
   `cargo clippy --fix`. La dépendance `imap-proto 0.10.2` sera refusée par
   une future version de Rust.
 
+## Addon Akira (2026-11-18) : restes
+
+- 🟠 Essayé dans le vrai îlot, mais sans réponse parlée ni tâche Claude
+  (voir `ETAT.md`, 2026-11-18).
+- 🟠 Google dans Akira : Gmail, Drive (lecture), Docs, Sheets faits, pas
+  encore essayés avec le vrai compte. Pas faits : Agenda, lecture des PDF,
+  Slides en écriture.
+- 🟢 Confirmations (`registry.Confirmations`) : n'importe quelle phrase de
+  l'utilisateur après le récapitulatif compte, même « non » ou l'écho de la
+  voix d'Akira sans casque. Le modèle doit encore interpréter le oui.
+- 🟢 Clic risqué du navigateur d'Akira (`browser_tools`, `confirme`) : sans
+  jeton ni phrase de l'utilisateur, contrairement aux mails et à Claude Code
+  (`registry.Confirmations`). Une page piégée pourrait cliquer « Acheter ».
+- 🟢 Saisie au clavier (« Écrire à Akira… » de la maquette) : il faut
+  injecter du texte dans la session Gemini Live côté AkiraVoice.
+- 🟢 Un appui sur le micro pendant le son de réveil ou de mise en veille
+  est perdu (`IlotBridge.wait` vide l'évènement, le watchdog remet les
+  déclencheurs à zéro).
+- 🟢 Sphère dans la pilule en veille : horloge d'ambiance à 25 i/s tant
+  qu'on est actif. À mesurer ; sinon la figer en veille (réglage « Sphère
+  dans la pilule » pour la masquer).
+- 🟢 Quitter ou mettre à jour l'îlot arrête Akira, et donc ses tâches Claude
+  Code en cours. Si on veut qu'elles survivent : les sortir du Job
+  (`BREAKAWAY`).
+- 🟢 Sphère : pas réactive au niveau de la voix (seulement à l'état), pas
+  de couleur du thème.
+
 ## Claude Code dans l'îlot (0.4.10) : restes
 
 - 🟢 Son définitif à choisir : seule la « bulle » est codée, dans

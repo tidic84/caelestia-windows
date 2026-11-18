@@ -243,6 +243,10 @@ Item {
                   { key: "assist_claude", label: "Claude", sub: "Questions envoyées à l'application Claude" }] },
         { id: "cusage", icon: "auto_awesome", label: "Claude", page: "ClaudeUsagePage", tip: "Utilisation de Claude",
           desc: "Limites de ton abonnement Claude : session de 5 h et semaine, avec leur remise à zéro (connexion de Claude Code ou de Claude Desktop)" },
+        // secret : cache tant qu'on n'a pas tape « akira » dans la recherche
+        // des Reglages (comme les packs de compagnon)
+        { id: "akira", icon: "psychology", label: "Akira", page: "AkiraPage", tip: "Akira, assistante vocale", secret: true,
+          desc: "Assistante vocale AkiraVoice, lancée par l'îlot : état et sous-titres dans la pilule, conversation et tâches Claude dans l'onglet" },
         // sans onglet (noTab) : seulement l'accueil et la pilule (periph.rs)
         { id: "batt", icon: "battery_full", label: "Batteries", noTab: true,
           desc: "Batterie de la souris et du casque sans fil (Logitech, EPOS H3PRO), relue chaque minute",
@@ -252,7 +256,21 @@ Item {
           desc: "Vos fonds d'écran et ceux de Wallpaper Engine ; choisir un fond recalcule les couleurs" },
         { id: "settings", icon: "settings", label: "", tip: "Réglages", page: "SettingsPage", core: true }
     ]
-    readonly property var addons: catalog.filter(t => !t.core)
+    // addons proposes dans Reglages > Addons : un addon secret n'y est
+    // qu'une fois debloque (ui.json), ou s'il est deja active
+    // (chaine intermediaire : la liste ne change pas a chaque reglage enregistre,
+    // sinon les lignes de Reglages > Addons seraient recreees)
+    readonly property string secretShown: catalog.filter(t => t.secret && addonShown(t.id)).map(t => t.id).join(",")
+    readonly property var addons: {
+        const shown = secretShown.split(",")
+        return catalog.filter(t => !t.core && (!t.secret || shown.indexOf(t.id) >= 0))
+    }
+    function addonShown(id) {
+        return !!(ui.unlocked || {})[id] || (cfg.addons || []).indexOf(id) >= 0
+    }
+    function unlockAddon(id) {
+        saveUi({ unlocked: Object.assign({}, ui.unlocked || {}, { [id]: true }) })
+    }
     // onglets affiches : essentiels + addons actives
     readonly property var tabItems: catalog.filter(t => !t.noTab && (t.core || (cfg.addons || []).indexOf(t.id) >= 0))
     readonly property var tabs: tabItems.map(t => t.id)
@@ -271,6 +289,9 @@ Item {
         return p.kind === "mouse" ? "mouse" : p.kind === "headset" ? "headphones" : "bolt"
     }
     function setAddon(id, on) {
+        // addon secret touche : il reste dans la liste, meme coupe
+        if (catalog.some(t => t.id === id && t.secret))
+            unlockAddon(id)
         const list = (cfg.addons || []).filter(a => a !== id)
         if (on)
             list.push(id)
@@ -382,6 +403,9 @@ Item {
             // fichiers glisses : une rangee de zones de depot (FileDrop.qml)
             if (Watch.dropOpen)
                 return { w: 480, h: 84 }
+            // conversation avec Akira : la pilule garde sa forme au survol
+            if (Watch.akLive)
+                return akSize
             // sans musique ni activite : le compagnon se montre a cote de l'heure
             const p = hasMedia ? { w: 460, h: 76 } : Watch.actShown ? { w: 380, h: 60 }
                 : { w: (weather ? 320 : 250) + (Watch.petShown ? 40 : 0), h: 50 }
@@ -392,6 +416,9 @@ Item {
         }
         if (act)
             return act.size
+        // conversation avec Akira : sphere, etat et sous-titre (Pill.qml)
+        if (Watch.akLive)
+            return akSize
         // paroles dans la pilule : seulement le disque (24 + 10 d'espacement)
         // et la ligne chantee, l'heure et les icones sont masquees (Pill.qml)
         if (lyPillW > 0)
@@ -402,7 +429,8 @@ Item {
         if (timerShown)
             w += 70
         // compagnon, activite (telechargement, jeu), Discord, voyant, extinction
-        w += (Watch.petShown ? 24 : 0) + (Watch.actShown ? 72 : 0) + (Watch.dcShown ? 26 : 0)
+        // sphere d'Akira : 20 + 10 d'espacement
+        w += (Watch.petShown ? 24 : 0) + (Watch.actShown ? 72 : 0) + (Watch.dcShown ? 26 : 0) + (Watch.akMini ? 30 : 0)
             + (Watch.privShown ? 18 : 0) + (Watch.offShown ? 62 : 0) + (Watch.ccWide ? (Watch.ccText.length > 4 ? 90 : 80) : 0)
         // addon Batteries : icone + « 59 % » par appareil (Pill.qml)
         if (battPill)
@@ -410,8 +438,9 @@ Item {
         return { w: w, h: 30 }
     }
     // rayon des coins bas
+    readonly property var akSize: ({ w: 460, h: 48 })
     function radiusFor(s) {
-        const r = s === "open" ? 30 : s === "peek" ? (hasMedia ? 26 : 22) : act ? 20 : 15
+        const r = s === "open" ? 30 : Watch.akLive && !act ? 24 : s === "peek" ? (hasMedia ? 26 : 22) : act ? 20 : 15
         // Apparence > Forme de l'ilot (le panneau ouvert garde ses coins)
         if (s === "open")
             return r
@@ -593,6 +622,9 @@ Item {
                 return onClick()
             return open(tab || null)
         }
+        // conversation avec Akira en cours : son onglet
+        if (Watch.akLive && hasTab("akira"))
+            return open("akira")
         open(hasMedia && currentTab === "home" ? "home" : null)
     }
 
@@ -617,17 +649,20 @@ Item {
     readonly property bool ambient: !fullscreen && !Theme.reduced && Watch.idle < 60
     readonly property bool ambientUsed: Watch.petShown || !!cfg.wxfx || cfg.island_bg === "aurora"
         || cfg.border === "rgb" || cfg.border === "pulse" || cfg.clock === "neon" || Watch.ccShown
+        || Watch.akMini || (mode === "open" && currentTab === "akira")
     readonly property int ambStep: 40
     // millisecondes d'ambiance ecoulees
     property real amb: 0
     // la promenade du compagnon (quand on ne fait rien) et le
-    // clignotement « partie trouvee » continuent sans personne
-    readonly property bool ambRunning: (root.ambient && root.ambientUsed) || ((Watch.petWinOn || Watch.matchFlash) && !Theme.reduced && !root.fullscreen)
+    // clignotement « partie trouvee » continuent sans personne, comme une
+    // conversation avec Akira (on parle sans toucher la souris)
+    readonly property bool ambRunning: (root.ambient && root.ambientUsed)
+        || ((Watch.petWinOn || Watch.matchFlash || Watch.akLive) && !Theme.reduced && !root.fullscreen)
     // a la frequence de l'ecran quand ca se voit en grand (compagnon en
     // promenade, aurore ou contour anime de l'ilot ouvert) ; sinon
     // 25 images/s (pilule repliee, repos)
     readonly property bool ambSmooth: Watch.petWinOn
-        || (mode === "open" && (cfg.island_bg === "aurora" || cfg.border === "rgb" || cfg.border === "pulse"))
+        || (mode === "open" && (cfg.island_bg === "aurora" || cfg.border === "rgb" || cfg.border === "pulse" || currentTab === "akira"))
     property Timer ambClock: Timer {
         interval: root.ambStep
         repeat: true

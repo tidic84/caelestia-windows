@@ -543,7 +543,10 @@ Item {
         // 5e case = id du pack
         const packs = Watch.petPacks.filter(p => p.name && fold(p.name) === fold(query))
                                     .map(p => [p.name, "pet", "", "", p.id])
-        return packs.concat(searchIndex.filter(e => {
+        // addon secret : seulement sur son nom exact ; 6e case = id de l'addon
+        const secrets = Ilot.catalog.filter(t => t.secret && fold(t.label) === fold(query))
+                                    .map(t => [t.label, "addons", "", "", "", t.id])
+        return packs.concat(secrets, searchIndex.filter(e => {
             const t = fold(e[0] + " " + e[2])
             return words.every(w => t.indexOf(w) >= 0)
         })).slice(0, 10)
@@ -677,7 +680,10 @@ Item {
                     onClicked: {
                         if (modelData[4])
                             page.unlockPacks()
-                        else
+                        else if (modelData[5]) {
+                            Ilot.unlockAddon(modelData[5])
+                            Ilot.settingsSection = "addons"
+                        } else
                             Ilot.settingsSection = modelData[1]
                         navSearch.text = ""
                     }
@@ -695,6 +701,7 @@ Item {
                         Txt {
                             width: parent.width
                             text: hit.modelData[4] ? (page.petPacksUnlocked ? "Compagnon" : "Compagnon secret · l'ajouter")
+                                : hit.modelData[5] ? (Ilot.addonShown(hit.modelData[5]) ? "Addons" : "Addon secret · le débloquer")
                                 : (hit.sec ? hit.sec.label : "") + (hit.modelData[3] ? " · avant : " + hit.modelData[3] : "")
                             px: 11
                             color: Theme.inkVariant
@@ -1143,6 +1150,8 @@ Item {
         keyRec = ""
         Watch.saveKeys(map)
     }
+    // Reglages > Addons > Akira : fin du journal affichee (vide : masque)
+    property string akLog: ""
     property string keyRec: ""
     // pendant l'enregistrement, le coeur prend les combinaisons avec la touche
     // Windows (sinon Windows les garde pour lui) et les renvoie (`keyrec`)
@@ -3243,6 +3252,8 @@ Item {
                             onClicked: {
                                 if (Ilot.hasTab("sounds"))
                                     Ilot.setAddon("sounds", false)
+                                // un addon secret affiche ne disparait pas en le coupant
+                                Ilot.addons.filter(a => a.secret).forEach(a => Ilot.unlockAddon(a.id))
                                 Ilot.setCfg({ addons: [] })
                             }
                         }
@@ -3345,6 +3356,90 @@ Item {
                             text: page.ccHooks ? "Retirer" : "Installer"
                             onClicked: page.ccHooksSet(!page.ccHooks)
                         }
+                    }
+
+                    // addon Akira (src/akira.rs) : l'ilot lance AkiraVoice ;
+                    // addon secret, rien ne s'affiche avant son deblocage
+                    Column {
+                    width: parent.width
+                    visible: Ilot.addonShown("akira")
+                    SubTitle { text: "Akira" }
+                    SetRow {
+                        subRow: true
+                        title: "Dossier d'AkiraVoice"
+                        sub: page.cfg.akira_dir || "Pas choisi : l'îlot ne lance pas Akira. Il faut le dossier qui contient « akira » et « .venv »"
+                        key: "akira_dir"
+                        TextBtn {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            icon: "folder_open"
+                            text: "Choisir"
+                            onClicked: Api.invoke("pick_folder", { title: "Dossier d'AkiraVoice" }).then(p => { if (p) page.set({ akira_dir: p }) })
+                        }
+                    }
+                    SetRow {
+                        subRow: true
+                        title: "État"
+                        sub: !Ilot.addonOn("akira") ? "Addon désactivé : Akira n'est pas lancée"
+                            : Watch.akOnline ? "En ligne" + (Watch.akInfo && Watch.akInfo.model ? " · " + Watch.akInfo.model : "")
+                            : Watch.akStatus.error || (Watch.akStatus.running ? "Démarrage…" : "Arrêtée")
+                        TextBtn {
+                            visible: Ilot.addonOn("akira") && !!Watch.akStatus.dir
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            icon: "restart_alt"
+                            text: "Relancer"
+                            onClicked: Api.invoke("akira_restart")
+                        }
+                    }
+                    SetRow {
+                        subRow: true
+                        title: "Sphère dans la pilule"
+                        sub: "À côté de l'heure, quand Akira est en veille"
+                        toggle: true
+                        checked: page.cfg.akira_pill !== false
+                        key: "akira_pill"
+                        onToggled: on => page.set({ akira_pill: on })
+                    }
+                    SetRow {
+                        subRow: true
+                        title: "Journal d'Akira"
+                        sub: "Ce qu'Akira écrit dans sa console (akira.log), pour comprendre un arrêt"
+                        TextBtn {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            icon: page.akLog !== "" ? "close" : "description"
+                            text: page.akLog !== "" ? "Masquer" : "Afficher"
+                            onClicked: {
+                                if (page.akLog !== "")
+                                    page.akLog = ""
+                                else
+                                    Api.invoke("akira_log").then(t => { page.akLog = t || "(vide)" })
+                            }
+                        }
+                    }
+                    Rectangle {
+                        visible: page.akLog !== ""
+                        x: 54
+                        width: parent.width - 54
+                        height: visible ? logTxt.implicitHeight + 20 : 0
+                        radius: 12
+                        color: Theme.surfaceHigh
+                        TextEdit {
+                            id: logTxt
+                            x: 10
+                            y: 10
+                            width: parent.width - 20
+                            readOnly: true
+                            selectByMouse: true
+                            wrapMode: TextEdit.WrapAnywhere
+                            text: page.akLog
+                            font.family: "Consolas"
+                            font.pointSize: 8
+                            color: Theme.inkVariant
+                            selectionColor: Theme.primary
+                        }
+                    }
                     }
                 }
         }
