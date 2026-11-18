@@ -288,7 +288,17 @@ void WinCtl::checkFullscreen()
         m_peek = false;
         m_peekOut = 0;
     }
-    setHidden(hide && !m_peek);
+    setHidden((hide && !m_peek) || m_userHidden);
+}
+
+void WinCtl::setUserHidden(bool on)
+{
+    if (on == m_userHidden)
+        return;
+    m_userHidden = on;
+    // apres la liaison QML en cours (fullscreenChanged y relancerait du QML)
+    QTimer::singleShot(0, this, &WinCtl::checkFullscreen);
+    Q_EMIT userHiddenChanged();
 }
 
 void WinCtl::setHidden(bool fs)
@@ -337,5 +347,5 @@ void WinCtl::pollPeek()
         return;
     m_peek = in;
     m_peekOut = 0;
-    setHidden(!in);
+    setHidden(!in || m_userHidden);
 }

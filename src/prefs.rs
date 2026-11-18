@@ -101,7 +101,7 @@ fn start(app: AppHandle) {
                 actions.clear();
                 let mut failed = Vec::new();
                 let mut win = Vec::new();
-                let map: HashMap<String, String> = crate::store::read("shortcuts").unwrap_or_default();
+                let map = shortcuts_get();
                 for (action, combo) in map {
                     if combo.is_empty() {
                         continue;
@@ -136,7 +136,7 @@ pub(crate) fn fire(app: &AppHandle, action: String) {
         return crate::apps::app_launch(id.to_string());
     }
     // la lecture se commande sans prendre le clavier du jeu ou de l'appli en cours
-    if !matches!(action.as_str(), "play" | "next" | "captions") {
+    if !matches!(action.as_str(), "play" | "next" | "captions" | "hide") {
         if let Some(w) = app.get_webview_window("island") {
             let _ = w.set_focus();
         }
@@ -162,16 +162,25 @@ pub fn shortcuts_set(map: HashMap<String, String>) -> Vec<String> {
     reload()
 }
 
+/// Raccourci par defaut de « Masquer / afficher l'ilot » : Ctrl+Alt+H n'est
+/// pris ni par Windows ni par AltGr+H sur les claviers francais. Une valeur
+/// vide (effacee dans les reglages) le desactive.
+const HIDE_DEFAULT: &str = "Ctrl+Alt+KeyH";
+
 pub fn shortcuts_get() -> HashMap<String, String> {
-    crate::store::read("shortcuts").unwrap_or_default()
+    let mut map: HashMap<String, String> = crate::store::read("shortcuts").unwrap_or_default();
+    // deja pris par une autre action : pas de defaut (un seul des deux marcherait)
+    if !map.contains_key("hide") {
+        let taken = map.values().any(|c| c == HIDE_DEFAULT);
+        map.insert("hide".into(), if taken { String::new() } else { HIDE_DEFAULT.into() });
+    }
+    map
 }
 
 /// Au demarrage : raccourcis enregistres.
 pub fn init(app: &AppHandle) {
     start(*app);
-    if !shortcuts_get().is_empty() {
-        reload();
-    }
+    reload();
 }
 
 // ----------------------------------------------------------- sauvegarde

@@ -38,6 +38,9 @@ class WinCtl : public QObject
     Q_PROPERTY(QStringList fsApps READ fsApps WRITE setFsApps NOTIFY fsAppsChanged)
     // executable de la derniere appli vue en plein ecran
     Q_PROPERTY(QString fsExe READ fsExe NOTIFY fsExeChanged)
+    // masquee a la demande (raccourci « Masquer / afficher l'ilot »), comme
+    // devant un jeu en plein ecran
+    Q_PROPERTY(bool userHidden READ userHidden WRITE setUserHidden NOTIFY userHiddenChanged)
 
 public:
     explicit WinCtl(QObject *parent = nullptr);
@@ -57,6 +60,8 @@ public:
     QStringList fsApps() const { return m_fsApps; }
     void setFsApps(const QStringList &l);
     QString fsExe() const { return m_fsExe; }
+    bool userHidden() const { return m_userHidden; }
+    void setUserHidden(bool on);
 
     // zones {x, y, w, h} en pixels logiques de la fenetre
     Q_INVOKABLE void setHit(const QVariantList &rects);
@@ -81,6 +86,7 @@ Q_SIGNALS:
     void fsModeChanged();
     void fsAppsChanged();
     void fsExeChanged();
+    void userHiddenChanged();
 
 private:
     void checkFullscreen();
@@ -106,6 +112,7 @@ private:
     QString m_fgExe;
     // mode "auto" : la fenetre serait masquee, mais la souris l'a rappelee
     bool m_hideWanted = false;
+    bool m_userHidden = false;
     bool m_peek = false;
     int m_peekOut = 0;
     QRegion m_mask;

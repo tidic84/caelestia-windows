@@ -1065,7 +1065,7 @@ Item {
     }
     // actions, puis un raccourci par onglet affiche (essentiels + addons actives)
     readonly property var keyActions: [
-        ["toggle", "Ouvrir / fermer l’îlot"], ["play", "Lecture / pause"], ["next", "Morceau suivant"], ["captions", "Sous-titres en direct"]
+        ["toggle", "Ouvrir / fermer l’îlot"], ["hide", "Masquer / afficher l’îlot"], ["play", "Lecture / pause"], ["next", "Morceau suivant"], ["captions", "Sous-titres en direct"]
     ].concat(Ilot.tabItems.map(t => [t.id, t.label || t.tip]))
     // raccourcis d'applications : action « app:<id> » -> [action, nom, icone]
     readonly property var appKeys: Object.keys(Watch.keyMap).filter(k => k.startsWith("app:")).map(k => {
@@ -1135,7 +1135,7 @@ Item {
         const map = Object.assign({}, Watch.keyMap)
         for (const k in map)
             if (map[k] === combo && k !== action)
-                map[k] = k.startsWith("app:") ? "" : undefined
+                map[k] = (k.startsWith("app:") || k === "hide") ? "" : undefined
         for (const k in map)
             if (map[k] === undefined)
                 delete map[k]
@@ -3958,8 +3958,9 @@ Item {
                 }
                 const map = Object.assign({}, Watch.keyMap)
                 if (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete) {
-                    // une appli garde sa ligne (croix pour la retirer)
-                    if (kr.isApp)
+                    // une appli garde sa ligne (croix pour la retirer) ; « hide »
+                    // a un raccourci par defaut, qu'une ligne absente remettrait
+                    if (kr.isApp || kr.action === "hide")
                         map[kr.action] = ""
                     else
                         delete map[kr.action]

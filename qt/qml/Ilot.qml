@@ -209,6 +209,9 @@ Item {
     // l'ilot reste affiche ou non (barre, notifications, compagnon)
     property bool fullscreen: false
     property bool covered: false
+    // masque a la demande (raccourci « Masquer / afficher l'ilot », Ctrl+Alt+H
+    // par defaut), jusqu'au prochain appui ou au redemarrage
+    property bool userHidden: false
     // barre affichee (masquage automatique) et souris dans la bande du haut
     property bool barPeek: false
     property bool atTop: false
@@ -428,6 +431,10 @@ Item {
             return
         if (mode === "open")
             releaseFocus()
+        // ouvrir l'ilot (raccourci, touche Windows, lanceur, Quick Share...)
+        // le fait reapparaitre s'il etait masque a la main
+        if (s === "open")
+            userHidden = false
         mode = s
         // la souris peut quitter l'ilot sans que Qt le voie (zones
         // cliquables reduites) : l'info-bulle ne doit pas rester
@@ -521,6 +528,10 @@ Item {
         if (fs) {
             setMode("collapsed")
             endActivity()
+        } else if (mode === "open") {
+            // reaffiche ouvert : le clavier, demande pendant que la fenetre
+            // etait encore masquee, n'a pas pu etre pris
+            grabFocus()
         }
         updateViz()
     }

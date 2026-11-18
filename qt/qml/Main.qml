@@ -39,6 +39,7 @@ Window {
         // Reglages > Jeu et absence > Îlot en plein écran
         fsMode: Ilot.cfg.fs_hide || "normal"
         fsApps: Ilot.fsApps
+        userHidden: Ilot.userHidden
         onTopHoverChanged: Ilot.setAtTop(topHover)
         onFullscreenChanged: Ilot.setFullscreen(fullscreen)
         onCoveredChanged: Ilot.covered = covered

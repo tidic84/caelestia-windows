@@ -13,6 +13,13 @@ Légende : 🔴 bug réel · 🟠 risque ou perte de performance · 🟢 propret
 
 ## Qt / QML (`qt/`)
 
+- 🟢 **Masquer l'îlot (Ctrl+Alt+H, 2026-11-18) : restes**
+  - Seule la fenêtre de l'îlot se cache : sans masquage auto, la bande de la
+    barre reste réservée ; les barres des autres écrans restent affichées.
+  - Les notifications reçues pendant le masquage attendent (5 au plus) et
+    s'affichent au retour. Le compagnon ne voit pas l'îlot masqué
+    (`covered` reste faux).
+
 - 🟢 **Renommer les applis (2026-11-04) : à essayer à la main**
   - Pas testé dans l'îlot ouvert (feuille, F2, ligne « via … »).
   - La ligne « via … » n'existe que sur les tuiles d'applis, pas sur les

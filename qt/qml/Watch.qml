@@ -1150,6 +1150,12 @@ Item {
                 return Api.invoke("media_action", { action: "next" })
             if (a === "captions")
                 return w.toggleCaptions()
+            if (a === "hide") {
+                if (!Ilot.userHidden)
+                    Ilot.setMode("collapsed")
+                Ilot.userHidden = !Ilot.userHidden
+                return
+            }
             if (a === "toggle") {
                 if (Ilot.mode === "open")
                     return Ilot.close()

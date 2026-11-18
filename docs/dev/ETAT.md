@@ -38,6 +38,21 @@ reprendre.
 
 ## Journal
 
+### 2026-11-18 : raccourci « Masquer / afficher l'îlot » (Ctrl+Alt+H)
+
+- Nouvelle action `hide` dans Réglages › Raccourcis, défaut `Ctrl+Alt+KeyH`
+  (`prefs.rs` `shortcuts_get` : ajouté si la clé est absente et la
+  combinaison libre ; `""` = désactivé). Rien de Windows dessus, AltGr+H ne
+  tape rien en AZERTY.
+- `WinCtl.userHidden` (`winctl.cpp`) : masque la fenêtre par le même chemin
+  que le plein écran (`setHidden`, donc `Ilot.fullscreen`). Pas sauvegardé :
+  un redémarrage le réaffiche. `Ilot.setMode("open")` remet
+  `userHidden = false` (touche Windows, lanceur, Quick Share...).
+- Vérifié : `qtuild.cmd`, `cargo test` (37 ok), qmllint ; relu par
+  `relecteur` (3 bugs corrigés) ; installé par `install.ps1` et essayé par
+  l'utilisateur : tout marche.
+- CHANGELOG à compléter avec la prochaine version (Tidic publie).
+
 ### 2026-11-16 : luminosité par écran (pastilles 1 · 2 · tous)
 
 - Maquette `docs/dev/maquettes/luminosite.html` (4 variantes) ; choix de
